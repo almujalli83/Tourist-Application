@@ -1,19 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { getUserById } from "../repo";
+import { ensureSecrets, secretFor } from "../secrets";
 import { toPublicUser, type PublicUser } from "./types";
 
 export const SESSION_COOKIE = "ta_session";
 const MAX_AGE_S = 60 * 60 * 24 * 7;
 
-function secret(): string {
-  const s = process.env.SESSION_SECRET;
-  if (!s && process.env.NODE_ENV === "production") throw new Error("SESSION_SECRET is required in production");
-  return s || "dev-only-session-secret";
-}
-
 function sign(payload: string): string {
-  return createHmac("sha256", secret()).update(payload).digest("base64url");
+  return createHmac("sha256", secretFor("session")).update(payload).digest("base64url");
 }
 
 export function createSessionToken(userId: string): string {
@@ -37,6 +32,7 @@ export function verifySessionToken(token: string | undefined): string | null {
 }
 
 export async function setSessionCookie(userId: string) {
+  await ensureSecrets();
   (await cookies()).set(SESSION_COOKIE, createSessionToken(userId), {
     httpOnly: true,
     sameSite: "lax",
@@ -51,6 +47,7 @@ export async function clearSessionCookie() {
 }
 
 export async function currentUser(): Promise<PublicUser | null> {
+  await ensureSecrets();
   const uid = verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value);
   if (!uid) return null;
   const user = await getUserById(uid);
