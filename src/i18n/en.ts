@@ -232,6 +232,7 @@ const en: Dictionary = {
       mobileNo: "Mobile number",
       mobileHint: "Choose the country code, then enter the number without the leading 0",
       countryCode: "Country code",
+      searchCountry: "Search country or code",
       mobileLength: "Digits: {n} (without the leading 0)",
       zipCode: "Postal code",
       sponsor: "Sponsor (adult traveller in this package)",

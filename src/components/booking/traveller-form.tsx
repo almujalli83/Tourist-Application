@@ -165,7 +165,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
       <Section title={t.travellers.sections.contact} icon={<UserIcon className="size-5" />}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {text("email", { required: true, dir: "ltr", type: "email", hint: tf.emailHint, max: 50 })}
-          <Field label={tf.mobileNo} required error={e("mobileNo")} hint={`${tf.mobileHint} · ${phoneHint(tr.mobileNo, tr.nationality, tf.mobileLength)}`} htmlFor={`t${index}-mobileNo`}>
+          <Field label={tf.mobileNo} required error={e("mobileNo")} hint={phoneHint(tr.mobileNo, tr.nationality, tf.mobileLength)} htmlFor={`t${index}-mobileNo`}>
             <PhoneInput id={`t${index}-mobileNo`} value={tr.mobileNo} defaultCountry={tr.nationality} onChange={(v) => onChange({ mobileNo: v })} invalid={!!e("mobileNo")} />
           </Field>
           {text("zipCode", { dir: "ltr", max: 15 })}

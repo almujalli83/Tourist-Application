@@ -59,7 +59,8 @@ function ProfileForm() {
           <Badge tone={isCo ? "gold" : "brand"}>{isCo ? "B2B" : "B2C"}</Badge>
         </div>
         <p className="mt-2 text-sm text-slate-500">{isCo ? t.account.b2bNote : t.account.b2cNote}</p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        {/* The profile sits in a narrow side panel: one field per row keeps every input readable. */}
+        <div className="mt-5 grid gap-4">
           <Field label={a.email}><Input value={user.email} disabled dir="ltr" /></Field>
           {isCo ? (
             <>
