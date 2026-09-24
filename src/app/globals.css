@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-950: #032920;
+  --color-brand-900: #05372b;
+  --color-brand-800: #084637;
+  --color-brand-700: #0b5a47;
+  --color-brand-600: #0f6b55;
+  --color-brand-500: #16806a;
+  --color-brand-400: #3a9a84;
+  --color-brand-100: #d6ebe4;
+  --color-brand-50: #eef6f3;
+
+  --color-gold-700: #8a6a2c;
+  --color-gold-600: #a47f37;
+  --color-gold-500: #b8913f;
+  --color-gold-100: #f3e9d2;
+  --color-gold-50: #fbf7ee;
+
+  --color-ink: #0f1b2d;
+  --color-surface: #f6f7f5;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numbers, codes and dates stay left-to-right inside RTL text. */
+.ltr-nums {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+input[type="date"] {
+  min-height: 2.75rem;
+}
+
+.pattern-bg {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgb(255 255 255 / 0.06) 0 2px, transparent 3px),
+    radial-gradient(circle at 70% 60%, rgb(255 255 255 / 0.05) 0 2px, transparent 3px);
+  background-size: 36px 36px, 48px 48px;
+}
+
+@media print {
+  header, footer, .no-print { display: none !important; }
+}

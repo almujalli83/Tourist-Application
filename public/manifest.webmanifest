@@ -1,0 +1,9 @@
+{
+  "name": "تطبيق السائح — Tourist App",
+  "short_name": "تطبيق السائح",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7f5",
+  "theme_color": "#05372b",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
