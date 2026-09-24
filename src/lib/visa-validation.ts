@@ -63,10 +63,13 @@ export function validateTraveller(t: Traveller, index: number, all: Traveller[],
   name(e, "middleNameEn", t.middleNameEn, false, false);
   name(e, "grandFatherNameEn", t.grandFatherNameEn, false, false);
   name(e, "familyNameEn", t.familyNameEn, true, false);
-  name(e, "firstNameAr", t.firstNameAr, arab, true);
-  name(e, "middleNameAr", t.middleNameAr, false, true);
-  name(e, "grandFatherNameAr", t.grandFatherNameAr, false, true);
-  name(e, "familyNameAr", t.familyNameAr, arab, true);
+  // Arabic names apply to nationals of Arab countries only (the fields are hidden otherwise).
+  if (arab) {
+    name(e, "firstNameAr", t.firstNameAr, true, true);
+    name(e, "middleNameAr", t.middleNameAr, false, true);
+    name(e, "grandFatherNameAr", t.grandFatherNameAr, false, true);
+    name(e, "familyNameAr", t.familyNameAr, true, true);
+  }
 
   // Birth date and consistency with the flight passenger type
   if (!isValidISODate(t.birthDate)) e.birthDate = "required";

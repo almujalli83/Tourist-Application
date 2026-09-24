@@ -53,7 +53,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
     );
   }
 
-  function applyMrz({ mrz: r, issueDate }: PassportScan) {
+  function applyMrz({ mrz: r, issueDate, arabicName }: PassportScan) {
     const patch: Partial<Traveller> = {};
     const clip = (s: string) => s.slice(0, 15);
     if (r.familyName) patch.familyNameEn = clip(r.familyName);
@@ -70,6 +70,12 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
       if (!tr.birthplace || tr.birthplace === tr.nationality) patch.birthplace = r.nationality;
     }
     if (issueDate && !tr.passportIssueDate) patch.passportIssueDate = issueDate;
+    if (arabicName) {
+      // Fill only empty fields so manual corrections are never overwritten.
+      for (const k of ["firstNameAr", "middleNameAr", "grandFatherNameAr", "familyNameAr"] as const) {
+        if (arabicName[k] && !tr[k]) patch[k] = arabicName[k];
+      }
+    }
     if (/^[A-Z]{2}$/.test(r.issuingCountry)) patch.passportIssuePlace = r.issuingCountry;
     onChange(patch);
   }
@@ -97,10 +103,14 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
           {text("middleNameEn", { dir: "ltr", upper: true, max: 15 })}
           {text("grandFatherNameEn", { dir: "ltr", upper: true, max: 15 })}
           {text("familyNameEn", { required: true, dir: "ltr", upper: true, max: 15 })}
-          {text("firstNameAr", { required: arab, dir: "rtl", max: 15 })}
-          {text("middleNameAr", { dir: "rtl", max: 15 })}
-          {text("grandFatherNameAr", { dir: "rtl", max: 15 })}
-          {text("familyNameAr", { required: arab, dir: "rtl", max: 15 })}
+          {arab && (
+            <>
+              {text("firstNameAr", { required: true, dir: "rtl", max: 15 })}
+              {text("middleNameAr", { dir: "rtl", max: 15 })}
+              {text("grandFatherNameAr", { dir: "rtl", max: 15 })}
+              {text("familyNameAr", { required: true, dir: "rtl", max: 15 })}
+            </>
+          )}
         </div>
         {arab && <p className="mt-2 text-xs text-gold-700">{t.travellers.arabicRequired}</p>}
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

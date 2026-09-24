@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { parseMrzText, type MrzResult } from "@/lib/mrz";
+import { extractArabicName, reconcileArabicName, splitArabicName, type ArabicNameParts } from "@/lib/arabic-name";
+import { isArabCountry } from "@/lib/data/countries";
 import { guessIssueDate } from "@/lib/passport-visual";
 import { useApp } from "../app-provider";
 import { CameraIcon, PassportIcon } from "../icons";
@@ -17,6 +19,8 @@ export interface PassportScan {
   mrz: MrzResult;
   /** Issue date read from the printed (visual) zone, when unambiguous. */
   issueDate: string | null;
+  /** Arabic name parts read from the printed zone (Arab passports only). */
+  arabicName: ArabicNameParts | null;
 }
 
 async function ocrMrz(img: HTMLImageElement): Promise<PassportScan | null> {
@@ -82,7 +86,28 @@ async function ocrMrz(img: HTMLImageElement): Promise<PassportScan | null> {
         console.warn("visual zone OCR failed", err);
       }
     }
-    return { mrz: best, issueDate };
+    // Arab passports print the Arabic name in the visual zone; the MRZ only has the Latin one.
+    let arabicName: ArabicNameParts | null = null;
+    if (isArabCountry(best.nationality)) {
+      try {
+        await worker.reinitialize("ara");
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO });
+        // Several renderings of the page, reconciled and verified against the MRZ name.
+        const readings: ArabicNameParts[] = [];
+        for (const [portion, binarize] of [[1, false], [1, true], [0.8, false]] as const) {
+          const { data } = await worker.recognize(mrzCanvas(bestSrc, portion, binarize));
+          const full = extractArabicName(data.text);
+          const parts = full ? splitArabicName(full) : null;
+          if (parts) readings.push(parts);
+          if (debug) console.debug("[ocr] arabic", JSON.stringify({ portion, binarize, text: data.text, parts }));
+        }
+        arabicName = reconcileArabicName(readings, best);
+        if (debug) console.debug("[ocr] arabic result", JSON.stringify(arabicName));
+      } catch (err) {
+        console.warn("Arabic name OCR failed", err);
+      }
+    }
+    return { mrz: best, issueDate, arabicName };
   } finally {
     await worker.terminate();
   }
