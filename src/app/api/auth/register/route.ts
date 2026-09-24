@@ -5,6 +5,7 @@ import { toPublicUser, type CompanyProfile, type IndividualProfile } from "@/lib
 import { cleanCompany, cleanIndividual, EMAIL_RE } from "@/lib/auth/validation";
 import { createUser } from "@/lib/repo";
 import { body, error, json } from "@/lib/http";
+import { validatePhone } from "@/lib/phone";
 
 interface RegisterBody {
   email: string;
@@ -22,6 +23,8 @@ export async function POST(req: Request) {
   if (!EMAIL_RE.test(email)) return error("email");
   if ((b.password ?? "").length < 8) return error("weakPassword");
   if (b.accountType !== "individual" && b.accountType !== "company") return error("required");
+  const phone = b.accountType === "company" ? b.company?.phone : b.individual?.phone;
+  if (validatePhone(phone?.trim() ?? "")) return error("phone");
   const individual = b.accountType === "individual" ? cleanIndividual(b.individual) : null;
   const company = b.accountType === "company" ? cleanCompany(b.company) : null;
   if (!individual && !company) return error("required");

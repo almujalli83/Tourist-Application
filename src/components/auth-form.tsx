@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PublicUser } from "@/lib/auth/types";
 import { useApp } from "./app-provider";
+import { PhoneInput, phoneHint } from "./phone-input";
 import { CountrySelect } from "./booking/country-select";
 import { BuildingIcon, UserIcon } from "./icons";
 import { Alert, Button, cx, Field, Input } from "./ui";
@@ -83,7 +84,9 @@ export function AuthForm({ initialMode = "login", onSuccess, compact }: {
         {mode === "register" && accountType === "individual" && (
           <>
             <Field label={a.fullName} required><Input value={f.fullName} onChange={set("fullName")} /></Field>
-            <Field label={a.phone} required><Input type="tel" dir="ltr" value={f.phone} onChange={set("phone")} /></Field>
+            <Field label={a.phone} required hint={phoneHint(f.phone, f.nationality || "SA", t.travellers.fields.mobileLength)}>
+              <PhoneInput value={f.phone} defaultCountry={f.nationality || "SA"} onChange={(v) => setF({ ...f, phone: v })} />
+            </Field>
             <Field label={a.nationality}><CountrySelect value={f.nationality} onChange={(v) => setF({ ...f, nationality: v })} /></Field>
           </>
         )}
@@ -94,7 +97,9 @@ export function AuthForm({ initialMode = "login", onSuccess, compact }: {
             <Field label={a.tourismLicenseNo} required><Input dir="ltr" value={f.tourismLicenseNo} onChange={set("tourismLicenseNo")} /></Field>
             <Field label={a.vatNo}><Input dir="ltr" value={f.vatNo} onChange={set("vatNo")} /></Field>
             <Field label={a.contactPerson} required><Input value={f.contactPerson} onChange={set("contactPerson")} /></Field>
-            <Field label={a.phone} required><Input type="tel" dir="ltr" value={f.phone} onChange={set("phone")} /></Field>
+            <Field label={a.phone} required hint={phoneHint(f.phone, "SA", t.travellers.fields.mobileLength)}>
+              <PhoneInput value={f.phone} onChange={(v) => setF({ ...f, phone: v })} />
+            </Field>
             <Field label={a.city}><Input value={f.city} onChange={set("city")} /></Field>
           </>
         )}
