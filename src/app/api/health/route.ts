@@ -1,5 +1,5 @@
 import { AGENTS } from "@/lib/agents/registry";
-import { mtConfig } from "@/lib/config";
+import { mtConfig, VISA_INSURANCE_FEE_SAR } from "@/lib/config";
 import { json } from "@/lib/http";
 import { databaseUrl } from "@/lib/store";
 
@@ -19,6 +19,7 @@ export async function GET() {
       sessionSecret: Boolean(process.env.SESSION_SECRET || process.env.OFFER_SECRET),
       database: Boolean(databaseUrl()),
       mtEvisa: mtConfig().mock ? "sandbox" : "live",
+      visaFeeSAR: VISA_INSURANCE_FEE_SAR,
     },
   });
 }
