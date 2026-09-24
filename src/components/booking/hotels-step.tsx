@@ -55,7 +55,7 @@ function HotelCard({ offer, selected, onSelect, idx }: { offer: HotelOffer; sele
   );
 }
 
-function StaySection({ result }: { result: HotelStayResult }) {
+function StaySection({ result, onRetry }: { result: HotelStayResult; onRetry?: () => void }) {
   const { t, locale } = useApp();
   const { hotels, selectHotel } = useBooking();
   const [sort, setSort] = useState<"price" | "rating">("price");
@@ -88,7 +88,12 @@ function StaySection({ result }: { result: HotelStayResult }) {
           {agents.map((a) => <option key={a.agentId} value={a.agentId}>{locale === "ar" ? a.agentNameAr : a.agentNameEn}</option>)}
         </Select>
       </div>
-      {result.failedAgents.length > 0 && <Alert tone="warning">{fmt(t.flights.failedAgents, { agents: result.failedAgents.join(", ") })}</Alert>}
+      {result.failedAgents.length > 0 && (
+        <Alert tone="warning">
+          {fmt(t.flights.failedAgents, { agents: result.failedAgents.join(", ") })}{" "}
+          {onRetry && <button className="font-semibold underline" onClick={onRetry}>{t.common.retry}</button>}
+        </Alert>
+      )}
       {offers.length === 0 && <p className="text-sm text-slate-500">{t.common.noResults}</p>}
       <div className="grid gap-3">
         {offers.map((o, i) => <HotelCard key={o.id} idx={i} offer={o} selected={hotels[stay.city] === o.id} onSelect={() => selectHotel(stay.city, o.id)} />)}
@@ -116,9 +121,9 @@ export function HotelsStep() {
     <WizardShell step={2} title={t.hotels.title} subtitle={t.hotels.subtitle} sidebarFooter={next}>
       {!flightsDone && booking.hydrated && <Alert tone="warning" className="mb-4">{t.flights.missing}</Alert>}
       {loading && <div className="flex items-center gap-3 rounded-xl bg-white p-6 text-brand-700"><Spinner className="size-6" />{t.flights.searching}</div>}
-      {error && <Alert tone="error">{t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button></Alert>}
+      {error && <Alert tone="error">{(t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button></Alert>}
       <div className="space-y-8">
-        {booking.hotelResults?.map((r) => <StaySection key={r.stay.city} result={r} />)}
+        {booking.hotelResults?.map((r) => <StaySection key={r.stay.city} result={r} onRetry={retry} />)}
       </div>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between lg:hidden">
         <Button variant="secondary" onClick={() => router.push(`/${locale}/package-visa/flights`)}>{t.common.back}</Button>

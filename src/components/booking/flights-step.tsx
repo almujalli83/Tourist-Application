@@ -75,7 +75,7 @@ function FlightCard({ offer, selected, onSelect }: { offer: FlightOffer; selecte
   );
 }
 
-function LegSection({ result }: { result: FlightLegResult }) {
+function LegSection({ result, onRetry }: { result: FlightLegResult; onRetry?: () => void }) {
   const { t, locale } = useApp();
   const { flights, selectFlight } = useBooking();
   const [sort, setSort] = useState<"price" | "duration" | "time">("price");
@@ -113,7 +113,12 @@ function LegSection({ result }: { result: FlightLegResult }) {
           {agents.map((a) => <option key={a.agentId} value={a.agentId}>{locale === "ar" ? a.agentNameAr : a.agentNameEn}</option>)}
         </Select>
       </div>
-      {result.failedAgents.length > 0 && <Alert tone="warning">{fmt(t.flights.failedAgents, { agents: result.failedAgents.join(", ") })}</Alert>}
+      {result.failedAgents.length > 0 && (
+        <Alert tone="warning">
+          {fmt(t.flights.failedAgents, { agents: result.failedAgents.join(", ") })}{" "}
+          {onRetry && <button className="font-semibold underline" onClick={onRetry}>{t.common.retry}</button>}
+        </Alert>
+      )}
       {offers.length === 0 && <p className="text-sm text-slate-500">{t.common.noResults}</p>}
       <div className="grid gap-3 xl:grid-cols-2">
         {offers.map((o) => <FlightCard key={o.id} offer={o} selected={selected === o.id} onSelect={() => selectFlight(leg.index, o.id)} />)}
@@ -147,11 +152,11 @@ export function FlightsStep() {
       )}
       {error && (
         <Alert tone="error">
-          {t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button>
+          {(t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button>
         </Alert>
       )}
       <div className="space-y-8">
-        {booking.flightResults?.map((r) => <LegSection key={r.leg.index} result={r} />)}
+        {booking.flightResults?.map((r) => <LegSection key={r.leg.index} result={r} onRetry={retry} />)}
       </div>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between lg:hidden">
         <Button variant="secondary" onClick={() => router.push(`/${locale}/package-visa`)}>{t.common.back}</Button>

@@ -5,7 +5,31 @@ import { computePackagePrice, type PriceBreakdown } from "@/lib/pricing";
 import type { ActivityOffer, FlightLeg, FlightOffer, HotelOffer, SearchCriteria, Traveller } from "@/lib/types";
 import { emptyTraveller } from "@/lib/visa-validation";
 
-const STORAGE_KEY = "ta_booking_v1";
+const STORAGE_KEY = "ta_booking_v2";
+const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
+/** Search results are re-fetched after this long (agent offers expire after 45 minutes). */
+const RESULTS_MAX_AGE_MS = 30 * 60 * 1000;
+
+interface Persisted {
+  build: string;
+  savedAt: number;
+  state: State;
+}
+
+/**
+ * Restores the saved booking. Search results and selections are kept only if they were saved
+ * by the same app version and are still fresh; otherwise only the trip criteria and the
+ * traveller details are restored and the searches run again.
+ */
+function restore(raw: string | null, now = Date.now()): State | null {
+  if (!raw) return null;
+  const saved = JSON.parse(raw) as Partial<Persisted>;
+  if (!saved.state) return null;
+  const s: State = { ...INITIAL, ...saved.state };
+  const fresh = saved.build === BUILD_ID && typeof saved.savedAt === "number" && now - saved.savedAt < RESULTS_MAX_AGE_MS;
+  if (fresh) return s;
+  return { ...INITIAL, criteria: s.criteria, travellers: s.travellers, disclaimerAccepted: s.disclaimerAccepted };
+}
 
 export interface FlightLegResult { leg: FlightLeg; offers: FlightOffer[]; failedAgents: string[] }
 export interface StayInfo { city: string; checkIn: string; checkOut: string; nights: number }
@@ -70,8 +94,9 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) setState({ ...INITIAL, ...JSON.parse(raw) });
+      sessionStorage.removeItem("ta_booking_v1"); // format used by earlier versions
+      const restored = restore(sessionStorage.getItem(STORAGE_KEY));
+      if (restored) setState(restored);
     } catch {
       /* storage unavailable */
     }
@@ -85,7 +110,8 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
       return;
     }
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(persistable(state)));
+      const saved: Persisted = { build: BUILD_ID, savedAt: Date.now(), state: persistable(state) };
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     } catch {
       /* quota or private mode */
     }

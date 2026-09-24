@@ -5,30 +5,57 @@ import { parseMrzText, type MrzResult } from "@/lib/mrz";
 import { useApp } from "../app-provider";
 import { CameraIcon, PassportIcon } from "../icons";
 import { Alert, Button, cx, Spinner } from "../ui";
-import { mrzCanvas, preparePassportImage, readAsDataURL } from "./image-utils";
+import { estimateSkew, mrzCanvas, preparePassportImage, readAsDataURL, rotated, rotatedBy } from "./image-utils";
 
-type Status = "idle" | "reading" | "success" | "partial" | "failed";
+type Status = "idle" | "reading" | "success" | "partial" | "failed" | "engine";
 
+class OcrEngineError extends Error {}
+
+/** Reads the passport MRZ fully in the browser, trying several crops, thresholds and orientations. */
 async function ocrMrz(img: HTMLImageElement): Promise<MrzResult | null> {
-  const { createWorker, PSM } = await import("tesseract.js");
-  // OCR runs fully in the browser from self-hosted assets (see scripts/copy-ocr-assets.mjs):
-  // the passport image never leaves the device for recognition.
-  const worker = await createWorker("eng", undefined, {
-    workerPath: process.env.NEXT_PUBLIC_TESSERACT_WORKER_PATH || "/tesseract/worker.min.js",
-    corePath: process.env.NEXT_PUBLIC_TESSERACT_CORE_PATH || "/tesseract/core",
-    langPath: process.env.NEXT_PUBLIC_TESSERACT_LANG_PATH || "/tesseract/lang",
-  });
+  let worker: Awaited<ReturnType<typeof import("tesseract.js")["createWorker"]>>;
+  let PSM: typeof import("tesseract.js")["PSM"];
+  try {
+    const t = await import("tesseract.js");
+    PSM = t.PSM;
+    // OCR runs fully in the browser from self-hosted assets (see scripts/copy-ocr-assets.mjs):
+    // the passport image never leaves the device for recognition.
+    worker = await t.createWorker("eng", undefined, {
+      workerPath: process.env.NEXT_PUBLIC_TESSERACT_WORKER_PATH || "/tesseract/worker.min.js",
+      corePath: process.env.NEXT_PUBLIC_TESSERACT_CORE_PATH || "/tesseract/core",
+      langPath: process.env.NEXT_PUBLIC_TESSERACT_LANG_PATH || "/tesseract/lang",
+    });
+  } catch (err) {
+    console.error("OCR engine failed to load", err);
+    throw new OcrEngineError(String(err));
+  }
   try {
     await worker.setParameters({
       tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<",
       tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
     });
     let best: MrzResult | null = null;
-    for (const portion of [0.3, 0.45, 1]) {
-      const { data } = await worker.recognize(mrzCanvas(img, portion));
-      const res = parseMrzText(data.text);
-      if (res && (!best || res.confidence > best.confidence)) best = res;
-      if (best && best.confidence >= 0.75) break;
+    // Diagnostics for support: run localStorage.setItem("ocrDebug", "1") in the browser console.
+    let debug = false;
+    try {
+      debug = localStorage.getItem("ocrDebug") === "1";
+    } catch {
+      /* storage unavailable */
+    }
+    const portrait = img.naturalHeight > img.naturalWidth * 1.15;
+    const orientations = portrait ? [1, 3, 0] : [0, 2];
+    for (const turns of orientations) {
+      const upright = turns ? rotated(img, turns) : img;
+      const skew = estimateSkew(upright);
+      const src = Math.abs(skew) >= 0.5 ? rotatedBy(upright, skew) : upright;
+      for (const [portion, binarize] of [[0.3, true], [0.3, false], [0.45, true], [1, true]] as const) {
+        const { data } = await worker.recognize(mrzCanvas(src, portion, binarize));
+        const res = parseMrzText(data.text);
+        if (debug) console.debug("[ocr]", JSON.stringify({ turns, skew, portion, binarize, text: data.text, valid: res?.valid }));
+        if (res && (!best || res.confidence > best.confidence)) best = res;
+        if (best && best.confidence === 1) return best;
+      }
+      if (best && best.confidence >= 0.75) return best;
     }
     return best;
   } finally {
@@ -63,12 +90,17 @@ export function PassportScanner({ value, onImage, onParsed, error }: {
         onParsed(res);
         setStatus(res.confidence === 1 ? "success" : "partial");
       } else setStatus("failed");
-    } catch {
-      setStatus("failed");
+    } catch (err) {
+      setStatus(err instanceof OcrEngineError ? "engine" : "failed");
     }
   }
 
-  const msg = { success: t.travellers.passportScan.success, partial: t.travellers.passportScan.partial, failed: t.travellers.passportScan.failed }[status as "success"];
+  const msg = {
+    success: t.travellers.passportScan.success,
+    partial: t.travellers.passportScan.partial,
+    failed: t.travellers.passportScan.failed,
+    engine: t.travellers.passportScan.engine,
+  }[status as "success"];
 
   return (
     <div className="flex flex-col gap-3">
@@ -99,7 +131,7 @@ export function PassportScanner({ value, onImage, onParsed, error }: {
           </span>
         )}
       </button>
-      <input ref={input} type="file" accept="image/jpeg,image/png,image/gif" capture="environment" className="hidden" onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/gif" className="hidden" onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
       {value && (
         <Button type="button" size="sm" variant="secondary" onClick={() => input.current?.click()}>
           <CameraIcon className="size-4" />{t.travellers.passportScan.replace}

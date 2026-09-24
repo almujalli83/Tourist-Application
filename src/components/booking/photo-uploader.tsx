@@ -52,7 +52,7 @@ export function PhotoUploader({ value, onChange, error }: { value: string; onCha
           </Button>
         </div>
       </div>
-      <input ref={input} type="file" accept="image/jpeg,image/png" capture="user" className="hidden" onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={input} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
       {(localError || error) && <p className="text-xs font-medium text-red-600">{localError ?? error}</p>}
     </div>
   );

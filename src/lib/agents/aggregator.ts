@@ -28,23 +28,30 @@ export interface AggregateResult<T> {
   failedAgents: string[];
 }
 
-async function fanOut<T>(
+/**
+ * Queries every agent in parallel. Only provider errors mark an agent as failed; the offers
+ * are signed afterwards so a server misconfiguration surfaces as an error, not as "no results".
+ */
+async function fanOut<T extends object>(
   run: (a: TravelAgentProvider) => Promise<T[]>,
 ): Promise<AggregateResult<T>> {
   const settled = await Promise.allSettled(AGENTS.map((a) => withTimeout(run(a))));
-  const offers: T[] = [];
+  const unsigned: T[] = [];
   const failedAgents: string[] = [];
   settled.forEach((s, i) => {
-    if (s.status === "fulfilled") offers.push(...s.value);
-    else failedAgents.push(AGENTS[i].id);
+    if (s.status === "fulfilled") unsigned.push(...s.value);
+    else {
+      failedAgents.push(AGENTS[i].id);
+      console.error(`travel agent ${AGENTS[i].id} failed:`, s.reason);
+    }
   });
-  return { offers, failedAgents };
+  return { offers: unsigned.map(sign), failedAgents };
 }
 
 export async function searchFlights(req: FlightSearchRequest): Promise<AggregateResult<FlightOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchFlights(req)).map(({ ref, ...o }) =>
-      sign<FlightOffer>({ ...o, ...agentRef(a), id: `F:${a.id}:${req.leg.date}:${req.leg.from}${req.leg.to}:${req.cabin}:${ref}`, totalSAR: priceFlightOffer(o.fare, req.pax) }),
+      ({ ...o, ...agentRef(a), id: `F:${a.id}:${req.leg.date}:${req.leg.from}${req.leg.to}:${req.cabin}:${ref}`, totalSAR: priceFlightOffer(o.fare, req.pax) }) as FlightOffer,
     ),
   );
   res.offers.sort((x, y) => x.totalSAR - y.totalSAR);
@@ -54,7 +61,7 @@ export async function searchFlights(req: FlightSearchRequest): Promise<Aggregate
 export async function searchHotels(req: HotelSearchRequest): Promise<AggregateResult<HotelOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchHotels(req)).map(({ ref, ...o }) =>
-      sign<HotelOffer>({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }),
+      ({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }) as HotelOffer,
     ),
   );
   // MT rejects packages with hotels rated below 4 stars (VTP003).
@@ -66,7 +73,7 @@ export async function searchHotels(req: HotelSearchRequest): Promise<AggregateRe
 export async function searchActivities(req: ActivitySearchRequest): Promise<AggregateResult<ActivityOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchActivities(req)).map(({ ref, ...o }) =>
-      sign<ActivityOffer>({ ...o, ...agentRef(a), id: `A:${a.id}:${req.from}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }),
+      ({ ...o, ...agentRef(a), id: `A:${a.id}:${req.from}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }) as ActivityOffer,
     ),
   );
   res.offers.sort((x, y) => x.date.localeCompare(y.date) || x.totalSAR - y.totalSAR);
