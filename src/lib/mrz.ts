@@ -122,7 +122,9 @@ export function parseMrz(line1: string, line2: string, now = new Date()): MrzRes
   if (l1[0] !== "P") return null;
 
   const issuingRaw = alpha(l1.slice(2, 5));
-  const names = alpha(l1.slice(5)).replace(/<+$/, "");
+  let names = alpha(l1.slice(5)).replace(/<+$/, "");
+  // The "<<" between surname and given names is sometimes read as "<K<" (or C/L/E).
+  if (!names.includes("<<")) names = names.replace(/<[KCLE]</, "<<<");
   const [familyRaw, givenRaw = ""] = names.split("<<");
   const familyName = familyRaw.replace(/<+/g, " ").trim();
   const givenNames = givenRaw.split("<").map((s) => s.trim()).filter(Boolean);

@@ -86,3 +86,14 @@ describe("MRZ repair safety", () => {
     expect(r.confidence).toBeLessThan(1);
   });
 });
+
+describe("MRZ name separator misread", () => {
+  it("splits surname and given names when '<<' was read as '<K<'", () => {
+    const l1 = "P<SAUALMUJALLI<K<RASHEED<MOHAMMED<R<<<<<<<<<";
+    const passport = "M640376<<";
+    const tail = `${checkDigit(passport)}SAU8312309M1811261<<<<<<<<<<<<<<0`;
+    const r = parseMrz(l1, `${passport}${tail}6`, new Date("2026-09-24"))!;
+    expect(r.familyName).toBe("ALMUJALLI");
+    expect(r.givenNames).toEqual(["RASHEED", "MOHAMMED", "R"]);
+  });
+});
