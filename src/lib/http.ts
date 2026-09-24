@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ensureSecrets } from "./secrets";
 
 export function json<T>(data: T, status = 200) {
   return NextResponse.json(data, { status, headers: { "cache-control": "no-store" } });
@@ -20,6 +21,7 @@ export async function body<T>(req: Request): Promise<T | null> {
 export function handle<A extends unknown[]>(fn: (...args: A) => Promise<Response>) {
   return async (...args: A): Promise<Response> => {
     try {
+      await ensureSecrets();
       return await fn(...args);
     } catch (err) {
       console.error(err);

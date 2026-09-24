@@ -4,23 +4,13 @@
  * serverless platforms with many instances (e.g. Vercel).
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { secretFor } from "../secrets";
 
 export const OFFER_TTL_MS = 45 * 60 * 1000;
 
 export interface Signed {
   expiresAt?: string;
   sig?: string;
-}
-
-export class ServerConfigError extends Error {
-  name = "ServerConfigError";
-}
-
-function secret(): string {
-  const s = process.env.OFFER_SECRET || process.env.SESSION_SECRET;
-  if (!s && process.env.NODE_ENV === "production")
-    throw new ServerConfigError("SESSION_SECRET environment variable is not set (required in production)");
-  return s || "dev-only-offer-secret";
 }
 
 /** Deterministic JSON (sorted keys) so the signature does not depend on key order. */
@@ -34,7 +24,7 @@ function canonical(v: unknown): string {
 function digest(offer: object): string {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { sig, ...rest } = offer as Signed & Record<string, unknown>;
-  return createHmac("sha256", secret()).update(canonical(rest)).digest("base64url");
+  return createHmac("sha256", secretFor("offers")).update(canonical(rest)).digest("base64url");
 }
 
 export function signOffer<T extends object>(offer: T, now = Date.now()): T & Signed {
