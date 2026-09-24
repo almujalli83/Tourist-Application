@@ -28,7 +28,7 @@ export function ActivitiesStep() {
   return (
     <WizardShell step={3} title={t.activities.title} subtitle={t.activities.subtitle} sidebarFooter={next}>
       {loading && <div className="flex items-center gap-3 rounded-xl bg-white p-6 text-brand-700"><Spinner className="size-6" />{t.flights.searching}</div>}
-      {error && <Alert tone="error">{t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button></Alert>}
+      {error && <Alert tone="error">{(t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button></Alert>}
       <div className="space-y-8">
         {booking.activityResults?.map(({ stay, offers }) => (
           <section key={stay.city} className="space-y-3">

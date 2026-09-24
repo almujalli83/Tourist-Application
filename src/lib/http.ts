@@ -15,3 +15,16 @@ export async function body<T>(req: Request): Promise<T | null> {
     return null;
   }
 }
+
+/** Wraps a route handler so configuration errors return a clear, logged error code. */
+export function handle<A extends unknown[]>(fn: (...args: A) => Promise<Response>) {
+  return async (...args: A): Promise<Response> => {
+    try {
+      return await fn(...args);
+    } catch (err) {
+      console.error(err);
+      const config = err instanceof Error && err.name === "ServerConfigError";
+      return error(config ? "serverConfig" : "generic", 500);
+    }
+  };
+}

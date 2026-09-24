@@ -116,7 +116,7 @@ export function HotelsStep() {
     <WizardShell step={2} title={t.hotels.title} subtitle={t.hotels.subtitle} sidebarFooter={next}>
       {!flightsDone && booking.hydrated && <Alert tone="warning" className="mb-4">{t.flights.missing}</Alert>}
       {loading && <div className="flex items-center gap-3 rounded-xl bg-white p-6 text-brand-700"><Spinner className="size-6" />{t.flights.searching}</div>}
-      {error && <Alert tone="error">{t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button></Alert>}
+      {error && <Alert tone="error">{(t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button></Alert>}
       <div className="space-y-8">
         {booking.hotelResults?.map((r) => <StaySection key={r.stay.city} result={r} />)}
       </div>

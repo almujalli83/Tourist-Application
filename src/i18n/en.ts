@@ -197,7 +197,8 @@ const en: Dictionary = {
       reading: "Reading passport automatically…",
       success: "Details filled from the passport — please review them",
       partial: "Some details were read — please check them carefully",
-      failed: "Automatic reading failed — please enter details manually",
+      failed: "Automatic reading failed — make sure the two bottom lines of the data page are sharp, well lit and not cut off, or enter details manually",
+      engine: "Automatic reading could not start on this device — please enter details manually",
     },
     photo: {
       title: "Personal photo",
@@ -337,6 +338,7 @@ const en: Dictionary = {
       payment_expired: "The card has expired",
       payment_declined: "The payment was declined by the issuing bank",
       invalidTravellers: "Traveller details are incomplete",
+      serverConfig: "The service is not fully configured on the server (missing settings). Please contact the administrator.",
       generic: "Something went wrong, please try again",
     },
   },

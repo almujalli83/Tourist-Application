@@ -147,7 +147,7 @@ export function FlightsStep() {
       )}
       {error && (
         <Alert tone="error">
-          {t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button>
+          {(t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button>
         </Alert>
       )}
       <div className="space-y-8">

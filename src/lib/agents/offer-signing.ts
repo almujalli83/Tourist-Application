@@ -12,9 +12,14 @@ export interface Signed {
   sig?: string;
 }
 
+export class ServerConfigError extends Error {
+  name = "ServerConfigError";
+}
+
 function secret(): string {
   const s = process.env.OFFER_SECRET || process.env.SESSION_SECRET;
-  if (!s && process.env.NODE_ENV === "production") throw new Error("SESSION_SECRET is required in production");
+  if (!s && process.env.NODE_ENV === "production")
+    throw new ServerConfigError("SESSION_SECRET environment variable is not set (required in production)");
   return s || "dev-only-offer-secret";
 }
 

@@ -48,3 +48,41 @@ describe("MRZ parser (ICAO 9303 TD3)", () => {
     expect(parseMrzText("hello world")).toBeNull();
   });
 });
+
+describe("MRZ OCR tolerance", () => {
+  it("restores '<' filler misread as K/L/C", () => {
+    const l1 = "P<UTOERIKSSON<<ANNA<MARIA<<<<KKK<<<LL<<<<CC<";
+    const l2 = "L898902C36UTO7408122F1204159ZE184226B<<KK<10";
+    const r = parseMrz(l1, l2, new Date("2026-01-01"))!;
+    expect(r.givenNames).toEqual(["ANNA", "MARIA"]);
+    expect(r.valid.composite).toBe(true);
+  });
+});
+
+describe("MRZ OCR line normalisation", () => {
+  it("recovers a missing leading P and a filler shortened by OCR", () => {
+    const text = "<INDSHARMA<<RAHUL<KUMAR<<<<<<<<<<<\nZ1234567<1IND8803159M3307205<<<<<<<<<<<<<02";
+    const r = parseMrzText(text, new Date("2026-09-24"))!;
+    expect(r.familyName).toBe("SHARMA");
+    expect(r.passportNo).toBe("Z1234567");
+    expect(r.valid).toEqual({ passportNo: true, birthDate: true, expiryDate: true, composite: true });
+  });
+});
+
+describe("MRZ passport number repair", () => {
+  it("fixes a single look-alike swap when only one candidate passes the check digit", () => {
+    const text = "P<INDSHARMA<<RAHUL<KUMAR<<<<<<<<<<<<<<<<<<<<\n21234567<1IND8803159M3307205<<<<<<<<<<<<<<02";
+    const r = parseMrzText(text, new Date("2026-09-24"))!;
+    expect(r.passportNo).toBe("Z1234567");
+    expect(r.valid.passportNo).toBe(true);
+  });
+});
+
+describe("MRZ repair safety", () => {
+  it("rejects implausible swaps and flags repaired values for review", () => {
+    const text = "P<INDSHARMA<<RAHUL<KUMAR<<<<<<<<<<<<<<<<<<<<\n71234567<1IND8803159M3307205<<<<<<<<<<<<<<02";
+    const r = parseMrzText(text, new Date("2026-09-24"))!;
+    expect(r.passportNo).toBe("Z1234567");
+    expect(r.confidence).toBeLessThan(1);
+  });
+});
