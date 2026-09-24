@@ -6,6 +6,7 @@ import type { StoredBooking } from "@/lib/bookings/types";
 import { cityName } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import { useApp } from "./app-provider";
+import { BackLink } from "./back-link";
 import { CheckIcon, RefreshIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "./ui";
 
@@ -61,6 +62,7 @@ export function BookingDetails({ id, fresh }: { id: string; fresh?: boolean }) {
 
   return (
     <div className="space-y-5">
+      <BackLink href={`/${locale}/account`} label={t.nav.myBookings} className="-ms-2.5" />
       {fresh && (
         <div className={cx("flex items-start gap-4 rounded-2xl p-6 text-white", failed ? "bg-amber-600" : "bg-brand-700")}>
           <span className="grid size-12 shrink-0 place-items-center rounded-full bg-white/20"><CheckIcon className="size-7" /></span>
