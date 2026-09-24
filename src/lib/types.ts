@@ -172,6 +172,9 @@ export interface Traveller {
   passportImage: string; // data URL
   security: SecurityAnswers;
   insurance: InsuranceAnswers;
+  /** Client-only: the saved traveller this form was filled from, and whether to save it back. */
+  savedId?: string | null;
+  saveToAccount?: boolean;
 }
 
 export interface BookingSelection {

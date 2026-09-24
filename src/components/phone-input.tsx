@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fmt } from "@/i18n";
 import { cleanNational, formatE164, parsePhone, PHONE_RULES, phoneCountries } from "@/lib/phone";
 import { useApp } from "./app-provider";
-import { cx } from "./ui";
+import { cx, useFieldId } from "./ui";
 
 /**
  * Mobile number field: a single control with a searchable country-code picker and the national
@@ -18,6 +18,8 @@ export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id
   id?: string;
 }) {
   const { locale, t } = useApp();
+  const fieldId = useFieldId();
+  const inputId = id ?? fieldId;
   const fallback = PHONE_RULES[defaultCountry] ? defaultCountry : "SA";
   const [country, setCountry] = useState(() => parsePhone(value, fallback)?.iso2 ?? fallback);
   const [open, setOpen] = useState(false);
@@ -85,7 +87,7 @@ export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id
         </button>
         <input
           ref={numberInput}
-          id={id}
+          id={inputId}
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"

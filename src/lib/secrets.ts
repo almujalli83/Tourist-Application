@@ -58,7 +58,7 @@ export function secretSource(): Source {
 }
 
 /** Purpose-specific key derived from the master secret. */
-export function secretFor(purpose: "session" | "offers"): string {
+export function secretFor(purpose: "session" | "offers" | "data"): string {
   const master = g.__appSecret?.value ?? envSecret() ?? (isProduction() ? null : "dev-only-secret");
   if (!master)
     throw new ServerConfigError("No signing secret: set SESSION_SECRET or configure DATABASE_URL (required in production)");

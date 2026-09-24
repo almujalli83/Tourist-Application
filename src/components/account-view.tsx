@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
 import { useApp } from "./app-provider";
 import { PhoneInput, phoneHint } from "./phone-input";
 import { BackLink } from "./back-link";
 import { StatusBadge } from "./booking-details";
 import { CountrySelect } from "./booking/country-select";
-import { BuildingIcon, UserIcon } from "./icons";
+import { BuildingIcon, UserIcon, UsersIcon } from "./icons";
 import { Alert, Badge, Button, Card, Field, Input } from "./ui";
 
 export interface BookingRow {
@@ -91,7 +92,7 @@ function ProfileForm() {
   );
 }
 
-export function AccountView({ bookings }: { bookings: BookingRow[] }) {
+export function AccountView({ bookings, savedTravellers }: { bookings: BookingRow[]; savedTravellers: number }) {
   const { t, locale, money, user } = useApp();
   const isCo = user?.accountType === "company";
   const stats = [
@@ -142,7 +143,22 @@ export function AccountView({ bookings }: { bookings: BookingRow[] }) {
             </ul>
           )}
         </Card>
-        <ProfileForm />
+        <div className="space-y-6">
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-bold">
+                <UsersIcon className="size-5 text-brand-700" />
+                {t.account.travellers.title}
+              </h2>
+              <Badge tone="brand">{fmt(t.account.travellers.count, { n: savedTravellers })}</Badge>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">{t.account.travellers.intro}</p>
+            <Link href={`/${locale}/account/travellers`} className="mt-4 inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
+              {t.account.travellers.manage}
+            </Link>
+          </Card>
+          <ProfileForm />
+        </div>
       </div>
     </div>
   );

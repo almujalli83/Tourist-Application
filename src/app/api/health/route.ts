@@ -26,6 +26,7 @@ export async function GET() {
     config: {
       sessionSecret: !secretError && source !== "missing",
       sessionSecretSource: secretError ? "database-error" : source,
+      dataEncryptionKey: !!process.env.DATA_ENCRYPTION_KEY?.trim(),
       database: Boolean(databaseUrl()),
       mtEvisa: mtConfig().mock ? "sandbox" : "live",
       visaFeeSAR: VISA_INSURANCE_FEE_SAR,

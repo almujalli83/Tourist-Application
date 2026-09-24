@@ -2,7 +2,7 @@
  * Minimal document store used by the repositories. Two implementations:
  * PostgreSQL (production, e.g. Vercel + Neon) and a local JSON file (development).
  */
-export type Collection = "users" | "userEmails" | "bookings" | "sandboxPackages" | "config";
+export type Collection = "users" | "userEmails" | "bookings" | "sandboxPackages" | "config" | "travellers";
 
 export interface DocStore {
   get<T>(col: Collection, id: string): Promise<T | null>;
@@ -13,4 +13,6 @@ export interface DocStore {
   put<T>(col: Collection, id: string, doc: T): Promise<void>;
   /** Atomic read-modify-write; returns null if the document does not exist. */
   update<T>(col: Collection, id: string, fn: (doc: T) => T): Promise<T | null>;
+  /** Removes the document; returns false when it did not exist. */
+  delete(col: Collection, id: string): Promise<boolean>;
 }
