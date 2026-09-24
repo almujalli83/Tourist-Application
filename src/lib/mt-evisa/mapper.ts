@@ -5,6 +5,7 @@
 import { mtConfig } from "../config";
 import { diffDays } from "../dates";
 import { getSaudiCity } from "../data/cities";
+import { isArabCountry } from "../data/countries";
 import { applicantShare } from "../pricing";
 import type { ActivityOffer, FlightOffer, HotelOffer, Traveller } from "../types";
 import type { MtClient } from "./client";
@@ -55,12 +56,13 @@ export async function buildSubmitRequests(client: MtClient, input: MapInput): Pr
       activities: input.activities,
       visaFeeSAR: input.visaFeeSAR,
     });
+    const arab = isArabCountry(t.nationality);
     const visitor: MtVisitorData = {
       applicationNo: input.applicationNos[i],
-      firstNameAr: orNull(t.firstNameAr),
-      middleNameAr: orNull(t.middleNameAr),
-      grandFatherNameAr: orNull(t.grandFatherNameAr),
-      familyNameAr: orNull(t.familyNameAr),
+      firstNameAr: arab ? orNull(t.firstNameAr) : null,
+      middleNameAr: arab ? orNull(t.middleNameAr) : null,
+      grandFatherNameAr: arab ? orNull(t.grandFatherNameAr) : null,
+      familyNameAr: arab ? orNull(t.familyNameAr) : null,
       firstNameEn: t.firstNameEn.trim(),
       middleNameEn: orNull(t.middleNameEn),
       grandFatherNameEn: orNull(t.grandFatherNameEn),

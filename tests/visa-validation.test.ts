@@ -20,7 +20,7 @@ describe("traveller validation (MT §2.4)", () => {
   });
 
   it("validates name alphabets and lengths", () => {
-    const t = validAdult({ firstNameEn: "فراز", familyNameEn: "A".repeat(16), firstNameAr: "Faraz" });
+    const t = validAdult({ nationality: "EG", firstNameEn: "فراز", familyNameEn: "A".repeat(16), firstNameAr: "Faraz", familyNameAr: "محمد" });
     const e = validateTraveller(t, 0, [t], ctx);
     expect(e.firstNameEn).toBe("latinOnly");
     expect(e.familyNameEn).toBe("max15");
@@ -63,5 +63,12 @@ describe("traveller validation (MT §2.4)", () => {
   it("limits package composition to 9 adults and 5 minors", () => {
     const adults = Array.from({ length: 10 }, () => validAdult());
     expect(validatePackageComposition(adults, ctx.arrivalDate).errors).toContain("maxAdults");
+  });
+});
+
+describe("Arabic names for non-Arab nationals", () => {
+  it("ignores leftover Arabic names when the nationality is not Arab", () => {
+    const t = validAdult({ nationality: "IN", firstNameAr: "Faraz" });
+    expect(validateTraveller(t, 0, [t], ctx)).toEqual({});
   });
 });
