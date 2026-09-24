@@ -241,11 +241,10 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
           <Section title={t.travellers.sections.insurance} icon={<HeartPulseIcon className="size-5" />} subtitle={t.travellers.insurance.intro}>
             <div className="divide-y divide-slate-100">
               {/* All six insurance questions of the MT guide (§2.4); 4–5 are optional, 6 depends on them. */}
-              {(["question1", "question2", "question3", "question4", "question5"] as const).map((k, i) => (
+              {(["question1", "question2", "question3", "question4", "question5"] as const).map((k) => (
                 <div key={k} className="py-3 first:pt-0">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-slate-800">
-                      <span className="me-1 font-semibold text-brand-700">{i + 1}.</span>
                       {t.travellers.insurance[k]}
                       {(k === "question4" || k === "question5") && <span className="ms-1 text-xs text-slate-400">({t.common.optional})</span>}
                     </p>
@@ -259,7 +258,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
                 return (
                   <div className="py-3">
                     <Field
-                      label={`6. ${t.travellers.insurance.question6}`}
+                      label={t.travellers.insurance.question6}
                       required={pregnant}
                       hint={pregnant ? undefined : t.travellers.insurance.question6Hint}
                       error={e("insurance.question6")}
