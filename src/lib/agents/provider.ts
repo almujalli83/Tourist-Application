@@ -22,8 +22,8 @@ export interface ActivitySearchRequest {
 
 /** Offers returned by a provider before the aggregator stamps them with agent info. */
 export type RawFlight = Omit<import("../types").FlightOffer, "agentId" | "agentNameEn" | "agentNameAr" | "id" | "totalSAR">;
-export type RawHotel = Omit<HotelOffer, "agentId" | "agentNameEn" | "agentNameAr" | "id">;
-export type RawActivity = Omit<ActivityOffer, "agentId" | "agentNameEn" | "agentNameAr" | "id">;
+export type RawHotel = Omit<HotelOffer, "agentId" | "agentNameEn" | "agentNameAr" | "id" | "forPax">;
+export type RawActivity = Omit<ActivityOffer, "agentId" | "agentNameEn" | "agentNameAr" | "id" | "forPax">;
 
 /**
  * Contract every travel agent (OTA / DMC / consolidator) integration implements.

@@ -1,32 +1,16 @@
 import { PACKAGE_LIMITS } from "../config";
+import { signOffer } from "./offer-signing";
 import { priceFlightOffer } from "../pricing";
 import type { ActivityOffer, FlightOffer, HotelOffer, TravelAgentRef } from "../types";
 import type { ActivitySearchRequest, FlightSearchRequest, HotelSearchRequest, TravelAgentProvider } from "./provider";
 import { AGENTS } from "./registry";
 
 const PROVIDER_TIMEOUT_MS = 8000;
-const OFFER_TTL_MS = 45 * 60 * 1000;
 
-type AnyOffer = FlightOffer | HotelOffer | ActivityOffer;
+/** Stamps the offer with an expiry and server signature (verified at booking time). */
+const sign = <T extends object>(offer: T): T => signOffer(offer);
 
-/** Offers are cached server-side so bookings are priced from what the agent returned, not from the client. */
-const g = globalThis as unknown as { __offerCache?: Map<string, { offer: AnyOffer; expires: number }> };
-const cache = (g.__offerCache ??= new Map());
-
-function remember<T extends AnyOffer>(offer: T): T {
-  cache.set(offer.id, { offer, expires: Date.now() + OFFER_TTL_MS });
-  return offer;
-}
-
-export function getCachedOffer<T extends AnyOffer>(id: string): T | undefined {
-  const hit = cache.get(id);
-  if (!hit) return undefined;
-  if (hit.expires < Date.now()) {
-    cache.delete(id);
-    return undefined;
-  }
-  return hit.offer as T;
-}
+export const paxKey = (p: { adults: number; children: number; infants: number }) => `${p.adults}-${p.children}-${p.infants}`;
 
 function withTimeout<T>(p: Promise<T>): Promise<T> {
   return Promise.race([
@@ -60,7 +44,7 @@ async function fanOut<T>(
 export async function searchFlights(req: FlightSearchRequest): Promise<AggregateResult<FlightOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchFlights(req)).map(({ ref, ...o }) =>
-      remember<FlightOffer>({ ...o, ...agentRef(a), id: `F:${a.id}:${req.leg.date}:${req.leg.from}${req.leg.to}:${req.cabin}:${ref}`, totalSAR: priceFlightOffer(o.fare, req.pax) }),
+      sign<FlightOffer>({ ...o, ...agentRef(a), id: `F:${a.id}:${req.leg.date}:${req.leg.from}${req.leg.to}:${req.cabin}:${ref}`, totalSAR: priceFlightOffer(o.fare, req.pax) }),
     ),
   );
   res.offers.sort((x, y) => x.totalSAR - y.totalSAR);
@@ -70,7 +54,7 @@ export async function searchFlights(req: FlightSearchRequest): Promise<Aggregate
 export async function searchHotels(req: HotelSearchRequest): Promise<AggregateResult<HotelOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchHotels(req)).map(({ ref, ...o }) =>
-      remember<HotelOffer>({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${req.pax.adults}-${req.pax.children}` }),
+      sign<HotelOffer>({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }),
     ),
   );
   // MT rejects packages with hotels rated below 4 stars (VTP003).
@@ -82,7 +66,7 @@ export async function searchHotels(req: HotelSearchRequest): Promise<AggregateRe
 export async function searchActivities(req: ActivitySearchRequest): Promise<AggregateResult<ActivityOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchActivities(req)).map(({ ref, ...o }) =>
-      remember<ActivityOffer>({ ...o, ...agentRef(a), id: `A:${a.id}:${req.from}:${ref}:${req.pax.adults}-${req.pax.children}` }),
+      sign<ActivityOffer>({ ...o, ...agentRef(a), id: `A:${a.id}:${req.from}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }),
     ),
   );
   res.offers.sort((x, y) => x.date.localeCompare(y.date) || x.totalSAR - y.totalSAR);

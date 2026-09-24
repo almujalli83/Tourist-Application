@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
-import { read } from "../db";
+import { getUserById } from "../repo";
 import { toPublicUser, type PublicUser } from "./types";
 
 export const SESSION_COOKIE = "ta_session";
@@ -53,6 +53,6 @@ export async function clearSessionCookie() {
 export async function currentUser(): Promise<PublicUser | null> {
   const uid = verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value);
   if (!uid) return null;
-  const user = await read((db) => db.users.find((u) => u.id === uid));
+  const user = await getUserById(uid);
   return user ? toPublicUser(user) : null;
 }

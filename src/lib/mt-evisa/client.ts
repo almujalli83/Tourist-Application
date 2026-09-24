@@ -5,7 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { mtConfig } from "../config";
-import { read, transact } from "../db";
+import { getSandboxPackage, updateSandboxPackage, upsertSandboxPackage } from "../repo";
 import { SANDBOX_LOOKUPS } from "./lookups";
 import { SANDBOX_PRIVACY_POLICY } from "./privacy";
 import type {
@@ -123,26 +123,22 @@ function createSandboxClient(): MtClient {
       if (errors.length)
         return { correlationId: randomUUID(), applicationNo: v.applicationNo, applicationStatus: errors, errorCodes: ["400"] };
 
-      const packageId = await transact((db) => {
-        // Same messageId → same package (§2.2 key condition 1).
-        let pkg = db.sandboxPackages.find((p) => p.packageId === req.packageId || p.packageId === `pkg-${req.messageId}`);
-        if (!pkg) {
-          pkg = { packageId: `pkg-${req.messageId}`, submittedAt: new Date().toISOString(), applications: [] };
-          db.sandboxPackages.push(pkg);
-        }
-        const app = {
-          applicationNo: v.applicationNo,
-          name: `${v.firstNameEn} ${v.familyNameEn}`,
-          countryId: v.nationality,
-          passportNo: v.passportNo,
-        };
-        pkg.applications = [...pkg.applications.filter((a) => a.applicationNo !== v.applicationNo), app];
-        return pkg.packageId;
-      });
+      // Same messageId → same package (§2.2 key condition 1).
+      const packageId = req.packageId || `pkg-${req.messageId}`;
+      const app = {
+        applicationNo: v.applicationNo,
+        name: `${v.firstNameEn} ${v.familyNameEn}`,
+        countryId: v.nationality,
+        passportNo: v.passportNo,
+      };
+      await upsertSandboxPackage(packageId, (pkg) => ({
+        ...pkg,
+        applications: [...pkg.applications.filter((a) => a.applicationNo !== v.applicationNo), app],
+      }));
       return { correlationId: randomUUID(), packageId, errorCodes: ["0"] };
     },
     async getTourismPackageStatus(packageId) {
-      const pkg = await read((db) => db.sandboxPackages.find((p) => p.packageId === packageId));
+      const pkg = await getSandboxPackage(packageId);
       if (!pkg) return { correlationId: randomUUID(), packageId, errorCodes: ["TP007"] };
       const elapsed = (Date.now() - Date.parse(pkg.submittedAt)) / 1000;
       const [, pkgStatus, appStatus] = pkg.cancelled
@@ -170,15 +166,14 @@ function createSandboxClient(): MtClient {
       };
     },
     async cancelTourismPackage(packageId) {
-      const ok = await transact((db) => {
-        const pkg = db.sandboxPackages.find((p) => p.packageId === packageId);
-        if (!pkg) return false;
+      let ok = false;
+      await updateSandboxPackage(packageId, (pkg) => {
         const elapsed = (Date.now() - Date.parse(pkg.submittedAt)) / 1000;
-        if (elapsed >= 40) return false; // beyond validated stage
-        pkg.cancelled = true;
-        return true;
+        if (elapsed >= 40) return pkg; // beyond validated stage
+        ok = true;
+        return { ...pkg, cancelled: true };
       });
-      return { correlationId: randomUUID(), errorCodes: [ok ? "0" : "CTP003"] };
+      return { correlationId: randomUUID(), errorCodes: [ok ? "0" : "CTP001"] };
     },
   };
 }

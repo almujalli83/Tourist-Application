@@ -21,7 +21,8 @@ platform: i18n (ar/en), multi-currency, B2C/B2B accounts, travel-agent aggregato
 - [ ] Live payment gateway (mada / Visa / Mastercard / Apple Pay) and VAT e-invoice (ZATCA) for B2B
 - [ ] Resubmission flow for CORRECTION_REQUIRED (`isResubmission=true` + packageId), cancellation (cancelTourismPackage)
 - [ ] updateTravellerTravelDetails when flights change after issuance
-- [ ] PostgreSQL persistence, email notifications, audit log, admin console for agents/commissions
+- [x] PostgreSQL persistence (Vercel/Neon ready) and stateless signed offers
+- [ ] Email notifications, audit log, admin console for agents/commissions
 - [ ] Live FX rates provider
 
 ## Future services

@@ -76,7 +76,13 @@ export function ReviewStep() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          selection: { criteria: booking.criteria, flights: booking.flights, hotels: booking.hotels, activities: booking.activities },
+          selection: {
+            criteria: booking.criteria,
+            flights: booking.flights,
+            hotels: booking.hotels,
+            activities: booking.activities,
+            offers: { flights: booking.selectedFlights, hotels: booking.selectedHotels, activities: booking.selectedActivities },
+          },
           travellers: booking.travellers,
           disclaimerAccepted: booking.disclaimerAccepted,
           expectedTotalSAR: price.totalSAR,

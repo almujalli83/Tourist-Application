@@ -35,6 +35,9 @@ export interface FlightLeg {
 }
 
 export interface TravelAgentRef {
+  /** Set by the server when an offer is returned; checked when booking. */
+  expiresAt?: string;
+  sig?: string;
   agentId: string;
   agentNameEn: string;
   agentNameAr: string;
@@ -83,6 +86,8 @@ export interface HotelOffer extends TravelAgentRef {
   nights: number;
   pricePerNightSAR: number;
   totalSAR: number;
+  /** Traveller mix the price was quoted for ("adults-children-infants"). */
+  forPax: string;
 }
 
 export type ActivityKind = "event" | "tour" | "restaurant";
@@ -103,6 +108,7 @@ export interface ActivityOffer extends TravelAgentRef {
   serviceChargeSAR: number;
   totalSAR: number; // for the whole party
   partySize: number;
+  forPax: string;
 }
 
 /* ---------------- Traveller / visa application data ---------------- */
@@ -170,6 +176,8 @@ export interface Traveller {
 
 export interface BookingSelection {
   criteria: SearchCriteria;
+  /** The selected offers exactly as returned (signed) by the search APIs. */
+  offers: { flights: FlightOffer[]; hotels: HotelOffer[]; activities: ActivityOffer[] };
   flights: Record<number, string>; // legIndex -> offer id
   hotels: Record<string, string>; // city -> offer id
   activities: string[]; // offer ids

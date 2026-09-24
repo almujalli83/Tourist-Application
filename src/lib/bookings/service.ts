@@ -1,8 +1,9 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { getCachedOffer } from "../agents/aggregator";
+import { paxKey } from "../agents/aggregator";
+import { verifyOffer } from "../agents/offer-signing";
 import type { PublicUser } from "../auth/types";
 import { VISA_INSURANCE_FEE_SAR } from "../config";
-import { read, transact } from "../db";
+import { getBookingForUser, listBookingsByUser, saveBooking, updateBooking } from "../repo";
 import { todayISO } from "../dates";
 import { buildLegs, stayDates, validateCriteria } from "../itinerary";
 import { getMtClient, mtIsOk } from "../mt-evisa/client";
@@ -41,23 +42,32 @@ function bookingReference(): string {
   return `TA-${Array.from({ length: 8 }, () => alphabet[randomInt(0, alphabet.length)]).join("")}`;
 }
 
-/** Resolves offers from the server-side cache, never trusting client-sent prices. */
+/**
+ * Validates the selected offers: each must carry a valid, unexpired server signature and
+ * match the itinerary and traveller mix, so client-side prices cannot be tampered with.
+ */
 export function resolveSelection(sel: BookingSelection) {
   const legs = buildLegs(sel.criteria);
   const stays = stayDates(sel.criteria);
+  const pax = paxKey(sel.criteria.pax);
+  const offers = sel.offers ?? { flights: [], hotels: [], activities: [] };
+  const pick = <T extends { id: string }>(list: T[] | undefined, id: string | undefined) => (id ? (list ?? []).find((o) => o.id === id) : undefined);
+
   const flights = legs.map((leg) => {
-    const o = getCachedOffer<FlightOffer>(sel.flights[leg.index] ?? "");
-    if (!o || o.legIndex !== leg.index || o.from !== leg.from || o.to !== leg.to) throw new BookingError("offerExpired");
+    const o = pick<FlightOffer>(offers.flights, sel.flights[leg.index]);
+    if (!o || !verifyOffer(o) || o.legIndex !== leg.index || o.from !== leg.from || o.to !== leg.to || !o.departAt.startsWith(leg.date))
+      throw new BookingError("offerExpired");
     return o;
   });
-  const hotels = stays.map((s) => {
-    const o = getCachedOffer<HotelOffer>(sel.hotels[s.city] ?? "");
-    if (!o || o.city !== s.city || o.checkIn !== s.checkIn || o.checkOut !== s.checkOut) throw new BookingError("offerExpired");
+  const hotels = stays.map((st) => {
+    const o = pick<HotelOffer>(offers.hotels, sel.hotels[st.city]);
+    if (!o || !verifyOffer(o) || o.city !== st.city || o.checkIn !== st.checkIn || o.checkOut !== st.checkOut || o.forPax !== pax)
+      throw new BookingError("offerExpired");
     return o;
   });
-  const activities = sel.activities.map((id) => {
-    const o = getCachedOffer<ActivityOffer>(id);
-    if (!o) throw new BookingError("offerExpired");
+  const activities = [...new Set(sel.activities)].map((id) => {
+    const o = pick<ActivityOffer>(offers.activities, id);
+    if (!o || !verifyOffer(o) || o.forPax !== pax || !stays.some((st) => st.city === o.city)) throw new BookingError("offerExpired");
     return o;
   });
   const price = computePackagePrice({ pax: sel.criteria.pax, flights, hotels, activities, visaFeeSAR: VISA_INSURANCE_FEE_SAR });
@@ -173,18 +183,16 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
     applicants,
   };
   // Passport images and photos are sent to MT only and are not retained.
-  await transact((db) => {
-    db.bookings.push(booking);
-  });
+  await saveBooking(booking);
   return booking;
 }
 
-export async function listBookings(userId: string): Promise<StoredBooking[]> {
-  return read((db) => db.bookings.filter((b) => b.userId === userId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+export function listBookings(userId: string): Promise<StoredBooking[]> {
+  return listBookingsByUser(userId);
 }
 
 export async function getBooking(userId: string, id: string): Promise<StoredBooking | undefined> {
-  return read((db) => db.bookings.find((b) => b.id === id && b.userId === userId));
+  return (await getBookingForUser(userId, id)) ?? undefined;
 }
 
 /** Pulls the latest package status from MT (getTourismPackageStatus) and stores it. */
@@ -193,9 +201,7 @@ export async function refreshBookingStatus(userId: string, id: string): Promise<
   if (!booking?.mt.packageId) return booking;
   const res = await getMtClient().getTourismPackageStatus(booking.mt.packageId);
   if (!mtIsOk(res.errorCodes)) return booking;
-  return transact((db) => {
-    const b = db.bookings.find((x) => x.id === id && x.userId === userId);
-    if (!b) return undefined;
+  const updated = await updateBooking(id, (b) => {
     b.mt.packageStatus = res.tourismPackageStatus ?? b.mt.packageStatus;
     b.mt.lastCheckedAt = new Date().toISOString();
     for (const t of res.travellerList ?? []) {
@@ -214,4 +220,5 @@ export async function refreshBookingStatus(userId: string, id: string): Promise<
     if (b.mt.packageStatus === "CANCELLED") b.status = "CANCELLED";
     return b;
   });
+  return updated ?? undefined;
 }

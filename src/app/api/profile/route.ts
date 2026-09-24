@@ -1,7 +1,7 @@
 import { currentUser } from "@/lib/auth/session";
 import { toPublicUser, type CompanyProfile, type IndividualProfile } from "@/lib/auth/types";
 import { cleanCompany, cleanIndividual } from "@/lib/auth/validation";
-import { transact } from "@/lib/db";
+import { updateUser } from "@/lib/repo";
 import { body, error, json } from "@/lib/http";
 
 export async function GET() {
@@ -16,11 +16,11 @@ export async function PUT(req: Request) {
   const individual = user.accountType === "individual" ? cleanIndividual(b?.individual) : null;
   const company = user.accountType === "company" ? cleanCompany(b?.company) : null;
   if (!individual && !company) return error("required");
-  const updated = await transact((db) => {
-    const u = db.users.find((x) => x.id === user.id)!;
-    if (individual) u.individual = individual;
-    if (company) u.company = company;
-    return u;
-  });
+  const updated = await updateUser(user.id, (u) => ({
+    ...u,
+    ...(individual ? { individual } : {}),
+    ...(company ? { company } : {}),
+  }));
+  if (!updated) return error("unauthorized", 401);
   return json({ user: toPublicUser(updated) });
 }

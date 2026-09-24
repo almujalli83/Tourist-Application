@@ -13,7 +13,7 @@ const flight = (kind: FlightOffer["kind"], from: string, to: string, dep: string
 const hotel: HotelOffer = {
   id: "h1", agentId: "a", agentNameEn: "Agent", agentNameAr: "وكيل", city: "RUH", nameEn: "Hotel", nameAr: "فندق", stars: 5,
   licenseNo: "10005815", districtEn: "", districtAr: "", reviewScore: 9, roomTypeEn: "", roomTypeAr: "", rooms: 1, board: "BB",
-  amenities: [], refundable: true, checkIn: "2026-10-10", checkOut: "2026-10-15", nights: 5, pricePerNightSAR: 800, totalSAR: 4000,
+  amenities: [], refundable: true, checkIn: "2026-10-10", checkOut: "2026-10-15", nights: 5, pricePerNightSAR: 800, totalSAR: 4000, forPax: "1-1-0",
 };
 
 describe("MT SubmitTourismPackage mapping", () => {
