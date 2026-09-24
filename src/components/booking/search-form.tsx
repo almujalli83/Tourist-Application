@@ -8,9 +8,10 @@ import { addDays, diffDays, isValidISODate, todayISO } from "@/lib/dates";
 import { splitNights, validateCriteria, type SearchError } from "@/lib/itinerary";
 import type { CabinClass, CityStay, PaxCount, SearchCriteria } from "@/lib/types";
 import { useApp } from "../app-provider";
-import { MapPinIcon, PlaneIcon, UsersIcon } from "../icons";
+import { PlaneIcon, UsersIcon } from "../icons";
 import { Alert, Button, Card, cx, Field, Input, Select } from "../ui";
 import { useBooking } from "./booking-context";
+import { CityMultiSelect } from "./city-multi-select";
 import { CountrySelect } from "./country-select";
 
 function Counter({ label, hint, value, min, max, onChange }: { label: string; hint: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
@@ -56,10 +57,6 @@ export function SearchForm() {
     });
   }, [cities, totalNights]);
 
-  function toggleCity(code: string) {
-    setCities((c) => (c.includes(code) ? c.filter((x) => x !== code) : [...c, code]));
-  }
-
   function setNights(i: number, n: number) {
     setStays((cur) => cur.map((s, idx) => (idx === i ? { ...s, nights: Math.max(1, n) } : s)));
   }
@@ -102,29 +99,8 @@ export function SearchForm() {
           </Field>
 
           <div className="lg:col-span-2">
-            <Field label={t.search.destinations} required error={err("cities")} hint={t.search.destinationsHint}>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                {SAUDI_CITIES.map((c) => {
-                  const idx = cities.indexOf(c.code);
-                  const on = idx >= 0;
-                  return (
-                    <button
-                      type="button"
-                      key={c.code}
-                      onClick={() => toggleCity(c.code)}
-                      aria-pressed={on}
-                      className={cx(
-                        "relative flex flex-col items-start rounded-xl border p-3 text-start transition",
-                        on ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600" : "border-slate-200 bg-white hover:border-brand-400",
-                      )}
-                    >
-                      {on && <span className="absolute end-2 top-2 grid size-5 place-items-center rounded-full bg-brand-700 text-[11px] font-bold text-white">{idx + 1}</span>}
-                      <span className="flex items-center gap-1.5 text-sm font-bold"><MapPinIcon className="size-4 text-gold-600" />{c[locale]}</span>
-                      <span className="mt-1 line-clamp-2 text-[11px] leading-snug text-slate-500">{locale === "ar" ? c.descriptionAr : c.descriptionEn}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            <Field label={t.search.destinations} required error={err("cities")} hint={t.search.destinationsHint} htmlFor="destinations">
+              <CityMultiSelect id="destinations" value={cities} onChange={setCities} invalid={!!err("cities")} />
             </Field>
           </div>
 
