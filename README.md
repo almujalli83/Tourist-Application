@@ -2,6 +2,8 @@
 
 > رحلتك وتأشيرتك إلى السعودية — Your trip & visa to Saudi Arabia
 
+<img src="docs/brand-lockup.png" alt="Saudi Trip" width="360">
+
 منصة رسمية ومتجاوبة مع جميع الأجهزة لحجز الباقات السياحية المتكاملة إلى المملكة العربية السعودية مع التأشيرة والتأمين.
 يُبنى التطبيق **خدمة تلو الأخرى** بمنهجية Agile في هذا المستودع — راجع [`docs/BACKLOG.md`](docs/BACKLOG.md).
 

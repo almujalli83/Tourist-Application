@@ -24,13 +24,22 @@ export const LockIcon = (p: P) => (<svg {...base(p)}><rect x="4" y="10.5" width=
 export const RefreshIcon = (p: P) => (<svg {...base(p)}><path d="M20 11a8 8 0 0 0-14.9-3.9M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9M20 20v-4h-4" /></svg>);
 export const HeartPulseIcon = (p: P) => (<svg {...base(p)}><path d="M20.8 11.2A5.5 5.5 0 0 0 12 5.6a5.5 5.5 0 0 0-8.8 5.6C4.6 15.5 12 20.5 12 20.5s7.4-5 8.8-9.3z" /><path d="M3.5 12h4l1.5-3 3 6 1.5-3h4" /></svg>);
 
+/** Saudi Trip mark: a map pin with a palm and a flight path. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 40 40" className={className} aria-hidden>
-      <rect width="40" height="40" rx="10" fill="#0b5a47" />
-      <path d="M20 7c-3.5 4.2-5.3 8.4-5.3 12.6 0 3.2 1.8 5.4 5.3 6.6 3.5-1.2 5.3-3.4 5.3-6.6C25.3 15.4 23.5 11.2 20 7z" fill="#b8913f" />
-      <path d="M9 28.5c3.4 2.4 7 3.5 11 3.5s7.6-1.1 11-3.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-      <path d="M20 26.2V33" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+    <svg viewBox="0 0 64 64" className={className} aria-hidden>
+      <rect width="64" height="64" rx="15" fill="#0b5a47" />
+      <path d="M9 47c9-15 26-27 46-31" fill="none" stroke="#fff" strokeOpacity=".28" strokeWidth="2" strokeLinecap="round" />
+      <path d="M55 16l-6.2-.6 2.4 2.8-1.2 3.4z" fill="#fff" fillOpacity=".9" />
+      <path transform="translate(32 34) scale(1.08) translate(-32 -34)" d="M32 55c-8.5-9.6-14.5-17.4-14.5-26a14.5 14.5 0 0 1 29 0c0 8.6-6 16.4-14.5 26z" fill="#b8913f" />
+      <g fill="#fff" transform="translate(-2.3 0.8)">
+        <path d="M31.3 41.5c.2-5.3.9-10.4 2.2-15.3l1.9.5c-1.2 4.8-1.8 9.7-2 14.8z" />
+        <path d="M34.2 24.8c-2.8-3.3-6.6-4.3-10.3-2.6 3.6-.1 6.9 1.1 9.4 3.7z" />
+        <path d="M34.2 24.8c1.4-4 4.8-6 8.9-5.5-3.4 1-6 3.2-7.5 6.3z" />
+        <path d="M34.3 25.2c3.9-1.5 7.8-.5 10.3 2.5-3.3-1.4-6.8-1.5-10 .1z" />
+        <path d="M34 25.3c-3.9-.8-7.4.8-9.4 4.1 3-2.1 6.4-2.9 9.8-2.4z" />
+        <path d="M34.2 24.8c-.4-3.9 1.3-7.2 4.5-8.8-2.3 2.6-3.3 5.6-3.1 8.9z" />
+      </g>
     </svg>
   );
 }

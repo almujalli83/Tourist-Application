@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title: { default: t.meta.appName, template: `%s — ${t.meta.appName}` },
     description: t.meta.description,
     manifest: "/manifest.webmanifest",
-    icons: { icon: "/icon.svg" },
+    icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
     alternates: { languages: { ar: "/ar", en: "/en" } },
   };
 }
