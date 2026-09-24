@@ -3,14 +3,13 @@
 import type { ReactNode } from "react";
 import { isArabCountry } from "@/lib/data/countries";
 import { COMPANION_TYPES } from "@/lib/mt-evisa/lookups";
-import type { MrzResult } from "@/lib/mrz";
 import type { ClarifiedAnswer, Traveller, YesNo } from "@/lib/types";
 import { SECURITY_CLARIFIED, SECURITY_SIMPLE, type FieldErrors } from "@/lib/visa-validation";
 import { useApp } from "../app-provider";
 import { HeartPulseIcon, PassportIcon, ShieldIcon, UserIcon, UsersIcon } from "../icons";
 import { Card, Field, Input, SectionTitle, Select, Textarea, YesNo as YesNoInput } from "../ui";
 import { CountrySelect } from "./country-select";
-import { PassportScanner } from "./passport-scanner";
+import { PassportScanner, type PassportScan } from "./passport-scanner";
 import { PhotoUploader } from "./photo-uploader";
 
 type Props = {
@@ -54,7 +53,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
     );
   }
 
-  function applyMrz(r: MrzResult) {
+  function applyMrz({ mrz: r, issueDate }: PassportScan) {
     const patch: Partial<Traveller> = {};
     const clip = (s: string) => s.slice(0, 15);
     if (r.familyName) patch.familyNameEn = clip(r.familyName);
@@ -65,7 +64,12 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
     if (r.birthDate && r.valid.birthDate) patch.birthDate = r.birthDate;
     if (r.expiryDate && r.valid.expiryDate) patch.passportExpiryDate = r.expiryDate;
     if (r.gender) patch.gender = r.gender;
-    if (/^[A-Z]{2}$/.test(r.nationality)) patch.nationality = r.nationality;
+    if (/^[A-Z]{2}$/.test(r.nationality)) {
+      patch.nationality = r.nationality;
+      // Country of birth is not in the MRZ; replace it only while it still holds the search default.
+      if (!tr.birthplace || tr.birthplace === tr.nationality) patch.birthplace = r.nationality;
+    }
+    if (issueDate && !tr.passportIssueDate) patch.passportIssueDate = issueDate;
     if (/^[A-Z]{2}$/.test(r.issuingCountry)) patch.passportIssuePlace = r.issuingCountry;
     onChange(patch);
   }

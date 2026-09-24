@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { parseMrzText, type MrzResult } from "@/lib/mrz";
+import { guessIssueDate } from "@/lib/passport-visual";
 import { useApp } from "../app-provider";
 import { CameraIcon, PassportIcon } from "../icons";
 import { Alert, Button, cx, Spinner } from "../ui";
@@ -12,7 +13,13 @@ type Status = "idle" | "reading" | "success" | "partial" | "failed" | "engine";
 class OcrEngineError extends Error {}
 
 /** Reads the passport MRZ fully in the browser, trying several crops, thresholds and orientations. */
-async function ocrMrz(img: HTMLImageElement): Promise<MrzResult | null> {
+export interface PassportScan {
+  mrz: MrzResult;
+  /** Issue date read from the printed (visual) zone, when unambiguous. */
+  issueDate: string | null;
+}
+
+async function ocrMrz(img: HTMLImageElement): Promise<PassportScan | null> {
   let worker: Awaited<ReturnType<typeof import("tesseract.js")["createWorker"]>>;
   let PSM: typeof import("tesseract.js")["PSM"];
   try {
@@ -35,6 +42,7 @@ async function ocrMrz(img: HTMLImageElement): Promise<MrzResult | null> {
       tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
     });
     let best: MrzResult | null = null;
+    let bestSrc: CanvasImageSource & { width: number; height: number } = img;
     // Diagnostics for support: run localStorage.setItem("ocrDebug", "1") in the browser console.
     let debug = false;
     try {
@@ -44,7 +52,7 @@ async function ocrMrz(img: HTMLImageElement): Promise<MrzResult | null> {
     }
     const portrait = img.naturalHeight > img.naturalWidth * 1.15;
     const orientations = portrait ? [1, 3, 0] : [0, 2];
-    for (const turns of orientations) {
+    search: for (const turns of orientations) {
       const upright = turns ? rotated(img, turns) : img;
       const skew = estimateSkew(upright);
       const src = Math.abs(skew) >= 0.5 ? rotatedBy(upright, skew) : upright;
@@ -52,12 +60,29 @@ async function ocrMrz(img: HTMLImageElement): Promise<MrzResult | null> {
         const { data } = await worker.recognize(mrzCanvas(src, portion, binarize));
         const res = parseMrzText(data.text);
         if (debug) console.debug("[ocr]", JSON.stringify({ turns, skew, portion, binarize, text: data.text, valid: res?.valid }));
-        if (res && (!best || res.confidence > best.confidence)) best = res;
-        if (best && best.confidence === 1) return best;
+        if (res && (!best || res.confidence > best.confidence)) {
+          best = res;
+          bestSrc = src;
+        }
+        if (best && best.confidence === 1) break search;
       }
-      if (best && best.confidence >= 0.75) return best;
+      if (best && best.confidence >= 0.75) break;
     }
-    return best;
+    if (!best) return null;
+
+    // Second pass over the printed zone for the issue date (not part of the MRZ).
+    let issueDate: string | null = null;
+    if (best.valid.birthDate && best.valid.expiryDate) {
+      try {
+        await worker.setParameters({ tessedit_char_whitelist: "", tessedit_pageseg_mode: PSM.AUTO });
+        const { data } = await worker.recognize(mrzCanvas(bestSrc, 1, false));
+        issueDate = guessIssueDate(data.text, best.birthDate, best.expiryDate);
+        if (debug) console.debug("[ocr] visual", JSON.stringify({ text: data.text, issueDate }));
+      } catch (err) {
+        console.warn("visual zone OCR failed", err);
+      }
+    }
+    return { mrz: best, issueDate };
   } finally {
     await worker.terminate();
   }
@@ -66,7 +91,7 @@ async function ocrMrz(img: HTMLImageElement): Promise<MrzResult | null> {
 export function PassportScanner({ value, onImage, onParsed, error }: {
   value: string;
   onImage: (dataUrl: string) => void;
-  onParsed: (r: MrzResult) => void;
+  onParsed: (r: PassportScan) => void;
   error?: string;
 }) {
   const { t } = useApp();
@@ -88,7 +113,7 @@ export function PassportScanner({ value, onImage, onParsed, error }: {
       const res = await ocrMrz(img);
       if (res) {
         onParsed(res);
-        setStatus(res.confidence === 1 ? "success" : "partial");
+        setStatus(res.mrz.confidence === 1 ? "success" : "partial");
       } else setStatus("failed");
     } catch (err) {
       setStatus(err instanceof OcrEngineError ? "engine" : "failed");
