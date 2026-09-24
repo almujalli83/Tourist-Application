@@ -5,6 +5,7 @@
 import { PACKAGE_LIMITS } from "./config";
 import { addMonths, ageOn, diffDays, isValidISODate } from "./dates";
 import { getCountry, isArabCountry } from "./data/countries";
+import { validatePhone } from "./phone";
 import type { ClarifiedAnswer, Traveller } from "./types";
 
 export type FieldErrors = Record<string, string>;
@@ -22,7 +23,6 @@ export const SECURITY_SIMPLE = ["beenDeported", "crimeFromInterpool", "passportR
 const LATIN_NAME = /^[A-Za-z][A-Za-z '\-]*$/;
 const ARABIC_NAME = /^[؀-ۿ][؀-ۿ ً-ٟ]*$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const MOBILE = /^(\+|00)\d{7,13}$/;
 
 export interface TravellerContext {
   arrivalDate: string;
@@ -110,9 +110,9 @@ export function validateTraveller(t: Traveller, index: number, all: Traveller[],
   // Contact
   if (!t.email.trim()) e.email = "required";
   else if (!EMAIL.test(t.email.trim()) || t.email.trim().length > 50) e.email = "email";
-  const mobile = t.mobileNo.replace(/[\s-]/g, "");
-  if (!mobile) e.mobileNo = "required";
-  else if (!MOBILE.test(mobile)) e.mobileNo = "mobile";
+  // "+<country code><number>" with the national length valid for the country (E.164, ≤ 15 chars).
+  const phoneError = validatePhone(t.mobileNo, t.nationality);
+  if (phoneError) e.mobileNo = phoneError;
   if (t.zipCode.length > 15) e.zipCode = "max15";
 
   // Sponsorship (§10.4.1): minors must have an adult sponsor within the package.

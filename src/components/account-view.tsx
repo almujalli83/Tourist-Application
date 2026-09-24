@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { cityName } from "@/lib/data/cities";
 import { useApp } from "./app-provider";
+import { PhoneInput, phoneHint } from "./phone-input";
 import { BackLink } from "./back-link";
 import { StatusBadge } from "./booking-details";
 import { CountrySelect } from "./booking/country-select";
@@ -67,13 +68,17 @@ function ProfileForm() {
               <Field label={a.tourismLicenseNo} required><Input dir="ltr" value={co.tourismLicenseNo} onChange={(e) => setCo({ ...co, tourismLicenseNo: e.target.value })} /></Field>
               <Field label={a.vatNo}><Input dir="ltr" value={co.vatNo} onChange={(e) => setCo({ ...co, vatNo: e.target.value })} /></Field>
               <Field label={a.contactPerson} required><Input value={co.contactPerson} onChange={(e) => setCo({ ...co, contactPerson: e.target.value })} /></Field>
-              <Field label={a.phone} required><Input dir="ltr" value={co.phone} onChange={(e) => setCo({ ...co, phone: e.target.value })} /></Field>
+              <Field label={a.phone} required hint={phoneHint(co.phone, "SA", t.travellers.fields.mobileLength)}>
+                <PhoneInput value={co.phone} onChange={(v) => setCo({ ...co, phone: v })} />
+              </Field>
               <Field label={a.city}><Input value={co.city} onChange={(e) => setCo({ ...co, city: e.target.value })} /></Field>
             </>
           ) : (
             <>
               <Field label={a.fullName} required><Input value={ind.fullName} onChange={(e) => setInd({ ...ind, fullName: e.target.value })} /></Field>
-              <Field label={a.phone} required><Input dir="ltr" value={ind.phone} onChange={(e) => setInd({ ...ind, phone: e.target.value })} /></Field>
+              <Field label={a.phone} required hint={phoneHint(ind.phone, ind.nationality || "SA", t.travellers.fields.mobileLength)}>
+                <PhoneInput value={ind.phone} defaultCountry={ind.nationality || "SA"} onChange={(v) => setInd({ ...ind, phone: v })} />
+              </Field>
               <Field label={a.nationality}><CountrySelect value={ind.nationality} onChange={(v) => setInd({ ...ind, nationality: v })} /></Field>
             </>
           )}
