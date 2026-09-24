@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
 import { diffDays } from "@/lib/dates";
 import { useApp } from "../app-provider";
+import { BackLink } from "../back-link";
 import { CheckIcon } from "../icons";
 import { Card, cx, Spinner } from "../ui";
 import { useBooking } from "./booking-context";
@@ -87,11 +89,13 @@ export function PriceSummary({ footer }: { footer?: ReactNode }) {
   );
 }
 
+const STEP_PATHS = ["", "/flights", "/hotels", "/activities", "/travellers", "/review"];
+
 /** Layout for every step after search: stepper, trip summary, main column and price sidebar. */
 export function WizardShell({ step, title, subtitle, children, sidebar = true, sidebarFooter }: {
   step: number; title: string; subtitle?: string; children: ReactNode; sidebar?: boolean; sidebarFooter?: ReactNode;
 }) {
-  const { locale } = useApp();
+  const { locale, t } = useApp();
   const { criteria, hydrated } = useBooking();
   const router = useRouter();
 
@@ -107,8 +111,11 @@ export function WizardShell({ step, title, subtitle, children, sidebar = true, s
     );
   }
 
+  const backHref = `/${locale}/package-visa${STEP_PATHS[Math.max(0, step - 1)]}`;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <BackLink href={backHref} className="-ms-2.5 mb-3" />
       <Stepper current={step} />
       <div className="mt-6 flex flex-col gap-1">
         <h1 className="text-xl font-bold text-ink sm:text-2xl">{title}</h1>
@@ -119,7 +126,16 @@ export function WizardShell({ step, title, subtitle, children, sidebar = true, s
         <div className="min-w-0">{children}</div>
         {sidebar && (
           <aside className="lg:sticky lg:top-24 lg:self-start">
-            <PriceSummary footer={sidebarFooter} />
+            <PriceSummary
+              footer={
+                <div className="flex flex-col gap-2">
+                  {sidebarFooter}
+                  <Link href={backHref} className="inline-flex h-10 items-center justify-center rounded-lg text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
+                    {t.common.back}
+                  </Link>
+                </div>
+              }
+            />
           </aside>
         )}
       </div>

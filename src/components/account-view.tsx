@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { cityName } from "@/lib/data/cities";
 import { useApp } from "./app-provider";
+import { BackLink } from "./back-link";
 import { StatusBadge } from "./booking-details";
 import { CountrySelect } from "./booking/country-select";
 import { BuildingIcon, UserIcon } from "./icons";
@@ -94,6 +95,7 @@ export function AccountView({ bookings }: { bookings: BookingRow[] }) {
   ];
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+      <BackLink href={`/${locale}`} label={t.nav.home} className="-ms-2.5" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-bold">{t.account.title}</h1>
         <Link href={`/${locale}/package-visa`} className="inline-flex h-11 items-center rounded-lg bg-gold-500 px-5 text-sm font-semibold text-white hover:bg-gold-600">{t.confirmation.newBooking}</Link>

@@ -232,10 +232,12 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
 
       <Section title={t.travellers.sections.insurance} icon={<HeartPulseIcon className="size-5" />} subtitle={t.travellers.insurance.intro}>
         <div className="divide-y divide-slate-100">
-          {(["question1", "question2", "question3", ...(tr.gender === "2" ? (["question4", "question5"] as const) : [])] as const).map((k) => (
+          {/* All six insurance questions of the MT guide (§2.4); 4–5 are optional, 6 depends on them. */}
+          {(["question1", "question2", "question3", "question4", "question5"] as const).map((k, i) => (
             <div key={k} className="py-3 first:pt-0">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-slate-800">
+                  <span className="me-1 font-semibold text-brand-700">{i + 1}.</span>
                   {t.travellers.insurance[k]}
                   {(k === "question4" || k === "question5") && <span className="ms-1 text-xs text-slate-400">({t.common.optional})</span>}
                 </p>
@@ -244,13 +246,30 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
               {e(`insurance.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`insurance.${k}`)}</p>}
             </div>
           ))}
-          {(tr.insurance.question4 === "true" || tr.insurance.question5 === "true") && (
-            <div className="py-3">
-              <Field label={t.travellers.insurance.question6} required error={e("insurance.question6")}>
-                <Input type="number" min={1} max={9} className="w-28" value={tr.insurance.question6} onChange={(ev) => setIns("question6", ev.target.value)} invalid={!!e("insurance.question6")} />
-              </Field>
-            </div>
-          )}
+          {(() => {
+            const pregnant = tr.insurance.question4 === "true" || tr.insurance.question5 === "true";
+            return (
+              <div className="py-3">
+                <Field
+                  label={`6. ${t.travellers.insurance.question6}`}
+                  required={pregnant}
+                  hint={pregnant ? undefined : t.travellers.insurance.question6Hint}
+                  error={e("insurance.question6")}
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    max={9}
+                    className="max-w-28"
+                    value={pregnant ? tr.insurance.question6 : "0"}
+                    disabled={!pregnant}
+                    onChange={(ev) => setIns("question6", ev.target.value)}
+                    invalid={!!e("insurance.question6")}
+                  />
+                </Field>
+              </div>
+            );
+          })()}
         </div>
       </Section>
     </div>

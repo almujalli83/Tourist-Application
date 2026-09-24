@@ -234,6 +234,9 @@ export function ReviewStep() {
             </Card>
           </form>
         )}
+        <div className="lg:hidden">
+          <Button variant="secondary" className="w-full" onClick={() => router.push(`/${locale}/package-visa/travellers`)}>{t.common.back}</Button>
+        </div>
       </div>
     </WizardShell>
   );
