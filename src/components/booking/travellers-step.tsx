@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fmt } from "@/i18n";
 import { todayISO } from "@/lib/dates";
 import { pickSavedData, SAVED_FIELDS, type SavedTraveller } from "@/lib/saved-travellers";
+import type { PublicUser } from "@/lib/auth/types";
 import type { Traveller } from "@/lib/types";
 import { emptyTraveller, validatePackageComposition, validateTraveller } from "@/lib/visa-validation";
 import { useApp } from "../app-provider";
@@ -51,16 +52,27 @@ export function TravellersStep() {
   );
 }
 
-/** Fills the form from a saved traveller; fields the saved record lacks get the form defaults. */
+const CONTACT_FIELDS = new Set<string>(["email", "mobileNo", "zipCode"]);
+
+/**
+ * Fills the form from a saved traveller. Fields the saved record lacks get the form defaults,
+ * except contact details, which keep what is already entered (e.g. the account's own).
+ */
 function fromSaved(tr: Traveller, saved: SavedTraveller): Partial<Traveller> {
   const defaults = pickSavedData(emptyTraveller(tr.paxType, saved.nationality || tr.nationality));
   const patch: Partial<Traveller> = { savedId: saved.id, saveToAccount: true };
-  for (const k of SAVED_FIELDS) (patch as Record<string, string>)[k] = saved[k] || defaults[k];
+  for (const k of SAVED_FIELDS) (patch as Record<string, string>)[k] = saved[k] || (CONTACT_FIELDS.has(k) ? tr[k] : defaults[k]);
   return patch;
 }
 
+/** The signed-in account's email and mobile, used to pre-fill the lead traveller's contact details. */
+function accountContact(user: PublicUser): { email: string; mobileNo: string } {
+  const phone = user.accountType === "company" ? user.company?.phone : user.individual?.phone;
+  return { email: user.email, mobileNo: phone ?? "" };
+}
+
 function TravellersForms() {
-  const { t, locale } = useApp();
+  const { t, locale, user } = useApp();
   const booking = useBooking();
   const router = useRouter();
   const [active, setActive] = useState(0);
@@ -85,6 +97,19 @@ function TravellersForms() {
         .catch(() => undefined);
     });
   }, [hydrated, travellers, updateTraveller]);
+
+  // Pre-fill the lead traveller's empty contact fields from the account (once, never overwriting).
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!hydrated || prefilled.current || !user || !travellers[0]) return;
+    prefilled.current = true;
+    const lead = travellers[0];
+    const contact = accountContact(user);
+    const patch: Partial<Traveller> = {};
+    if (!lead.email.trim() && contact.email) patch.email = contact.email;
+    if (!lead.mobileNo.trim() && contact.mobileNo) patch.mobileNo = contact.mobileNo;
+    if (Object.keys(patch).length) updateTraveller(0, patch);
+  }, [hydrated, travellers, updateTraveller, user]);
 
   /** Saves the travellers the user chose to keep; returns false if any failed. */
   async function saveChosen(): Promise<boolean> {
