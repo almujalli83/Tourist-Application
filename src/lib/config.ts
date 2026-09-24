@@ -1,5 +1,11 @@
 /** Server-side configuration (read from environment variables). */
-export const VISA_INSURANCE_FEE_SAR = Number(process.env.VISA_INSURANCE_FEE_SAR ?? "402.21");
+const DEFAULT_VISA_FEE_SAR = 402.21;
+const configuredFee = Number(process.env.VISA_INSURANCE_FEE_SAR);
+/** Visa + insurance fee per traveller; an empty or invalid setting falls back to 402.21 SAR. */
+export const VISA_INSURANCE_FEE_SAR =
+  process.env.VISA_INSURANCE_FEE_SAR?.trim() && Number.isFinite(configuredFee) && configuredFee > 0
+    ? configuredFee
+    : DEFAULT_VISA_FEE_SAR;
 
 /** Package constraints from MT eVisa guide §10.4.2 and business validation codes §10.1. */
 export const PACKAGE_LIMITS = {
