@@ -2,9 +2,10 @@ import type { Dictionary } from "./ar";
 
 const en: Dictionary = {
   meta: {
-    appName: "Tourist App",
+    appName: "Saudi Trip",
+    slogan: "Your trip & visa to Saudi Arabia",
     tagline: "Your official gateway to tourism package visas for Saudi Arabia",
-    description: "Tourist App — book an all-inclusive tourism package (flights, hotels, activities) and get your tourist visa and insurance in one step.",
+    description: "Saudi Trip — book an all-inclusive tourism package (flights, hotels, activities) and get your tourist visa and insurance in one step.",
   },
   nav: {
     home: "Home",
@@ -77,7 +78,7 @@ const en: Dictionary = {
     heroTitle: "Discover Saudi Arabia with an all-inclusive package",
     heroSubtitle: "International and domestic flights, licensed hotels and curated activities from accredited travel agents — with your tourist visa and medical insurance in a single application.",
     startNow: "Start your application",
-    servicesTitle: "Tourist App services",
+    servicesTitle: "Saudi Trip services",
     servicesSubtitle: "We are rolling out services one by one to cover your entire journey",
     packageVisaDesc: "An all-inclusive tourism package with visa and insurance, connected to travel agents and the Ministry of Tourism eVisa platform.",
     comingServices: ["Tourist eVisa", "Event booking", "Transport & mobility", "Tour guides"],
@@ -414,7 +415,7 @@ const en: Dictionary = {
   },
   footer: {
     rights: "All rights reserved",
-    about: "Tourist App is a platform for booking all-inclusive tourism packages with visa, connected to the Ministry of Tourism platform and accredited travel agents.",
+    about: "Saudi Trip is a platform for booking all-inclusive tourism packages with visa, connected to the Ministry of Tourism platform and accredited travel agents.",
     support: "Support",
     privacy: "Privacy",
     terms: "Terms & conditions",

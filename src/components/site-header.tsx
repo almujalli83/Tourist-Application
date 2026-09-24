@@ -53,7 +53,7 @@ export function SiteHeader() {
           <Logo className="size-9" />
           <span className="flex flex-col leading-tight">
             <span className="text-base font-bold">{t.meta.appName}</span>
-            <span className="hidden text-[11px] text-brand-100/80 sm:block">{locale === "ar" ? "Tourist App" : "تطبيق السائح"}</span>
+            <span className="hidden text-[11px] text-brand-100/80 sm:block">{t.meta.slogan}</span>
           </span>
         </Link>
 

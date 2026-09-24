@@ -1,4 +1,4 @@
-# Product backlog — تطبيق السائح
+# Product backlog — Saudi Trip (سعودي تريب)
 
 The app is delivered service by service (Agile). Each service lives in this repository and reuses the shared
 platform: i18n (ar/en), multi-currency, B2C/B2B accounts, travel-agent aggregator, and MT eVisa client.

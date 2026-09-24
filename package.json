@@ -1,8 +1,8 @@
 {
-  "name": "tourist-application",
+  "name": "saudi-trip",
   "version": "0.1.0",
   "private": true,
-  "description": "تطبيق السائح — Tourist Application (Tourism Package Visa service)",
+  "description": "Saudi Trip (سعودي تريب) — tourism package visa platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
