@@ -65,10 +65,14 @@ function fromSaved(tr: Traveller, saved: SavedTraveller): Partial<Traveller> {
   return patch;
 }
 
-/** The signed-in account's email and mobile, used to pre-fill the lead traveller's contact details. */
-function accountContact(user: PublicUser): { email: string; mobileNo: string } {
-  const phone = user.accountType === "company" ? user.company?.phone : user.individual?.phone;
-  return { email: user.email, mobileNo: phone ?? "" };
+/**
+ * The individual account's email and mobile, used to pre-fill the lead traveller's contact details.
+ * Company accounts get none: the eVisa and insurance policy go to each traveller's own email, so
+ * the agency enters its clients' details.
+ */
+function accountContact(user: PublicUser): { email: string; mobileNo: string } | null {
+  if (user.accountType === "company") return null;
+  return { email: user.email, mobileNo: user.individual?.phone ?? "" };
 }
 
 function TravellersForms() {
@@ -105,6 +109,7 @@ function TravellersForms() {
     prefilled.current = true;
     const lead = travellers[0];
     const contact = accountContact(user);
+    if (!contact) return;
     const patch: Partial<Traveller> = {};
     if (!lead.email.trim() && contact.email) patch.email = contact.email;
     if (!lead.mobileNo.trim() && contact.mobileNo) patch.mobileNo = contact.mobileNo;
