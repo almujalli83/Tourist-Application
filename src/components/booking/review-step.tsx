@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
+import { countryName } from "@/lib/data/countries";
 import type { PrivacyPolicyResponse } from "@/lib/mt-evisa/types";
 import { useApp } from "../app-provider";
 import { AuthForm } from "../auth-form";
@@ -175,8 +176,12 @@ export function ReviewStep() {
                   <img src={x.personPhoto} alt="" className="size-10 rounded-full object-cover" />
                 ) : <span className="size-10 rounded-full bg-slate-200" />}
                 <div>
-                  <p className="font-semibold">{[x.firstNameEn, x.familyNameEn].join(" ")}</p>
-                  <p className="ltr-nums text-xs text-slate-500">{x.passportNo} · {x.nationality}</p>
+                  <p className="font-semibold">{[x.firstNameEn, x.familyNameEn].filter(Boolean).join(" ") || fmt(t.travellers.travellerN, { n: i + 1 })}</p>
+                  <p className="text-xs text-slate-500">
+                    {[{ adult: t.common.adult, child: t.common.child, infant: t.common.infant }[x.paxType], x.passportNo, countryName(x.nationality, locale)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
                 </div>
               </li>
             ))}

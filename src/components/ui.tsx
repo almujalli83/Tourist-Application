@@ -76,7 +76,7 @@ export function Field({ label, error, hint, required, children, className, htmlF
   const id = htmlFor ?? autoId;
   return (
     <FieldIdContext.Provider value={id}>
-    <div className={cx("flex flex-col gap-1.5", className)}>
+    <div className={cx("flex min-w-0 flex-col gap-1.5", className)}>
       <label htmlFor={id} className="text-sm font-medium text-slate-700">
         {label}
         {required && <span className="ms-0.5 text-red-600">*</span>}
@@ -89,7 +89,7 @@ export function Field({ label, error, hint, required, children, className, htmlF
 }
 
 const inputBase =
-  "w-full rounded-lg border bg-white px-3 text-sm text-ink placeholder:text-slate-400 transition focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:bg-slate-50";
+  "w-full min-w-0 max-w-full rounded-lg border bg-white px-3 text-sm text-ink placeholder:text-slate-400 transition focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:bg-slate-50";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }>(function Input(
   { invalid, className, id, ...rest }, ref,
