@@ -65,5 +65,10 @@ export function createPgStore(url: string): DocStore {
         return next;
       })) as never;
     },
+    async delete(col, id) {
+      await init();
+      const rows = await sql`delete from documents where collection = ${col} and id = ${id} returning id`;
+      return rows.length > 0;
+    },
   };
 }

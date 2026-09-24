@@ -20,6 +20,8 @@ type Props = {
   errors: FieldErrors;
   showErrors: boolean;
   onChange: (patch: Partial<Traveller>) => void;
+  /** "profile" edits a saved traveller: trip-specific sections are hidden. */
+  mode?: "booking" | "profile";
 };
 
 function Section({ title, icon, children, subtitle }: { title: string; icon: ReactNode; children: ReactNode; subtitle?: string }) {
@@ -31,7 +33,8 @@ function Section({ title, icon, children, subtitle }: { title: string; icon: Rea
   );
 }
 
-export function TravellerForm({ index, traveller: tr, all, errors, showErrors, onChange }: Props) {
+export function TravellerForm({ index, traveller: tr, all, errors, showErrors, onChange, mode = "booking" }: Props) {
+  const booking = mode === "booking";
   const { t, locale } = useApp();
   const tf = t.travellers.fields;
   const e = (k: string) => (showErrors && errors[k] ? t.travellers.errors[errors[k] as keyof typeof t.travellers.errors] ?? errors[k] : undefined);
@@ -170,111 +173,115 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
           </Field>
           {text("zipCode", { dir: "ltr", max: 15 })}
         </div>
-        {index > 0 && (
+        {booking && index > 0 && (
           <button type="button" className="mt-3 text-sm font-semibold text-brand-700 hover:underline" onClick={() => onChange({ email: all[0].email, mobileNo: all[0].mobileNo, zipCode: all[0].zipCode })}>
             {t.travellers.copyContact}
           </button>
         )}
       </Section>
 
-      <Section title={t.travellers.sections.companion} icon={<UsersIcon className="size-5" />}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={tf.sponsor} error={e("sponsorIndex")}>
-            <Select
-              value={tr.sponsorIndex === null ? "" : String(tr.sponsorIndex)}
-              onChange={(ev) => onChange({ sponsorIndex: ev.target.value === "" ? null : Number(ev.target.value) })}
-              invalid={!!e("sponsorIndex")}
-            >
-              <option value="">{tf.noSponsor}</option>
-              {sponsors.map(({ o, i }) => <option key={i} value={i}>{nameOf(o, i)}</option>)}
-            </Select>
-          </Field>
-          {tr.sponsorIndex !== null && (
-            <Field label={tf.companionType} required error={e("companionType")}>
-              <Select value={tr.companionType} onChange={(ev) => onChange({ companionType: ev.target.value })} invalid={!!e("companionType")}>
-                <option value="">—</option>
-                {COMPANION_TYPES.map((c) => <option key={c.code} value={c.code}>{c[locale]}</option>)}
-              </Select>
-            </Field>
-          )}
-        </div>
-      </Section>
-
-      <Section title={t.travellers.sections.security} icon={<ShieldIcon className="size-5" />} subtitle={t.travellers.security.intro}>
-        <div className="divide-y divide-slate-100">
-          {SECURITY_CLARIFIED.map((k) => (
-            <div key={k} className="py-3 first:pt-0">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-800">{t.travellers.security[k]}</p>
-                <YesNoInput name={`t${index}-${k}`} value={tr.security[k].answer} onChange={(v) => setSecurity(k, { answer: v })} labels={yn} invalid={!!e(`security.${k}`)} />
-              </div>
-              {tr.security[k].answer === "true" && (
-                <Textarea
-                  className="mt-2"
-                  maxLength={2000}
-                  placeholder={`${t.travellers.security.clarification}: ${t.travellers.security.clarificationHints[k]}`}
-                  value={tr.security[k].clarification}
-                  onChange={(ev) => setSecurity(k, { clarification: ev.target.value })}
-                  invalid={!!e(`security.${k}`)}
-                />
-              )}
-              {e(`security.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`security.${k}`)}</p>}
-            </div>
-          ))}
-          {SECURITY_SIMPLE.map((k) => (
-            <div key={k} className="py-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-800">{t.travellers.security[k]}</p>
-                <YesNoInput name={`t${index}-${k}`} value={tr.security[k]} onChange={(v) => setSimple(k, v)} labels={yn} invalid={!!e(`security.${k}`)} />
-              </div>
-              {e(`security.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`security.${k}`)}</p>}
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section title={t.travellers.sections.insurance} icon={<HeartPulseIcon className="size-5" />} subtitle={t.travellers.insurance.intro}>
-        <div className="divide-y divide-slate-100">
-          {/* All six insurance questions of the MT guide (§2.4); 4–5 are optional, 6 depends on them. */}
-          {(["question1", "question2", "question3", "question4", "question5"] as const).map((k, i) => (
-            <div key={k} className="py-3 first:pt-0">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-800">
-                  <span className="me-1 font-semibold text-brand-700">{i + 1}.</span>
-                  {t.travellers.insurance[k]}
-                  {(k === "question4" || k === "question5") && <span className="ms-1 text-xs text-slate-400">({t.common.optional})</span>}
-                </p>
-                <YesNoInput name={`t${index}-${k}`} value={tr.insurance[k] as YesNo | ""} onChange={(v) => setIns(k, v)} labels={yn} invalid={!!e(`insurance.${k}`)} />
-              </div>
-              {e(`insurance.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`insurance.${k}`)}</p>}
-            </div>
-          ))}
-          {(() => {
-            const pregnant = tr.insurance.question4 === "true" || tr.insurance.question5 === "true";
-            return (
-              <div className="py-3">
-                <Field
-                  label={`6. ${t.travellers.insurance.question6}`}
-                  required={pregnant}
-                  hint={pregnant ? undefined : t.travellers.insurance.question6Hint}
-                  error={e("insurance.question6")}
+      {booking && (
+        <>
+          <Section title={t.travellers.sections.companion} icon={<UsersIcon className="size-5" />}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={tf.sponsor} error={e("sponsorIndex")}>
+                <Select
+                  value={tr.sponsorIndex === null ? "" : String(tr.sponsorIndex)}
+                  onChange={(ev) => onChange({ sponsorIndex: ev.target.value === "" ? null : Number(ev.target.value) })}
+                  invalid={!!e("sponsorIndex")}
                 >
-                  <Input
-                    type="number"
-                    min={0}
-                    max={9}
-                    className="max-w-28"
-                    value={pregnant ? tr.insurance.question6 : "0"}
-                    disabled={!pregnant}
-                    onChange={(ev) => setIns("question6", ev.target.value)}
-                    invalid={!!e("insurance.question6")}
-                  />
+                  <option value="">{tf.noSponsor}</option>
+                  {sponsors.map(({ o, i }) => <option key={i} value={i}>{nameOf(o, i)}</option>)}
+                </Select>
+              </Field>
+              {tr.sponsorIndex !== null && (
+                <Field label={tf.companionType} required error={e("companionType")}>
+                  <Select value={tr.companionType} onChange={(ev) => onChange({ companionType: ev.target.value })} invalid={!!e("companionType")}>
+                    <option value="">—</option>
+                    {COMPANION_TYPES.map((c) => <option key={c.code} value={c.code}>{c[locale]}</option>)}
+                  </Select>
                 </Field>
-              </div>
-            );
-          })()}
-        </div>
-      </Section>
+              )}
+            </div>
+          </Section>
+
+          <Section title={t.travellers.sections.security} icon={<ShieldIcon className="size-5" />} subtitle={t.travellers.security.intro}>
+            <div className="divide-y divide-slate-100">
+              {SECURITY_CLARIFIED.map((k) => (
+                <div key={k} className="py-3 first:pt-0">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-800">{t.travellers.security[k]}</p>
+                    <YesNoInput name={`t${index}-${k}`} value={tr.security[k].answer} onChange={(v) => setSecurity(k, { answer: v })} labels={yn} invalid={!!e(`security.${k}`)} />
+                  </div>
+                  {tr.security[k].answer === "true" && (
+                    <Textarea
+                      className="mt-2"
+                      maxLength={2000}
+                      placeholder={`${t.travellers.security.clarification}: ${t.travellers.security.clarificationHints[k]}`}
+                      value={tr.security[k].clarification}
+                      onChange={(ev) => setSecurity(k, { clarification: ev.target.value })}
+                      invalid={!!e(`security.${k}`)}
+                    />
+                  )}
+                  {e(`security.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`security.${k}`)}</p>}
+                </div>
+              ))}
+              {SECURITY_SIMPLE.map((k) => (
+                <div key={k} className="py-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-800">{t.travellers.security[k]}</p>
+                    <YesNoInput name={`t${index}-${k}`} value={tr.security[k]} onChange={(v) => setSimple(k, v)} labels={yn} invalid={!!e(`security.${k}`)} />
+                  </div>
+                  {e(`security.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`security.${k}`)}</p>}
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          <Section title={t.travellers.sections.insurance} icon={<HeartPulseIcon className="size-5" />} subtitle={t.travellers.insurance.intro}>
+            <div className="divide-y divide-slate-100">
+              {/* All six insurance questions of the MT guide (§2.4); 4–5 are optional, 6 depends on them. */}
+              {(["question1", "question2", "question3", "question4", "question5"] as const).map((k, i) => (
+                <div key={k} className="py-3 first:pt-0">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-800">
+                      <span className="me-1 font-semibold text-brand-700">{i + 1}.</span>
+                      {t.travellers.insurance[k]}
+                      {(k === "question4" || k === "question5") && <span className="ms-1 text-xs text-slate-400">({t.common.optional})</span>}
+                    </p>
+                    <YesNoInput name={`t${index}-${k}`} value={tr.insurance[k] as YesNo | ""} onChange={(v) => setIns(k, v)} labels={yn} invalid={!!e(`insurance.${k}`)} />
+                  </div>
+                  {e(`insurance.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`insurance.${k}`)}</p>}
+                </div>
+              ))}
+              {(() => {
+                const pregnant = tr.insurance.question4 === "true" || tr.insurance.question5 === "true";
+                return (
+                  <div className="py-3">
+                    <Field
+                      label={`6. ${t.travellers.insurance.question6}`}
+                      required={pregnant}
+                      hint={pregnant ? undefined : t.travellers.insurance.question6Hint}
+                      error={e("insurance.question6")}
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        max={9}
+                        className="max-w-28"
+                        value={pregnant ? tr.insurance.question6 : "0"}
+                        disabled={!pregnant}
+                        onChange={(ev) => setIns("question6", ev.target.value)}
+                        invalid={!!e("insurance.question6")}
+                      />
+                    </Field>
+                  </div>
+                );
+              })()}
+            </div>
+          </Section>
+        </>
+      )}
     </div>
   );
 }

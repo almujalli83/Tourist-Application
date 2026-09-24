@@ -69,6 +69,9 @@ export function SectionTitle({ title, subtitle, icon }: { title: string; subtitl
 /** Lets Input/Select/Textarea pick up the id of the surrounding Field so its label is associated. */
 const FieldIdContext = createContext<string | undefined>(undefined);
 
+/** The id of the surrounding Field, for custom controls that render their own input. */
+export const useFieldId = () => useContext(FieldIdContext);
+
 export function Field({ label, error, hint, required, children, className, htmlFor }: {
   label: string; error?: string; hint?: string; required?: boolean; children: ReactNode; className?: string; htmlFor?: string;
 }) {

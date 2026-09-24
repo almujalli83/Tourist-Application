@@ -60,5 +60,12 @@ export function createFileStore(file: string): DocStore {
         c[id] = fn(clone(c[id]) as never);
         return clone(c[id]) as never;
       }, true),
+    delete: (col, id) =>
+      run((d) => {
+        const c = d[col] ?? {};
+        if (!(id in c)) return false;
+        delete c[id];
+        return true;
+      }, true),
   };
 }

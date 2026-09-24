@@ -2,14 +2,16 @@ import { redirect } from "next/navigation";
 import { AccountView } from "@/components/account-view";
 import { currentUser } from "@/lib/auth/session";
 import { listBookings } from "@/lib/bookings/service";
+import { listSavedTravellers } from "@/lib/saved-travellers-repo";
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const user = await currentUser();
   if (!user) redirect(`/${locale}/login?next=/${locale}/account`);
-  const bookings = await listBookings(user.id);
+  const [bookings, saved] = await Promise.all([listBookings(user.id), listSavedTravellers(user.id)]);
   return (
     <AccountView
+      savedTravellers={saved.length}
       bookings={bookings.map((b) => ({
         id: b.id,
         reference: b.reference,
