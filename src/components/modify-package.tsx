@@ -22,6 +22,8 @@ interface Options {
   returnFlights: FlightOffer[];
   hotels: HotelOffer[];
   domesticFlights: FlightOffer[];
+  /** Lists empty because the agents could not be reached. */
+  unavailable?: ("hotels" | "domesticFlights" | "returnFlights")[];
 }
 
 function Choice({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -280,7 +282,7 @@ export function ModifyPackage({ id }: { id: string }) {
           {options.kind === "extend" && (
             <Card className="p-5 sm:p-6">
               <SectionTitle title={m.hotelsTitle} icon={<HotelIcon className="size-5" />} />
-              {options.hotels.length === 0 && <p className="mt-3 text-sm text-slate-500">{m.noOptions}</p>}
+              {options.hotels.length === 0 && <Alert tone="warning" className="mt-3">{options.unavailable?.includes("hotels") ? m.agentsUnavailable : m.noOptions}</Alert>}
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {options.hotels.slice(0, 10).map((h) => (
                   <Choice key={h.id} selected={hotelId === h.id} onClick={() => setHotelId(h.id)}>
@@ -301,7 +303,7 @@ export function ModifyPackage({ id }: { id: string }) {
           {options.kind === "extend" && mode === "newCity" && transport === "flight" && (
             <Card className="p-5 sm:p-6">
               <SectionTitle title={m.domesticTitle} icon={<PlaneIcon className="size-5" />} />
-              {options.domesticFlights.length === 0 && <p className="mt-3 text-sm text-slate-500">{m.noOptions}</p>}
+              {options.domesticFlights.length === 0 && <Alert tone="warning" className="mt-3">{options.unavailable?.includes("domesticFlights") ? m.agentsUnavailable : m.noOptions}</Alert>}
               <div className="mt-4 space-y-2">
                 {options.domesticFlights.slice(0, 8).map((f) => (
                   <Choice key={f.id} selected={domesticId === f.id} onClick={() => setDomesticId(f.id)}>{flightRow(f)}</Choice>
@@ -312,7 +314,7 @@ export function ModifyPackage({ id }: { id: string }) {
 
           <Card className="p-5 sm:p-6">
             <SectionTitle title={m.returnTitle} icon={<PlaneIcon className="size-5" />} subtitle={fmt(m.returnAgentNote, { agent: locale === "ar" ? retFlight.agentNameAr : retFlight.agentNameEn })} />
-            {options.returnFlights.length === 0 && <p className="mt-3 text-sm text-slate-500">{m.noOptions}</p>}
+            {options.returnFlights.length === 0 && <Alert tone="warning" className="mt-3">{options.unavailable?.includes("returnFlights") ? m.agentsUnavailable : m.noOptions}</Alert>}
             <div className="mt-4 space-y-2">
               {options.returnFlights.slice(0, 8).map((f) => (
                 <Choice key={f.id} selected={returnId === f.id} onClick={() => setReturnId(f.id)}>{flightRow(f)}</Choice>
@@ -320,6 +322,17 @@ export function ModifyPackage({ id }: { id: string }) {
             </div>
           </Card>
 
+          {!plan && (
+            <Alert tone="warning">
+              {fmt(m.cannotComplete, {
+                items: [
+                  options.kind === "extend" && !options.hotels.length && m.hotelsTitle,
+                  options.kind === "extend" && mode === "newCity" && transport === "flight" && !options.domesticFlights.length && m.domesticTitle,
+                  !options.returnFlights.length && m.returnTitle,
+                ].filter(Boolean).join(locale === "ar" ? "، " : ", ") || m.selectAll,
+              })}
+            </Alert>
+          )}
           {plan && !quote && !error && <div className="flex items-center gap-3 text-brand-700"><Spinner className="size-5" />{t.common.loading}</div>}
 
           {quote && (
