@@ -8,6 +8,8 @@ export interface PriceBreakdown {
   visaInsuranceSAR: number;
   visaFeePerTravellerSAR: number;
   travellers: number;
+  /** Paid, non-refundable amounts of services cancelled by a package change (still part of the price). */
+  retainedSAR?: number;
   totalSAR: number;
 }
 
@@ -21,6 +23,7 @@ export function computePackagePrice(input: {
   hotels: HotelOffer[];
   activities: ActivityOffer[];
   visaFeeSAR: number;
+  retainedSAR?: number;
 }): PriceBreakdown {
   const travellers = input.pax.adults + input.pax.children + input.pax.infants;
   const flightsSAR = roundSAR(input.flights.reduce((a, f) => a + priceFlightOffer(f.fare, input.pax), 0));
@@ -34,7 +37,8 @@ export function computePackagePrice(input: {
     visaInsuranceSAR,
     visaFeePerTravellerSAR: input.visaFeeSAR,
     travellers,
-    totalSAR: roundSAR(flightsSAR + hotelsSAR + activitiesSAR + visaInsuranceSAR),
+    ...(input.retainedSAR ? { retainedSAR: roundSAR(input.retainedSAR) } : {}),
+    totalSAR: roundSAR(flightsSAR + hotelsSAR + activitiesSAR + visaInsuranceSAR + (input.retainedSAR ?? 0)),
   };
 }
 
@@ -50,10 +54,12 @@ export function applicantShare(input: {
   hotels: HotelOffer[];
   activities: ActivityOffer[];
   visaFeeSAR: number;
+  retainedSAR?: number;
 }) {
   const flightPrice = roundSAR(input.flights.reduce((a, f) => a + f.fare[input.paxType], 0));
   const hotelPrices = input.hotels.map((h) => roundSAR(h.totalSAR / input.travellers));
   const activities = roundSAR(input.activities.reduce((a, x) => a + x.totalSAR, 0) / input.travellers);
-  const total = roundSAR(flightPrice + hotelPrices.reduce((a, b) => a + b, 0) + activities + input.visaFeeSAR);
+  const retained = (input.retainedSAR ?? 0) / input.travellers;
+  const total = roundSAR(flightPrice + hotelPrices.reduce((a, b) => a + b, 0) + activities + input.visaFeeSAR + retained);
   return { flightPrice, hotelPrices, activities, total };
 }

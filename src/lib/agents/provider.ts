@@ -42,4 +42,17 @@ export interface TravelAgentProvider {
   quoteStayExtension(req: { hotel: HotelOffer; newCheckOut: string }): Promise<{ pricePerNightSAR: number } | null>;
   /** Fee charged per ticket (adults and children) to change the date or route of a ticket it issued. */
   flightChangeFeeSAR(offer: FlightOffer): number;
+  /**
+   * Sends a package change (ticket reissue, stay extension, cancellations, new bookings) to the
+   * agent for approval. Nothing is final until `confirmChange`; `releaseChange` withdraws it.
+   */
+  requestChange(req: AgentChangeRequest): Promise<{ approved: true; reference: string } | { approved: false; reason: string }>;
+  confirmChange(reference: string): Promise<void>;
+  releaseChange(reference: string): Promise<void>;
+}
+
+export interface AgentChangeRequest {
+  bookingReference: string;
+  /** Items of the change handled by this agent (hotels, flights, activities). */
+  items: { type: string; description: string; amountSAR: number }[];
 }

@@ -235,6 +235,9 @@ function ModificationLog({ booking, onChange }: { booking: StoredBooking; onChan
                 </li>
               ))}
             </ul>
+            {!!m.agents?.length && (
+              <p className="ltr-nums text-xs text-slate-500">{l.agentRefs}: {m.agents.map((x) => `${locale === "ar" ? x.agentNameAr : x.agentNameEn} ${x.reference}`).join(" · ")}</p>
+            )}
             {m.notified && <p className="text-xs text-brand-700">✓ {l.notified}</p>}
             {m.mt.status !== "UPDATED" && m.id === latest?.id && (
               <Button size="sm" variant="secondary" loading={busy === m.id} onClick={() => void retry(m)}>{l.retry}</Button>

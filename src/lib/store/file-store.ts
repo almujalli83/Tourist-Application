@@ -60,6 +60,7 @@ export function createFileStore(file: string): DocStore {
         c[id] = fn(clone(c[id]) as never);
         return clone(c[id]) as never;
       }, true),
+    list: (col, limit = 500) => run((d) => Object.values(d[col] ?? {}).slice(-limit).reverse().map(clone) as never, false),
     delete: (col, id) =>
       run((d) => {
         const c = d[col] ?? {};
