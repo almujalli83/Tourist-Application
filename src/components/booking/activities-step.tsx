@@ -7,6 +7,7 @@ import { useApp } from "../app-provider";
 import { MapPinIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "../ui";
 import { useBooking, type ActivityStayResult } from "./booking-context";
+import { PackageRequirements, usePackageCheck } from "./package-requirements";
 import { useFetchStep } from "./use-fetch-step";
 import { WizardShell } from "./wizard-shell";
 
@@ -20,15 +21,22 @@ export function ActivitiesStep() {
     booking.criteria,
     (d) => booking.setActivityResults(d.stays),
   );
+  // The visa form opens only for packages meeting the key package requirements.
+  const check = usePackageCheck();
+  const blocked = !check?.ok;
   const next = (
-    <Button className="w-full" onClick={() => router.push(`/${locale}/package-visa/travellers`)}>
-      {booking.activities.length ? t.common.continue : t.activities.skip}
-    </Button>
+    <div className="flex flex-col gap-1.5">
+      <Button className="w-full" disabled={blocked} onClick={() => router.push(`/${locale}/package-visa/travellers`)}>
+        {booking.activities.length ? t.common.continue : t.activities.skip}
+      </Button>
+      {blocked && <p className="text-center text-xs font-medium text-red-700">{t.packageRules.continueHint}</p>}
+    </div>
   );
   return (
     <WizardShell step={3} title={t.activities.title} subtitle={t.activities.subtitle} sidebarFooter={next}>
       {loading && <div className="flex items-center gap-3 rounded-xl bg-white p-6 text-brand-700"><Spinner className="size-6" />{t.flights.searching}</div>}
       {error && <Alert tone="error">{(t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button></Alert>}
+      {check && <PackageRequirements check={check} className="mb-6" />}
       <div className="space-y-8">
         {booking.activityResults?.map(({ stay, offers }) => (
           <section key={stay.city} className="space-y-3">

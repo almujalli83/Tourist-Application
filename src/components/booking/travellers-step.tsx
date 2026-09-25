@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmt } from "@/i18n";
@@ -14,6 +15,7 @@ import { CheckIcon, LockIcon } from "../icons";
 import { fetchSavedTraveller, saveTraveller, useSavedTravellers } from "../saved-travellers-api";
 import { Alert, Button, Card, cx, SectionTitle } from "../ui";
 import { useBooking } from "./booking-context";
+import { PackageRequirements, usePackageCheck } from "./package-requirements";
 import { SavedTravellerPicker } from "./saved-traveller-picker";
 import { TravellerForm } from "./traveller-form";
 import { WizardShell } from "./wizard-shell";
@@ -38,7 +40,19 @@ export function useTravellerValidation() {
 
 /** Traveller details are personal data: they are entered only once the user is signed in. */
 export function TravellersStep() {
-  const { t, user } = useApp();
+  const { t, locale, user } = useApp();
+  const check = usePackageCheck();
+  // Only packages meeting the key package requirements reach the sign-in and visa form.
+  if (check && !check.ok) {
+    return (
+      <WizardShell step={4} title={t.packageRules.blockedTitle} subtitle={t.packageRules.notMet}>
+        <PackageRequirements check={check} />
+        <Link href={`/${locale}/package-visa/activities`} className="mt-4 inline-flex h-11 items-center rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
+          {t.packageRules.fixPackage}
+        </Link>
+      </WizardShell>
+    );
+  }
   if (user) return <TravellersForms />;
   return (
     <WizardShell step={4} title={t.travellers.title} subtitle={t.travellers.subtitle}>

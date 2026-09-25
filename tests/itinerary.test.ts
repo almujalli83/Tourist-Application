@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildLegs, splitNights, stayDates, validateCriteria } from "@/lib/itinerary";
+import { addDays } from "@/lib/dates";
 import type { SearchCriteria } from "@/lib/types";
 
 const base: SearchCriteria = {
@@ -39,14 +40,22 @@ describe("itinerary", () => {
     expect(validateCriteria(base, "2026-09-24")).toEqual([]);
   });
 
-  it("enforces MT business rules", () => {
+  it("enforces the key package rules", () => {
     const today = "2026-09-24";
-    expect(validateCriteria({ ...base, departureDate: "2026-09-25", returnDate: "2026-10-02" }, today)).toContain("leadTime"); // VTP010
-    expect(validateCriteria({ ...base, departureDate: "2026-12-20", returnDate: "2026-12-27" }, today)).toContain("leadTime");
-    expect(validateCriteria({ ...base, stays: [{ city: "RUH", nights: 25 }], returnDate: "2026-11-04" }, today)).toContain("duration"); // VTP004
-    expect(validateCriteria({ ...base, stays: [{ city: "MED", nights: 7 }] }, today)).toContain("cities"); // VTP006
+    const trip = (departureDate: string, nights: number) => ({ ...base, departureDate, returnDate: addDays(departureDate, nights), stays: [{ city: "RUH", nights }] });
+    // Purchase-to-travel: at least 3 days (and at most 80, VTP010)
+    expect(validateCriteria(trip("2026-09-26", 5), today)).toContain("leadTime");
+    expect(validateCriteria(trip("2026-09-27", 5), today)).not.toContain("leadTime");
+    expect(validateCriteria(trip("2026-12-20", 5), today)).toContain("leadTime");
+    // Duration: 2 to 88 days
+    expect(validateCriteria(trip("2026-10-10", 1), today)).toContain("duration");
+    expect(validateCriteria(trip("2026-10-10", 88), today)).toEqual([]);
+    expect(validateCriteria(trip("2026-10-10", 89), today)).toContain("duration");
+    // All regions: Madinah is allowed; unknown or non-airport destinations are not
+    expect(validateCriteria({ ...base, stays: [{ city: "MED", nights: 7 }] }, today)).toEqual([]);
+    expect(validateCriteria({ ...base, stays: [{ city: "MKK", nights: 7 }] }, today)).toContain("cities");
     expect(validateCriteria({ ...base, pax: { adults: 10, children: 0, infants: 0 } }, today)).toContain("maxAdults");
-    expect(validateCriteria({ ...base, pax: { adults: 2, children: 4, infants: 2 } }, today)).toContain("maxMinors"); // TP009
+    expect(validateCriteria({ ...base, pax: { adults: 2, children: 4, infants: 2 } }, today)).toContain("maxMinors");
     expect(validateCriteria({ ...base, pax: { adults: 1, children: 0, infants: 2 } }, today)).toContain("infants");
     expect(validateCriteria({ ...base, stays: [{ city: "RUH", nights: 3 }] }, today)).toContain("nightsMismatch");
   });
