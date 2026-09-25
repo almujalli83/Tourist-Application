@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
 import { SAUDI_CITIES } from "@/lib/data/cities";
@@ -7,12 +8,29 @@ import { directionsLinks, distanceKm } from "@/lib/guide/geo";
 import { isOpenNow, ksaClock } from "@/lib/guide/hours";
 import type { PublicPlace } from "@/lib/guide/repo";
 import { matchesQuery } from "@/lib/guide/search";
+import { fmtKsa } from "@/lib/events/format";
 import { CITY_CENTERS } from "@/lib/guide/centers";
-import { PLACE_CATEGORIES, type OpeningSlot, type PlaceCategory, type PlaceTag } from "@/lib/guide/types";
+import { PLACE_CATEGORIES, type OpeningSlot, type PlaceTag } from "@/lib/guide/types";
 import { useApp } from "../app-provider";
-import { ChevronIcon, ClockIcon, DirectionsIcon, GlobeIcon, HeartIcon, LocateIcon, MapPinIcon, PhoneIcon, SearchIcon, ShareIcon, XIcon } from "../icons";
+import { ChevronIcon, ClockIcon, DirectionsIcon, GlobeIcon, HeartIcon, LocateIcon, MapPinIcon, PhoneIcon, SearchIcon, ShareIcon, TicketIcon, XIcon } from "../icons";
 import { Alert, Badge, Button, cx, Spinner } from "../ui";
-import { CATEGORY_COLORS, GuideMap } from "./guide-map";
+import { CATEGORY_COLORS, GuideMap, type GuideCategory } from "./guide-map";
+
+/** A guide place, or an event on sale shown on the map (category "event"). */
+type GuidePlace = Omit<PublicPlace, "category"> & { category: GuideCategory; eventId?: string; nextStart?: string; minPriceSAR?: number };
+const GUIDE_CATEGORIES: GuideCategory[] = ["event", ...PLACE_CATEGORIES];
+
+interface EventSummary {
+  id: string; city: string; titleAr: string; titleEn: string; descriptionAr: string; descriptionEn: string;
+  venueAr: string; venueEn: string; lat: number; lng: number; durationMins: number; minPriceSAR: number; sessions: { start: string }[];
+}
+
+const eventPlace = (e: EventSummary): GuidePlace => ({
+  id: `event:${e.id}`, eventId: e.id, city: e.city, category: "event", nameAr: e.titleAr, nameEn: e.titleEn,
+  descriptionAr: e.descriptionAr, descriptionEn: e.descriptionEn, addressAr: e.venueAr, addressEn: e.venueEn,
+  lat: e.lat, lng: e.lng, tags: [], source: "official", updatedAt: "", durationMins: e.durationMins,
+  nextStart: e.sessions[0]?.start, minPriceSAR: e.minPriceSAR,
+});
 
 const LOCAL_FAVORITES = "guide:favorites";
 const FILTER_TAGS: PlaceTag[] = ["family", "kids", "wheelchair", "free"];
@@ -44,21 +62,30 @@ export function GuideView() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [tripCities, setTripCities] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
-  const [places, setPlaces] = useState<PublicPlace[] | null>(null);
+  const [places, setPlaces] = useState<GuidePlace[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useState<"explore" | "favorites">("explore");
-  const [category, setCategory] = useState<PlaceCategory | "all">("all");
+  const [category, setCategory] = useState<GuideCategory | "all">("all");
   const [q, setQ] = useState("");
   const [openOnly, setOpenOnly] = useState(false);
   const [tags, setTags] = useState<PlaceTag[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "map">("list");
   const [favIds, setFavIds] = useState<string[]>([]);
-  const [favPlaces, setFavPlaces] = useState<PublicPlace[] | null>(null);
+  const [favPlaces, setFavPlaces] = useState<GuidePlace[] | null>(null);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locState, setLocState] = useState<"idle" | "locating" | "denied">("idle");
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [events, setEvents] = useState<EventSummary[]>([]);
+
+  useEffect(() => {
+    fetch("/api/events", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { events: EventSummary[] }) => setEvents(d.events))
+      .catch(() => setEvents([]));
+  }, []);
+  const cityEvents = useMemo(() => events.filter((e) => e.city === city).map(eventPlace), [events, city]);
 
   useEffect(() => {
     const i = setInterval(() => setNow(new Date()), 60_000);
@@ -177,7 +204,7 @@ export function GuideView() {
     );
   }
 
-  const source = tab === "favorites" ? favPlaces : places;
+  const source = useMemo(() => (tab === "favorites" ? favPlaces : places && [...places, ...cityEvents]), [tab, favPlaces, places, cityEvents]);
   const results = useMemo(() => {
     if (!source) return null;
     const list = source.filter(
@@ -192,12 +219,12 @@ export function GuideView() {
   }, [source, category, openOnly, tags, q, userLoc, now]);
 
   const selected = useMemo(
-    () => (selectedId ? [...(places ?? []), ...(favPlaces ?? [])].find((p) => p.id === selectedId) ?? null : null),
-    [selectedId, places, favPlaces],
+    () => (selectedId ? [...(places ?? []), ...cityEvents, ...(favPlaces ?? [])].find((p) => p.id === selectedId) ?? null : null),
+    [selectedId, places, favPlaces, cityEvents],
   );
 
   const catCounts = useMemo(() => {
-    const c: Partial<Record<PlaceCategory, number>> = {};
+    const c: Partial<Record<GuideCategory, number>> = {};
     for (const p of source ?? []) c[p.category] = (c[p.category] ?? 0) + 1;
     return c;
   }, [source]);
@@ -212,9 +239,9 @@ export function GuideView() {
   const center = CITY_CENTERS[city ?? "RUH"] ?? CITY_CENTERS.RUH;
   const farFromCity = userLoc && city && distanceKm(userLoc, center) > FAR_KM;
   const cityOptions = SAUDI_CITIES.filter((c) => (counts[c.code] ?? 0) > 0 || tripCities.includes(c.code) || c.code === city);
-  const fitKey = [tab, city, category, openOnly, tags.join(), q, favPlaces?.length ?? 0, places?.length ?? 0, view].join("|");
+  const fitKey = [tab, city, category, openOnly, tags.join(), q, favPlaces?.length ?? 0, places?.length ?? 0, cityEvents.length, view].join("|");
 
-  async function share(p: PublicPlace) {
+  async function share(p: GuidePlace) {
     const url = `${window.location.origin}/${locale}/guide?city=${p.city}&place=${encodeURIComponent(p.id)}`;
     if (navigator.share) {
       try {
@@ -238,13 +265,14 @@ export function GuideView() {
     if (!fromMap) setView("list");
   }
 
-  const openBadge = (p: PublicPlace) => {
+  const openBadge = (p: GuidePlace) => {
     const o = isOpenNow(p, now);
     if (o === null) return null;
     return <Badge tone={o ? "brand" : "red"}>{p.open24h ? g.open24h : o ? g.open : g.closed}</Badge>;
   };
 
-  const favButton = (p: PublicPlace, big = false) => {
+  const favButton = (p: GuidePlace, big = false) => {
+    if (p.eventId) return null; // events are bought, not saved
     const on = favIds.includes(p.id);
     return (
       <button
@@ -330,7 +358,7 @@ export function GuideView() {
       </div>
       <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" aria-label={g.filters}>
         <Chip active={category === "all"} onClick={() => setCategory("all")}>{g.all}</Chip>
-        {PLACE_CATEGORIES.filter((c) => catCounts[c]).map((c) => (
+        {GUIDE_CATEGORIES.filter((c) => catCounts[c]).map((c) => (
           <Chip key={c} active={category === c} onClick={() => setCategory(category === c ? "all" : c)} color={CATEGORY_COLORS[c]}>
             {g.categories[c]} <span className="opacity-60">{catCounts[c]}</span>
           </Chip>
@@ -481,10 +509,10 @@ function Chip({ active, onClick, color, children }: { active: boolean; onClick: 
 }
 
 function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBadge, favButton, now }: {
-  place: PublicPlace; km: number | null; onBack: () => void; onShowMap: () => void; onShare: () => void; copied: boolean;
+  place: GuidePlace; km: number | null; onBack: () => void; onShowMap: () => void; onShare: () => void; copied: boolean;
   openBadge: React.ReactNode; favButton: React.ReactNode; now: Date;
 }) {
-  const { t, locale } = useApp();
+  const { t, locale, money } = useApp();
   const g = t.guide;
   const ar = locale === "ar";
   const links = directionsLinks(p);
@@ -518,7 +546,7 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {openBadge}
         {km !== null && <Badge tone="gold">{fmt(g.distance, { d: km.toFixed(1) })}</Badge>}
-        <Badge>{g.source[p.source]}</Badge>
+        {!p.eventId && <Badge>{g.source[p.source]}</Badge>}
       </div>
       {description && <p className="mt-4 text-sm leading-7 text-slate-700">{description}</p>}
 
@@ -537,8 +565,18 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
         </Button>
       </div>
 
+      {p.eventId && (
+        <div className="mt-4 rounded-xl border border-pink-200 bg-pink-50 p-3 text-sm">
+          {p.nextStart && <p><span className="font-semibold">{g.nextSession}:</span> {fmtKsa(p.nextStart, locale, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}</p>}
+          {p.minPriceSAR !== undefined && <p className="mt-1 text-slate-600">{fmt(t.events.from, { price: money(p.minPriceSAR) })}</p>}
+          <Link href={`/${locale}/events/${encodeURIComponent(p.eventId)}`} className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gold-500 text-sm font-semibold text-white hover:bg-gold-600">
+            <TicketIcon className="size-4" /> {g.bookTickets}
+          </Link>
+        </div>
+      )}
+
       <dl className="mt-5 space-y-3 text-sm">
-        <div>
+        {!p.eventId && <div>
           <dt className="flex items-center gap-1.5 font-semibold text-ink"><ClockIcon className="size-4 text-slate-400" /> {g.hours}</dt>
           <dd className="mt-1 text-slate-700">
             {p.open24h ? g.open24h : p.hours?.length ? (
@@ -552,7 +590,7 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
               </ul>
             ) : g.hoursUnknown}
           </dd>
-        </div>
+        </div>}
         {duration && <Row label={g.duration} value={duration} />}
         {cuisine && <Row label={g.cuisine} value={cuisine} />}
         {p.priceLevel && <Row label={g.price} value={`${"﷼".repeat(p.priceLevel)} · ${g.priceLevels[p.priceLevel]}`} />}

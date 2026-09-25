@@ -3,5 +3,5 @@ import path from "node:path";
 
 export default defineConfig({
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
-  test: { include: ["tests/**/*.test.ts"], environment: "node", env: { DB_FILE: ".vitest-db.json" } },
+  test: { include: ["tests/**/*.test.ts"], environment: "node", setupFiles: ["tests/setup.ts"] },
 });
