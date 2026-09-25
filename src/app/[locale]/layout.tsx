@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppProvider } from "@/components/app-provider";
+import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getDictionary } from "@/i18n";
@@ -52,6 +53,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <SiteFooter />
+          <AssistantWidget />
         </AppProvider>
       </body>
     </html>
