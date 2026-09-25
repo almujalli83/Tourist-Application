@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CURRENCIES } from "@/lib/currency";
 import { useApp } from "./app-provider";
-import { GlobeIcon, Logo, MenuIcon, UserIcon, XIcon } from "./icons";
+import { ChevronIcon, GlobeIcon, Logo, MenuIcon, UserIcon, XIcon } from "./icons";
 import { cx } from "./ui";
 
 export function SiteHeader() {
@@ -13,6 +13,8 @@ export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
   const otherLocale = locale === "ar" ? "en" : "ar";
   const switchHref = pathname.replace(/^\/(ar|en)(?=\/|$)/, `/${otherLocale}`);
 
@@ -21,12 +23,35 @@ export function SiteHeader() {
     { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
     { href: `/${locale}/events`, label: t.events.nav },
     { href: `/${locale}/guide`, label: t.guide.nav },
-    ...(user ? [{ href: `/${locale}/account`, label: t.nav.myBookings }, { href: `/${locale}/account/wallet`, label: t.wallet.nav }] : []),
-    ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
+    { href: `/${locale}/transport`, label: t.transport.nav },
   ];
+  // Personal pages live in the account menu to keep the bar on one line.
+  const accountLinks = user
+    ? [
+        { href: `/${locale}/account`, label: t.nav.myBookings },
+        { href: `/${locale}/account/wallet`, label: t.wallet.nav },
+        ...(user.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
+      ]
+    : [];
+
+  // Close the account menu on navigation, outside clicks and Escape.
+  useEffect(() => setAccountOpen(false), [pathname]);
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAccountOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [accountOpen]);
 
   // The most specific matching link is the active one (e.g. /account/wallet over /account).
-  const activeHref = links
+  const activeHref = [...links, ...accountLinks]
     .map((l) => l.href)
     .filter((h) => (h === `/${locale}` ? pathname === h : pathname.startsWith(h)))
     .sort((a, b) => b.length - a.length)[0];
@@ -61,8 +86,8 @@ export function SiteHeader() {
         <Link href={`/${locale}`} className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
           <Logo className="size-9" />
           <span className="flex flex-col leading-tight">
-            <span className="text-base font-bold">{t.meta.appName}</span>
-            <span className="hidden text-[11px] text-brand-100/80 sm:block">{t.meta.slogan}</span>
+            <span className="whitespace-nowrap text-base font-bold">{t.meta.appName}</span>
+            <span className="hidden whitespace-nowrap text-[11px] text-brand-100/80 sm:block xl:hidden 2xl:block">{t.meta.slogan}</span>
           </span>
         </Link>
 
@@ -72,7 +97,7 @@ export function SiteHeader() {
               key={l.href}
               href={l.href}
               className={cx(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10",
+                "whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-white/10",
                 l.href === activeHref && "bg-white/10 text-gold-100",
               )}
             >
@@ -88,12 +113,31 @@ export function SiteHeader() {
             {t.nav.language}
           </Link>
           {user ? (
-            <div className="flex items-center gap-1">
-              <Link href={`/${locale}/account`} className="flex h-9 items-center gap-1.5 rounded-md bg-white/10 px-3 text-sm font-medium hover:bg-white/15">
+            <div className="relative" ref={accountRef}>
+              <button
+                type="button"
+                onClick={() => setAccountOpen((o) => !o)}
+                aria-expanded={accountOpen}
+                aria-haspopup="menu"
+                className={cx(
+                  "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-white/10 px-3 text-sm font-medium hover:bg-white/15",
+                  accountLinks.some((l) => l.href === activeHref) && "text-gold-100",
+                )}
+              >
                 <UserIcon className="size-4" />
                 {t.nav.account}
-              </Link>
-              <button onClick={logout} className="h-9 rounded-md px-3 text-sm text-brand-100 hover:bg-white/10">{t.nav.logout}</button>
+                <ChevronIcon className={cx("size-3.5 transition-transform", accountOpen ? "-rotate-90" : "rotate-90")} />
+              </button>
+              {accountOpen && (
+                <div role="menu" className="absolute end-0 top-11 z-50 w-56 overflow-hidden rounded-xl bg-white py-1 text-ink shadow-xl ring-1 ring-black/5">
+                  {accountLinks.map((l) => (
+                    <Link key={l.href} role="menuitem" href={l.href} onClick={() => setAccountOpen(false)} className={cx("block px-4 py-2.5 text-sm font-medium hover:bg-brand-50", l.href === activeHref && "bg-brand-50 text-brand-800")}>
+                      {l.label}
+                    </Link>
+                  ))}
+                  <button role="menuitem" onClick={logout} className="block w-full border-t border-slate-100 px-4 py-2.5 text-start text-sm text-slate-600 hover:bg-slate-50">{t.nav.logout}</button>
+                </div>
+              )}
             </div>
           ) : (
             <Link href={`/${locale}/login`} className="flex h-9 items-center gap-1.5 rounded-md bg-gold-500 px-4 text-sm font-semibold hover:bg-gold-600">
@@ -118,7 +162,10 @@ export function SiteHeader() {
             ))}
             {user ? (
               <>
-                <Link href={`/${locale}/account`} onClick={() => setOpen(false)} className="rounded-md px-3 py-3 text-base font-medium hover:bg-white/10">{t.nav.account}</Link>
+                <span className="mt-2 border-t border-white/10 px-3 pb-1 pt-3 text-xs font-semibold text-brand-100/70">{t.nav.account}</span>
+                {accountLinks.map((l) => (
+                  <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="rounded-md px-3 py-3 text-base font-medium hover:bg-white/10">{l.label}</Link>
+                ))}
                 <button onClick={() => { setOpen(false); logout(); }} className="rounded-md px-3 py-3 text-start text-base font-medium hover:bg-white/10">{t.nav.logout}</button>
               </>
             ) : (

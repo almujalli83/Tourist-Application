@@ -17,8 +17,24 @@ import { Alert, Badge, Button, cx, Spinner } from "../ui";
 import { CATEGORY_COLORS, GuideMap, type GuideCategory } from "./guide-map";
 
 /** A guide place, or an event on sale shown on the map (category "event"). */
-type GuidePlace = Omit<PublicPlace, "category"> & { category: GuideCategory; eventId?: string; nextStart?: string; minPriceSAR?: number };
-const GUIDE_CATEGORIES: GuideCategory[] = ["event", ...PLACE_CATEGORIES];
+type GuidePlace = Omit<PublicPlace, "category"> & { category: GuideCategory; eventId?: string; nextStart?: string; minPriceSAR?: number; trainStation?: string; transit?: boolean };
+const GUIDE_CATEGORIES: GuideCategory[] = ["event", "station", ...PLACE_CATEGORIES];
+
+interface StationsData {
+  stations: { code: string; nameAr: string; nameEn: string; city: string; lat: number; lng: number; line: string }[];
+  lines: { id: string; nameAr: string; nameEn: string }[];
+  metro: { code: string; nameAr: string; nameEn: string; lat: number; lng: number; linesAr: string; linesEn: string }[];
+}
+
+function stationPlaces(d: StationsData, city: string, g: { trainStation: string; metroStation: string }): GuidePlace[] {
+  const base = { city, category: "station" as const, tags: [], source: "official" as const, updatedAt: "", transit: true };
+  const trains = d.stations.filter((s) => s.city === city).map((s): GuidePlace => {
+    const line = d.lines.find((l) => l.id === s.line);
+    return { ...base, id: `station:${s.code}`, nameAr: s.nameAr, nameEn: s.nameEn, descriptionAr: `${g.trainStation} — ${line?.nameAr ?? ""}`, descriptionEn: `${g.trainStation} — ${line?.nameEn ?? ""}`, lat: s.lat, lng: s.lng, trainStation: s.code };
+  });
+  const metro = city === "RUH" ? d.metro.map((m): GuidePlace => ({ ...base, id: `station:${m.code}`, nameAr: m.nameAr, nameEn: m.nameEn, descriptionAr: `${g.metroStation} — ${m.linesAr}`, descriptionEn: `${g.metroStation} — ${m.linesEn}`, lat: m.lat, lng: m.lng })) : [];
+  return [...trains, ...metro];
+}
 
 interface EventSummary {
   id: string; city: string; titleAr: string; titleEn: string; descriptionAr: string; descriptionEn: string;
@@ -85,7 +101,18 @@ export function GuideView() {
       .then((d: { events: EventSummary[] }) => setEvents(d.events))
       .catch(() => setEvents([]));
   }, []);
-  const cityEvents = useMemo(() => events.filter((e) => e.city === city).map(eventPlace), [events, city]);
+  const [stationsData, setStationsData] = useState<StationsData | null>(null);
+  useEffect(() => {
+    fetch("/api/trains/stations")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(setStationsData)
+      .catch(() => setStationsData(null));
+  }, []);
+  const cityEvents = useMemo(
+    () => [...events.filter((e) => e.city === city).map(eventPlace), ...(stationsData && city ? stationPlaces(stationsData, city, g) : [])],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [events, city, stationsData],
+  );
 
   useEffect(() => {
     const i = setInterval(() => setNow(new Date()), 60_000);
@@ -272,7 +299,7 @@ export function GuideView() {
   };
 
   const favButton = (p: GuidePlace, big = false) => {
-    if (p.eventId) return null; // events are bought, not saved
+    if (p.eventId || p.transit) return null; // events and stations are not saved as favourites
     const on = favIds.includes(p.id);
     return (
       <button
@@ -546,7 +573,7 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {openBadge}
         {km !== null && <Badge tone="gold">{fmt(g.distance, { d: km.toFixed(1) })}</Badge>}
-        {!p.eventId && <Badge>{g.source[p.source]}</Badge>}
+        {!p.eventId && !p.transit && <Badge>{g.source[p.source]}</Badge>}
       </div>
       {description && <p className="mt-4 text-sm leading-7 text-slate-700">{description}</p>}
 
@@ -575,8 +602,14 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
         </div>
       )}
 
+      {p.trainStation && (
+        <Link href={`/${locale}/trains?from=${p.trainStation}`} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gold-500 text-sm font-semibold text-white hover:bg-gold-600">
+          <TicketIcon className="size-4" /> {g.bookTrain}
+        </Link>
+      )}
+
       <dl className="mt-5 space-y-3 text-sm">
-        {!p.eventId && <div>
+        {!p.eventId && !p.transit && <div>
           <dt className="flex items-center gap-1.5 font-semibold text-ink"><ClockIcon className="size-4 text-slate-400" /> {g.hours}</dt>
           <dd className="mt-1 text-slate-700">
             {p.open24h ? g.open24h : p.hours?.length ? (

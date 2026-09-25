@@ -9,6 +9,7 @@ import type { PublicWalletDoc, WalletDocType, WalletPerson } from "@/lib/wallet"
 import { useApp } from "./app-provider";
 import { BackLink } from "./back-link";
 import { EventTicketsSection } from "./events/ticket-view";
+import { TrainTicketsSection } from "./transport/train-ticket-view";
 import { PassportIcon, ShieldIcon, TicketIcon, UserIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Field, Input, SectionTitle, Select, Spinner } from "./ui";
 
@@ -100,6 +101,7 @@ export function WalletView() {
       )}
 
       <EventTicketsSection />
+      <TrainTicketsSection />
     </div>
   );
 }
