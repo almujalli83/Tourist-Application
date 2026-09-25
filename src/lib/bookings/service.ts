@@ -10,7 +10,8 @@ import { expectedTravellers } from "../occupancy";
 import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildSubmitRequests } from "../mt-evisa/mapper";
 import { checkPackageRequirements } from "../package-rules";
-import { chargeCard, type CardInput } from "../payment";
+import { esimTotal, issueEsimsForBooking, validateBookingEsim } from "../esim/orders";
+import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { syncIssuedDocuments } from "../wallet";
 import { computePackagePrice } from "../pricing";
 import type { ActivityOffer, BookingSelection, FlightOffer, HotelOffer, Traveller } from "../types";
@@ -31,6 +32,8 @@ export interface CreateBookingInput {
   displayCurrency: string;
   clientReference?: string;
   card: CardInput;
+  /** Optional eSIMs (Tygo) for some travellers, paid with the package but not part of its price. */
+  esim?: { planId: string; travellers: number[]; expectedSAR: number };
 }
 
 /** Numeric application number (STP015: numbers only). */
@@ -126,7 +129,17 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
 
   if (Math.abs(price.totalSAR - input.expectedTotalSAR) > 0.009) throw new BookingError("priceChanged", price);
 
-  const payment = await chargeCard(input.card, price.totalSAR);
+  // eSIMs are an add-on: charged together with the package but not counted in its price (or its minimum).
+  let esimSel: ReturnType<typeof validateBookingEsim> = null;
+  try {
+    esimSel = validateBookingEsim(input.esim, travellers.length);
+  } catch {
+    throw new BookingError("invalidEsim");
+  }
+  const esimSAR = esimSel ? esimTotal(esimSel.plan, esimSel.indexes.length) : 0;
+  if (Math.abs(esimSAR - (esimSel ? Number(input.esim?.expectedSAR) : 0)) > 0.009) throw new BookingError("priceChanged", price);
+
+  const payment = await chargeCard(input.card, Math.round((price.totalSAR + esimSAR) * 100) / 100);
   if (!payment.ok) throw new BookingError(`payment_${payment.code}`);
 
   const client = getMtClient();
@@ -210,6 +223,23 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
     ticketNos,
     modifications: [],
   };
+  if (esimSel) {
+    try {
+      const order = await issueEsimsForBooking(user, {
+        plan: esimSel.plan,
+        recipients: esimSel.indexes.map((i) => ({ name: [travellers[i].firstNameEn, travellers[i].familyNameEn].join(" ").trim(), email: travellers[i].email })),
+        payment: { transactionId: payment.transactionId, method: payment.method, last4: payment.last4 },
+        booking: { id: booking.id, reference: booking.reference },
+      });
+      booking.esim = { orderId: order.id, amountSAR: esimSAR };
+    } catch (err) {
+      // The package stands; only the eSIM amount is refunded (it can be bought again later).
+      console.error("eSIM issue failed", err);
+      await refundPayment(payment.transactionId, esimSAR);
+      booking.esim = { orderId: null, amountSAR: 0, failed: true };
+    }
+  }
+
   // Passport images and photos are sent to MT only and are not retained.
   await saveBooking(booking);
   return booking;

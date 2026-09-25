@@ -25,6 +25,7 @@ export function SiteHeader() {
     { href: `/${locale}/restaurants`, label: t.restaurants.nav },
     { href: `/${locale}/guide`, label: t.guide.nav },
     { href: `/${locale}/transport`, label: t.transport.nav },
+    { href: `/${locale}/esim`, label: t.esim.nav },
   ];
   // Personal pages live in the account menu to keep the bar on one line.
   const accountLinks = user

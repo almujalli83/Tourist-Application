@@ -46,14 +46,14 @@ export function TravellersStep() {
   // Only packages meeting the key package requirements reach the sign-in and visa form.
   if (check.loading && !check.check) {
     return (
-      <WizardShell step={4} title={t.travellers.title} subtitle={t.travellers.subtitle}>
+      <WizardShell step={5} title={t.travellers.title} subtitle={t.travellers.subtitle}>
         <div className="grid place-items-center py-16"><Spinner className="size-8 text-brand-700" /></div>
       </WizardShell>
     );
   }
   if (!check.loading && !check.ok) {
     return (
-      <WizardShell step={4} title={t.packageRules.blockedTitle}>
+      <WizardShell step={5} title={t.packageRules.blockedTitle}>
         <PackageRequirements state={check} />
         <Link href={`/${locale}/package-visa/activities`} className="mt-4 inline-flex h-11 items-center rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
           {t.packageRules.fixPackage}
@@ -63,7 +63,7 @@ export function TravellersStep() {
   }
   if (user) return <TravellersForms />;
   return (
-    <WizardShell step={4} title={t.travellers.title} subtitle={t.travellers.subtitle}>
+    <WizardShell step={5} title={t.travellers.title} subtitle={t.travellers.subtitle}>
       <Card className="p-5 sm:p-6">
         <SectionTitle title={t.travellers.loginTitle} icon={<LockIcon className="size-5" />} subtitle={t.travellers.loginIntro} />
         <div className="mt-5 max-w-2xl">
@@ -183,7 +183,7 @@ function TravellersForms() {
   const usedIds = booking.travellers.map((x) => x.savedId).filter((x): x is string => !!x);
 
   return (
-    <WizardShell step={4} title={t.travellers.title} subtitle={t.travellers.subtitle} sidebarFooter={nextBtn}>
+    <WizardShell step={5} title={t.travellers.title} subtitle={t.travellers.subtitle} sidebarFooter={nextBtn}>
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="tablist">
         {booking.travellers.map((x, i) => {
           const ok = Object.keys(errors[i] ?? {}).length === 0;

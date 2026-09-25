@@ -26,7 +26,7 @@ export function ActivitiesStep() {
   const blocked = !check.ok;
   const next = (
     <div className="flex flex-col gap-1.5">
-      <Button className="w-full" disabled={blocked} onClick={() => router.push(`/${locale}/package-visa/travellers`)}>
+      <Button className="w-full" disabled={blocked} onClick={() => router.push(`/${locale}/package-visa/esim`)}>
         {booking.activities.length ? t.common.continue : t.activities.skip}
       </Button>
       {blocked && !check.loading && <p className="text-center text-xs font-medium text-red-700">{t.packageRules.continueHint}</p>}
