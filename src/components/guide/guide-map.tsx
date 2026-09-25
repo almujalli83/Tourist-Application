@@ -6,10 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import type { PlaceCategory } from "@/lib/guide/types";
 
 /** Marker colour per category (also used by the category chips). */
-export type GuideCategory = PlaceCategory | "event";
+export type GuideCategory = PlaceCategory | "event" | "station";
 
 export const CATEGORY_COLORS: Record<GuideCategory, string> = {
   event: "#be185d",
+  station: "#334155",
   landmark: "#0f766e",
   heritage: "#b45309",
   museum: "#7c3aed",
