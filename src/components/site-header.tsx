@@ -22,6 +22,7 @@ export function SiteHeader() {
     { href: `/${locale}`, label: t.nav.home },
     { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
     { href: `/${locale}/events`, label: t.events.nav },
+    { href: `/${locale}/restaurants`, label: t.restaurants.nav },
     { href: `/${locale}/guide`, label: t.guide.nav },
     { href: `/${locale}/transport`, label: t.transport.nav },
   ];

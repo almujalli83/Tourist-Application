@@ -17,13 +17,27 @@ import { Alert, Badge, Button, cx, Spinner } from "../ui";
 import { CATEGORY_COLORS, GuideMap, type GuideCategory } from "./guide-map";
 
 /** A guide place, or an event on sale shown on the map (category "event"). */
-type GuidePlace = Omit<PublicPlace, "category"> & { category: GuideCategory; eventId?: string; nextStart?: string; minPriceSAR?: number; trainStation?: string; transit?: boolean };
+type GuidePlace = Omit<PublicPlace, "category"> & { category: GuideCategory; eventId?: string; nextStart?: string; minPriceSAR?: number; trainStation?: string; transit?: boolean; restaurantId?: string };
 const GUIDE_CATEGORIES: GuideCategory[] = ["event", "station", ...PLACE_CATEGORIES];
 
 interface StationsData {
   stations: { code: string; nameAr: string; nameEn: string; city: string; lat: number; lng: number; line: string }[];
   lines: { id: string; nameAr: string; nameEn: string }[];
   metro: { code: string; nameAr: string; nameEn: string; lat: number; lng: number; linesAr: string; linesEn: string }[];
+}
+
+interface RestaurantSummary {
+  id: string; city: string; nameAr: string; nameEn: string; descriptionAr: string; descriptionEn: string; addressAr: string; addressEn: string;
+  lat: number; lng: number; priceLevel: number; hours: OpeningSlot[]; tags: PlaceTag[]; cuisine: string;
+}
+
+function restaurantPlaces(list: RestaurantSummary[], city: string, cuisines: Record<string, string>, cuisinesEn: Record<string, string>): GuidePlace[] {
+  return list.filter((r) => r.city === city).map((r) => ({
+    id: `restaurant:${r.id}`, restaurantId: r.id, city, category: "restaurant" as const, nameAr: r.nameAr, nameEn: r.nameEn,
+    descriptionAr: r.descriptionAr, descriptionEn: r.descriptionEn, addressAr: r.addressAr, addressEn: r.addressEn,
+    lat: r.lat, lng: r.lng, priceLevel: r.priceLevel, hours: r.hours, tags: r.tags, cuisineAr: cuisines[r.cuisine], cuisineEn: cuisinesEn[r.cuisine],
+    source: "official" as const, updatedAt: "",
+  }));
 }
 
 function stationPlaces(d: StationsData, city: string, g: { trainStation: string; metroStation: string }): GuidePlace[] {
@@ -102,6 +116,13 @@ export function GuideView() {
       .catch(() => setEvents([]));
   }, []);
   const [stationsData, setStationsData] = useState<StationsData | null>(null);
+  const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
+  useEffect(() => {
+    fetch("/api/restaurants")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { restaurants: RestaurantSummary[] }) => setRestaurants(d.restaurants))
+      .catch(() => setRestaurants([]));
+  }, []);
   useEffect(() => {
     fetch("/api/trains/stations")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -109,9 +130,13 @@ export function GuideView() {
       .catch(() => setStationsData(null));
   }, []);
   const cityEvents = useMemo(
-    () => [...events.filter((e) => e.city === city).map(eventPlace), ...(stationsData && city ? stationPlaces(stationsData, city, g) : [])],
+    () => [
+      ...events.filter((e) => e.city === city).map(eventPlace),
+      ...(stationsData && city ? stationPlaces(stationsData, city, g) : []),
+      ...(city ? restaurantPlaces(restaurants, city, t.restaurants.cuisines, t.restaurants.cuisines) : []),
+    ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [events, city, stationsData],
+    [events, city, stationsData, restaurants],
   );
 
   useEffect(() => {
@@ -299,7 +324,7 @@ export function GuideView() {
   };
 
   const favButton = (p: GuidePlace, big = false) => {
-    if (p.eventId || p.transit) return null; // events and stations are not saved as favourites
+    if (p.eventId || p.transit || p.restaurantId) return null; // bookable items are not saved as favourites
     const on = favIds.includes(p.id);
     return (
       <button
@@ -573,7 +598,7 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {openBadge}
         {km !== null && <Badge tone="gold">{fmt(g.distance, { d: km.toFixed(1) })}</Badge>}
-        {!p.eventId && !p.transit && <Badge>{g.source[p.source]}</Badge>}
+        {!p.eventId && !p.transit && !p.restaurantId && <Badge>{g.source[p.source]}</Badge>}
       </div>
       {description && <p className="mt-4 text-sm leading-7 text-slate-700">{description}</p>}
 
@@ -600,6 +625,12 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
             <TicketIcon className="size-4" /> {g.bookTickets}
           </Link>
         </div>
+      )}
+
+      {p.restaurantId && (
+        <Link href={`/${locale}/restaurants/${p.restaurantId}`} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gold-500 text-sm font-semibold text-white hover:bg-gold-600">
+          <TicketIcon className="size-4" /> {g.bookTable}
+        </Link>
       )}
 
       {p.trainStation && (
