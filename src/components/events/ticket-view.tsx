@@ -8,9 +8,10 @@ import { fmtKsa } from "@/lib/events/format";
 import type { EventOrder } from "@/lib/events/types";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
-import { CalendarIcon, MapPinIcon } from "../icons";
+import { CalendarIcon, MapPinIcon, TicketIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
+import { WalletTicketsPane } from "../wallet-tickets-pane";
 import { EVENT_COLORS } from "./events-view";
 
 interface OrderView { order: EventOrder; qr: Record<string, string>; canCancel: boolean; deadline: string | null }
@@ -130,47 +131,29 @@ export function TicketView({ id }: { id: string }) {
   );
 }
 
-/** Wallet section: the account's event orders. */
-export function EventTicketsSection() {
+/** Wallet pane: the account's event orders. */
+export function EventTicketsPane({ orders }: { orders: EventOrder[] | null }) {
   const { t, locale, money } = useApp();
   const tk = t.events.ticket;
   const ar = locale === "ar";
-  const [orders, setOrders] = useState<EventOrder[] | null>(null);
-
-  useEffect(() => {
-    fetch("/api/events/orders", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { orders: [] }))
-      .then((d: { orders: EventOrder[] }) => setOrders(d.orders))
-      .catch(() => setOrders([]));
-  }, []);
-
+  const now = Date.now();
+  const items = orders?.map((o) => ({
+    id: o.id,
+    href: `/${locale}/account/tickets/${o.id}`,
+    title: ar ? o.event.titleAr : o.event.titleEn,
+    subtitle: `${fmtKsa(o.session.start, locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · ${fmt(tk.tickets, { n: o.tickets.length })} · ${money(o.totalSAR)}`,
+    status: { label: tk.status[o.status], tone: o.status === "CANCELLED" ? ("red" as const) : ("brand" as const) },
+    upcoming: o.status === "CONFIRMED" && Date.parse(o.session.start) > now,
+  })) ?? null;
   return (
-    <Card className="overflow-hidden" data-testid="wallet-event-tickets">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-        <h2 className="font-bold">{tk.myTickets}</h2>
-        <Link href={`/${locale}/events`} className="text-sm font-semibold text-brand-700 hover:underline">{tk.browse}</Link>
-      </div>
-      {orders === null ? (
-        <div className="grid place-items-center py-6"><Spinner className="size-5 text-brand-600" /></div>
-      ) : orders.length === 0 ? (
-        <p className="px-5 py-6 text-center text-sm text-slate-500">{tk.empty}</p>
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {orders.map((o) => (
-            <li key={o.id}>
-              <Link href={`/${locale}/account/tickets/${o.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
-                <div className="min-w-0">
-                  <p className="font-semibold">{ar ? o.event.titleAr : o.event.titleEn}</p>
-                  <p className="text-xs text-slate-500">
-                    {fmtKsa(o.session.start, locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {fmt(tk.tickets, { n: o.tickets.length })} · {money(o.totalSAR)}
-                  </p>
-                </div>
-                <Badge tone={o.status === "CANCELLED" ? "red" : "brand"}>{tk.status[o.status]}</Badge>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+    <WalletTicketsPane
+      testid="wallet-event-tickets"
+      title={tk.myTickets}
+      subtitle={t.wallet.ticketsSubtitle}
+      icon={<TicketIcon className="size-5" />}
+      action={{ href: `/${locale}/events`, label: tk.browse }}
+      items={items}
+      emptyText={tk.empty}
+    />
   );
 }

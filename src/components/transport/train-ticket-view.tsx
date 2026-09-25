@@ -9,6 +9,7 @@ import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
 import { TrainIcon } from "../icons";
 import { PrintButton } from "../print-button";
+import { WalletTicketsPane } from "../wallet-tickets-pane";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
 
 interface StationLite { code: string; nameAr: string; nameEn: string }
@@ -153,52 +154,34 @@ export function TrainTicketView({ id }: { id: string }) {
   );
 }
 
-/** Wallet section: the account's train bookings. */
-export function TrainTicketsSection() {
+/** Wallet pane: the account's train bookings. */
+export function TrainTicketsPane({ orders }: { orders: TrainOrder[] | null }) {
   const { t, locale, money } = useApp();
   const tk = t.trains.ticket;
   const ar = locale === "ar";
   const net = useNetwork();
-  const [orders, setOrders] = useState<TrainOrder[] | null>(null);
-
-  useEffect(() => {
-    fetch("/api/trains/orders", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { orders: [] }))
-      .then((d: { orders: TrainOrder[] }) => setOrders(d.orders))
-      .catch(() => setOrders([]));
-  }, []);
   const st = (code: string) => {
     const s = net?.stations.find((x) => x.code === code);
     return s ? (ar ? s.nameAr : s.nameEn) : code;
   };
-
+  const now = Date.now();
+  const items = orders?.map((o) => ({
+    id: o.id,
+    href: `/${locale}/account/train-tickets/${o.id}`,
+    title: `${st(o.legs[0].trip.from)} ${o.legs.length > 1 ? "⇄" : "→"} ${st(o.legs[0].trip.to)}`,
+    subtitle: `${fmtKsa(o.legs[0].trip.depart, locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · ${fmt(tk.tickets, { n: o.tickets.length })} · ${money(o.totalSAR)}`,
+    status: { label: tk.status[o.status], tone: o.status === "CANCELLED" ? ("red" as const) : ("brand" as const) },
+    upcoming: o.status === "CONFIRMED" && Date.parse(o.legs[o.legs.length - 1].trip.depart) > now,
+  })) ?? null;
   return (
-    <Card className="overflow-hidden" data-testid="wallet-train-tickets">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-        <h2 className="font-bold">{tk.myTickets}</h2>
-        <Link href={`/${locale}/trains`} className="text-sm font-semibold text-brand-700 hover:underline">{tk.book}</Link>
-      </div>
-      {orders === null ? (
-        <div className="grid place-items-center py-6"><Spinner className="size-5 text-brand-600" /></div>
-      ) : orders.length === 0 ? (
-        <p className="px-5 py-6 text-center text-sm text-slate-500">{tk.empty}</p>
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {orders.map((o) => (
-            <li key={o.id}>
-              <Link href={`/${locale}/account/train-tickets/${o.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
-                <div className="min-w-0">
-                  <p className="font-semibold">{st(o.legs[0].trip.from)} {o.legs.length > 1 ? "⇄" : "→"} {st(o.legs[0].trip.to)}</p>
-                  <p className="text-xs text-slate-500">
-                    {fmtKsa(o.legs[0].trip.depart, locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {fmt(tk.tickets, { n: o.tickets.length })} · {money(o.totalSAR)}
-                  </p>
-                </div>
-                <Badge tone={o.status === "CANCELLED" ? "red" : "brand"}>{tk.status[o.status]}</Badge>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+    <WalletTicketsPane
+      testid="wallet-train-tickets"
+      title={tk.myTickets}
+      subtitle={t.wallet.trainsSubtitle}
+      icon={<TrainIcon className="size-5" />}
+      action={{ href: `/${locale}/trains`, label: tk.book }}
+      items={items}
+      emptyText={tk.empty}
+    />
   );
 }
