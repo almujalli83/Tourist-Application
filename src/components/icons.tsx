@@ -43,3 +43,10 @@ export function Logo({ className }: { className?: string }) {
     </svg>
   );
 }
+export const HeartIcon = (p: P) => (<svg {...base(p)}><path d="M20.8 8.6A5.5 5.5 0 0 0 12 5.6a5.5 5.5 0 0 0-8.8 3C2.4 13.5 12 20.5 12 20.5s9.6-7 8.8-11.9z" /></svg>);
+export const SearchIcon = (p: P) => (<svg {...base(p)}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>);
+export const ClockIcon = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>);
+export const ShareIcon = (p: P) => (<svg {...base(p)}><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4" /></svg>);
+export const LocateIcon = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>);
+export const DirectionsIcon = (p: P) => (<svg {...base(p)}><path d="m3 11 19-9-9 19-2-8z" /></svg>);
+export const PhoneIcon = (p: P) => (<svg {...base(p)}><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" /></svg>);

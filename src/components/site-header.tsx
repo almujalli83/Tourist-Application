@@ -19,6 +19,7 @@ export function SiteHeader() {
   const links = [
     { href: `/${locale}`, label: t.nav.home },
     { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
+    { href: `/${locale}/guide`, label: t.guide.nav },
     ...(user ? [{ href: `/${locale}/account`, label: t.nav.myBookings }, { href: `/${locale}/account/wallet`, label: t.wallet.nav }] : []),
     ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
   ];
@@ -64,7 +65,7 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-1 lg:flex">
           {links.map((l) => (
             <Link
               key={l.href}
@@ -79,7 +80,7 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           {currencySelect}
           <Link href={switchHref} className="flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium hover:bg-white/10" hrefLang={otherLocale}>
             <GlobeIcon className="size-4" />
@@ -101,13 +102,13 @@ export function SiteHeader() {
           )}
         </div>
 
-        <button className="grid size-10 place-items-center rounded-md hover:bg-white/10 md:hidden" onClick={() => setOpen((o) => !o)} aria-label={t.nav.menu} aria-expanded={open}>
+        <button className="grid size-10 place-items-center rounded-md hover:bg-white/10 lg:hidden" onClick={() => setOpen((o) => !o)} aria-label={t.nav.menu} aria-expanded={open}>
           {open ? <XIcon className="size-6" /> : <MenuIcon className="size-6" />}
         </button>
       </div>
 
       {open && (
-        <div className="border-t border-white/10 bg-brand-900 px-4 pb-4 md:hidden">
+        <div className="border-t border-white/10 bg-brand-900 px-4 pb-4 lg:hidden">
           <nav className="flex flex-col py-2">
             {links.map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="rounded-md px-3 py-3 text-base font-medium hover:bg-white/10">

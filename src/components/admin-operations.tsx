@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import type { operationsOverview } from "@/lib/admin";
 import { useApp } from "./app-provider";
-import { RefreshIcon } from "./icons";
+import { MapPinIcon, RefreshIcon } from "./icons";
 import { StatusBadge } from "./booking-details";
 import { Alert, Badge, Button, Card, Spinner } from "./ui";
 
@@ -63,7 +64,12 @@ export function AdminOperations() {
           <h1 className="text-2xl font-bold">{a.title}</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">{a.subtitle}</p>
         </div>
-        <Button variant="secondary" onClick={() => void load()}><RefreshIcon className="size-4" />{a.refresh}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/${locale}/admin/guide`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
+            <MapPinIcon className="size-4" />{t.guide.admin.nav}
+          </Link>
+          <Button variant="secondary" onClick={() => void load()}><RefreshIcon className="size-4" />{a.refresh}</Button>
+        </div>
       </div>
 
       {!data.emailProvider && <Alert tone="warning">{a.emailProviderOff}</Alert>}
