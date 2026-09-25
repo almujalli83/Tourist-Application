@@ -206,6 +206,8 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
     status: allOk ? "SUBMITTED" : "SUBMISSION_FAILED",
     mt: { mode: client.mode, messageId, packageId, packageStatus: allOk ? "RECEIVED" : null, lastCheckedAt: null },
     applicants,
+    ticketNos,
+    modifications: [],
   };
   // Passport images and photos are sent to MT only and are not retained.
   await saveBooking(booking);

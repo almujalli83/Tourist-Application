@@ -117,6 +117,8 @@ export interface ActivityOffer extends TravelAgentRef {
   serviceChargeSAR: number;
   totalSAR: number; // for the whole party
   partySize: number;
+  /** Cancellation policy: refundable tickets are refunded in full when cancelled. */
+  refundable?: boolean;
   forPax: string;
 }
 

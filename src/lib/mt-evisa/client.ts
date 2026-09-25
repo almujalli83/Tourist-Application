@@ -10,7 +10,7 @@ import { SANDBOX_LOOKUPS } from "./lookups";
 import { SANDBOX_PRIVACY_POLICY } from "./privacy";
 import type {
   MtLookupItem, MtLookupName, MtLookupResponse, PackageStatusResponse, PrivacyPolicyResponse,
-  SubmitTourismPackageRequest, SubmitTourismPackageResponse,
+  SubmitTourismPackageRequest, SubmitTourismPackageResponse, UpdateTravelDetailsRequest, UpdateTravelDetailsResponse,
 } from "./types";
 
 export class MtApiError extends Error {
@@ -26,6 +26,8 @@ export interface MtClient {
   submitTourismPackage(req: SubmitTourismPackageRequest): Promise<SubmitTourismPackageResponse>;
   getTourismPackageStatus(packageId: string): Promise<PackageStatusResponse>;
   cancelTourismPackage(packageId: string): Promise<{ correlationId: string; errorCodes: string[] }>;
+  /** Updates the travel details of one visa-granted applicant (§8, updateTravellerTravelDetails). */
+  updateTravellerTravelDetails(req: UpdateTravelDetailsRequest): Promise<UpdateTravelDetailsResponse>;
 }
 
 const isOk = (codes?: string[]) => !codes || codes.length === 0 || codes.every((c) => String(c) === "0");
@@ -91,6 +93,8 @@ function createLiveClient(): MtClient {
       }),
     cancelTourismPackage: (packageId) =>
       call(`/MTOTAServices/1.0/cancelTourismPackage`, { method: "POST", body: { dmcId: cfg.dmcId, packageId } }),
+    updateTravellerTravelDetails: (req) =>
+      call<UpdateTravelDetailsResponse>(`/MTOTAServices/1.0/updateTravellerTravelDetails`, { method: "POST", body: req }),
   };
 }
 
@@ -174,6 +178,20 @@ function createSandboxClient(): MtClient {
         return { ...pkg, cancelled: true };
       });
       return { correlationId: randomUUID(), errorCodes: [ok ? "0" : "CTP001"] };
+    },
+    async updateTravellerTravelDetails(req) {
+      // Mirrors the §8 validations that apply in the sandbox.
+      const fail = (code: string) => ({ correlationId: randomUUID(), errorCodes: [code] });
+      const pkg = await getSandboxPackage(req.packageId);
+      const v = req.visitorData;
+      if (!pkg || !pkg.applications.some((a) => a.applicationNo === v.applicationNo)) return fail("UTD005");
+      const issued = (Date.now() - Date.parse(pkg.submittedAt)) / 1000 >= SANDBOX_TIMELINE[SANDBOX_TIMELINE.length - 1][0];
+      if (!issued || pkg.cancelled) return fail("UTD006");
+      const expiry = new Date(Date.parse(pkg.submittedAt) + 365 * 86_400_000).toISOString().slice(0, 10);
+      if (v.arrivalAndDepartureData.departureDate > expiry) return fail("UTD008");
+      if (Number(v.generalPackageData.packageDuration) < 2) return fail("UTD013");
+      if (v.accommodationData.some((h) => !h.licenseNo)) return fail("UTD009");
+      return { correlationId: randomUUID(), errorCodes: ["0"] };
     },
   };
 }
