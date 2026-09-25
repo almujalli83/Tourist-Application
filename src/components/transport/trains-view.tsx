@@ -23,6 +23,8 @@ const COACHES = [
   { id: "C3", cls: "economy" as const, rows: 15, letters: ["A", "B", "C", "D"], aisleAfter: 2 },
   { id: "C4", cls: "economy" as const, rows: 15, letters: ["A", "B", "C", "D"], aisleAfter: 2 },
 ];
+const coachSeats = (cls: TrainClass) =>
+  COACHES.filter((c) => c.cls === cls).flatMap((c) => Array.from({ length: c.rows }, (_, r) => c.letters.map((l) => `${c.id}-${r + 1}${l}`)).flat());
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
 /** Train tickets (SAR): search, trips, seats on the coach map, passengers and payment. */
@@ -52,6 +54,7 @@ export function TrainsView() {
   const [pax, setPax] = useState<PassengerForm[]>([]);
   const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [paying, setPaying] = useState(false);
+  const [showMissing, setShowMissing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const key = useRef(newKey());
   const count = adults + children;
@@ -123,9 +126,21 @@ export function TrainsView() {
     return list;
   }, [cls]);
 
+  // Seats are assigned automatically once a train's availability is known (and topped up when
+  // passengers are added); the traveller can change them on the coach map.
   useEffect(() => {
-    setSeats((cur) => [cur[0].slice(0, count), cur[1].slice(0, count)]);
-  }, [count]);
+    setSeats((cur) => {
+      const next = ([0, 1] as const).map((i) => {
+        const tk = taken[i];
+        if (tk === null) return cur[i].slice(0, count);
+        const kept = cur[i].filter((s) => !tk.includes(s)).slice(0, count);
+        const free = coachSeats(cls).filter((s) => !tk.includes(s) && !kept.includes(s));
+        return [...kept, ...free.slice(0, count - kept.length)];
+      }) as [string[], string[]];
+      return next[0].join() === cur[0].join() && next[1].join() === cur[1].join() ? cur : next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taken, count]);
   useEffect(() => {
     setSeats((cur) => [[], cur[1]]);
     void loadTaken(0, outTrip);
@@ -140,10 +155,27 @@ export function TrainsView() {
   const seatsReady = legs.length > 0 && legs.every((_, i) => seats[i].length === count);
   const paxReady = pax.every((p) => p.ref || (p.nameEn.trim().includes(" ") && p.nationality && p.passportNo.trim().length >= 5));
   const ready = legs.length === (round ? 2 : 1) && seatsReady && paxReady;
+  const paxComplete = (p: PassengerForm) => !!p.ref || (p.nameEn.trim().includes(" ") && !!p.nationality && p.passportNo.trim().length >= 5);
+
+  // What is still needed before paying (shown instead of silently disabling the button).
+  const missing: { text: string; target: string }[] = [];
+  if (!outTrip) missing.push({ text: tr.missing.outbound, target: "trips-out" });
+  if (round && !retTrip) missing.push({ text: tr.missing.ret, target: "trips-ret" });
+  legs.forEach((_, i) => {
+    if (seats[i].length !== count) missing.push({ text: fmt(tr.missing.seats, { n: count, leg: i === 0 ? tr.outbound : tr.return }), target: `coach-${i}` });
+  });
+  pax.forEach((p, i) => {
+    if (!paxComplete(p)) missing.push({ text: fmt(tr.missing.passenger, { n: i + 1 }), target: `passenger-${i}` });
+  });
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
-    if (!ready) return;
+    if (!ready) {
+      setShowMissing(true);
+      const first = missing[0];
+      if (first) document.querySelector(`[data-testid="${first.target}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setPaying(true);
     setErr(null);
     try {
@@ -302,7 +334,7 @@ export function TrainsView() {
                       const used = new Set(pax.filter((_, j) => j !== i).map((x) => x.ref).filter(Boolean));
                       const set = (patch: Partial<PassengerForm>) => setPax((cur) => cur.map((x, j) => (j === i ? { ...x, ...patch } : x)));
                       return (
-                        <div key={i} className="rounded-xl border border-slate-200 p-4" data-testid="passenger">
+                        <div key={i} className={cx("rounded-xl border p-4", showMissing && !paxComplete(p) ? "border-amber-400 bg-amber-50/40" : "border-slate-200")} data-testid={`passenger-${i}`}>
                           <p className="text-sm font-bold">{fmt(tr.passengerN, { n: i + 1 })} <Badge>{tr.types[p.type]}</Badge></p>
                           <div className="mt-3 grid gap-3 sm:grid-cols-2">
                             <Field label={tr.pickSaved} className="sm:col-span-2">
@@ -313,14 +345,14 @@ export function TrainsView() {
                             </Field>
                             {!p.ref && (
                               <>
-                                <Field label={tr.nameEn} required className="sm:col-span-2">
-                                  <Input dir="ltr" value={p.nameEn} onChange={(e) => set({ nameEn: e.target.value.toUpperCase().replace(/[^A-Z' -]/g, "") })} placeholder="SARA ALI" />
+                                <Field label={tr.nameEn} required hint={tr.nameHint} className="sm:col-span-2">
+                                  <Input dir="ltr" invalid={showMissing && !p.nameEn.trim().includes(" ")} value={p.nameEn} onChange={(e) => set({ nameEn: e.target.value.toUpperCase().replace(/[^A-Z' -]/g, "") })} placeholder="SARA ALI" />
                                 </Field>
                                 <Field label={tr.nationality} required>
                                   <CountrySelect value={p.nationality} onChange={(v) => set({ nationality: v })} />
                                 </Field>
                                 <Field label={tr.passportNo} required>
-                                  <Input dir="ltr" value={p.passportNo} onChange={(e) => set({ passportNo: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15) })} />
+                                  <Input dir="ltr" invalid={showMissing && p.passportNo.trim().length < 5} value={p.passportNo} onChange={(e) => set({ passportNo: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15) })} />
                                 </Field>
                               </>
                             )}
@@ -369,7 +401,15 @@ export function TrainsView() {
                     <Field label={t.review.cvc} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required /></Field>
                   </div>
                   <p className="text-xs text-slate-500">{t.review.testCards}</p>
-                  <Button type="submit" variant="gold" size="lg" className="w-full" loading={paying} disabled={!ready}>
+                  {showMissing && missing.length > 0 && (
+                    <Alert tone="warning" className="text-xs">
+                      <p className="font-semibold">{tr.missing.title}</p>
+                      <ul className="mt-1 list-disc space-y-0.5 ps-4" data-testid="train-missing">
+                        {missing.map((m) => <li key={m.target}>{m.text}</li>)}
+                      </ul>
+                    </Alert>
+                  )}
+                  <Button type="submit" variant="gold" size="lg" className="w-full" loading={paying}>
                     <LockIcon className="size-5" />{paying ? tr.paying : fmt(tr.pay, { amount: money(total) })}
                   </Button>
                 </form>
