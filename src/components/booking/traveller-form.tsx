@@ -240,7 +240,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
 
           <Section title={t.travellers.sections.insurance} icon={<HeartPulseIcon className="size-5" />} subtitle={t.travellers.insurance.intro}>
             <div className="divide-y divide-slate-100">
-              {/* All six insurance questions of the MT guide (§2.4); 4–5 are optional, 6 depends on them. */}
+              {/* All six insurance questions of the MT guide (§2.4); 4–5 are optional, 6 follows a Yes to 4 or 5. */}
               {(["question1", "question2", "question3", "question4", "question5"] as const).map((k) => (
                 <div key={k} className="py-3 first:pt-0">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -253,30 +253,25 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
                   {e(`insurance.${k}`) && <p className="mt-1 text-xs font-medium text-red-600">{e(`insurance.${k}`)}</p>}
                 </div>
               ))}
-              {(() => {
-                const pregnant = tr.insurance.question4 === "true" || tr.insurance.question5 === "true";
-                return (
-                  <div className="py-3">
-                    <Field
-                      label={t.travellers.insurance.question6}
-                      required={pregnant}
-                      hint={pregnant ? undefined : t.travellers.insurance.question6Hint}
-                      error={e("insurance.question6")}
-                    >
-                      <Input
-                        type="number"
-                        min={0}
-                        max={9}
-                        className="max-w-28"
-                        value={pregnant ? tr.insurance.question6 : "0"}
-                        disabled={!pregnant}
-                        onChange={(ev) => setIns("question6", ev.target.value)}
-                        invalid={!!e("insurance.question6")}
-                      />
-                    </Field>
-                  </div>
-                );
-              })()}
+              {/* Months of pregnancy: asked only once a pregnancy question is answered Yes. */}
+              {(tr.insurance.question4 === "true" || tr.insurance.question5 === "true") && (
+                <div className="py-3">
+                  <Field className="max-w-40" label={t.travellers.insurance.question6} required error={e("insurance.question6")} htmlFor={`t${index}-question6`}>
+                    <Input
+                      id={`t${index}-question6`}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={9}
+                      dir="ltr"
+                      placeholder="1–9"
+                      value={tr.insurance.question6 === "0" ? "" : tr.insurance.question6}
+                      onChange={(ev) => setIns("question6", ev.target.value)}
+                      invalid={!!e("insurance.question6")}
+                    />
+                  </Field>
+                </div>
+              )}
             </div>
           </Section>
         </>

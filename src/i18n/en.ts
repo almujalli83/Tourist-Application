@@ -277,7 +277,6 @@ const en: Dictionary = {
       question4: "Is there an existing pregnancy?",
       question5: "Is the pregnancy the result of IVF or an assisted method?",
       question6: "Months of pregnancy",
-      question6Hint: "0 if not applicable (enabled when either pregnancy question is answered Yes)",
     },
     errors: {
       required: "This field is required",
