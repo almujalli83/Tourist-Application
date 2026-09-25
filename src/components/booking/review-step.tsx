@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
+import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import { cityName } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import type { PrivacyPolicyResponse } from "@/lib/mt-evisa/types";
@@ -76,7 +77,7 @@ export function ReviewStep() {
     }
     setSubmitting(true);
     setError(null);
-    const [expMonth = "", expYear = ""] = card.exp.split("/").map((s) => s.trim());
+    const { expMonth, expYear } = parseExpiry(card.exp);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
@@ -230,7 +231,7 @@ export function ReviewStep() {
                 </Field>
                 <Field label={t.review.expiry} required>
                   <Input dir="ltr" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={card.exp}
-                    onChange={(e) => setCard({ ...card, exp: e.target.value.replace(/[^\d/]/g, "").slice(0, 5) })} required />
+                    onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required />
                 </Field>
                 <Field label={t.review.cvc} required>
                   <Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc}

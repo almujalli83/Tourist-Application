@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
+import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import type { Eligibility, ModificationQuote } from "@/lib/bookings/modify";
 import type { StoredBooking, TransportMode } from "@/lib/bookings/types";
 import { cityName, SAUDI_CITIES } from "@/lib/data/cities";
@@ -159,7 +160,7 @@ export function ModifyPackage({ id }: { id: string }) {
     if (!plan || !quote) return;
     setSubmitting(true);
     setError(null);
-    const [expMonth = "", expYear = ""] = card.exp.split("/").map((s) => s.trim());
+    const { expMonth, expYear } = parseExpiry(card.exp);
     try {
       const res = await fetch(`/api/bookings/${id}/modify`, {
         method: "POST",
@@ -377,7 +378,7 @@ export function ModifyPackage({ id }: { id: string }) {
                     </Field>
                     <Field label={t.review.expiry} required>
                       <Input dir="ltr" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={card.exp}
-                        onChange={(e) => setCard({ ...card, exp: e.target.value.replace(/[^\d/]/g, "").slice(0, 5) })} required />
+                        onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required />
                     </Field>
                     <Field label={t.review.cvc} required>
                       <Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc}
