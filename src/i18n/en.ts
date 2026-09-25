@@ -835,6 +835,8 @@ const en: Dictionary = {
     nameEn: "Name as in passport (English)",
     nationality: "Nationality",
     passportNo: "Passport number",
+    nameHint: "First and family name as in the passport",
+    missing: { title: "Complete the following to pay:", outbound: "Choose the outbound trip", ret: "Choose the return trip", seats: "Choose {n} seats on the {leg} trip", passenger: "Complete passenger {n}: full English name, nationality and passport number" },
     passengersNote: "Tickets are issued in each passenger's name and passport number; every passenger must carry their passport.",
     summary: "Booking summary",
     total: "Total",
