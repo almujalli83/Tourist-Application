@@ -9,6 +9,12 @@ export interface PaxCount {
   infants: number;
 }
 
+/** One hotel room: adults aged 18+ and the age (0–17) of each child. */
+export interface RoomOccupancy {
+  adults: number;
+  childAges: number[];
+}
+
 export interface CityStay {
   city: string; // Saudi city IATA code
   nights: number;
@@ -19,6 +25,9 @@ export interface SearchCriteria {
   stays: CityStay[]; // ordered destinations with nights
   departureDate: string; // YYYY-MM-DD
   returnDate: string; // YYYY-MM-DD
+  /** Guests per room, as chosen in the search (ages drive fares and package rules). */
+  rooms: RoomOccupancy[];
+  /** Airline fare categories derived from `rooms` (adult 12+, child 2–11, infant under 2). */
   pax: PaxCount;
   cabin: CabinClass;
   nationality: string; // ISO2
@@ -172,6 +181,8 @@ export interface Traveller {
   passportImage: string; // data URL
   security: SecurityAnswers;
   insurance: InsuranceAnswers;
+  /** Age declared in the search for a minor (0–17); null for an adult (18+). Set from the search. */
+  declaredAge?: number | null;
   /** Client-only: the saved traveller this form was filled from, and whether to save it back. */
   savedId?: string | null;
   saveToAccount?: boolean;

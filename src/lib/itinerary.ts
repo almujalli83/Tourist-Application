@@ -1,5 +1,6 @@
 import { addDays, diffDays, isValidISODate } from "./dates";
 import { PACKAGE_LIMITS } from "./config";
+import { paxFromRooms, validateRooms } from "./occupancy";
 import { getCity, getSaudiCity } from "./data/cities";
 import { getCountry } from "./data/countries";
 import type { CityStay, FlightLeg, PaxCount, SearchCriteria } from "./types";
@@ -52,6 +53,8 @@ export type SearchError =
   | "duration"
   | "nightsMismatch"
   | "pax"
+  | "rooms"
+  | "childAges"
   | "maxAdults"
   | "maxMinors"
   | "infants"
@@ -71,11 +74,14 @@ export function validateCriteria(c: SearchCriteria, today: string): SearchError[
     if (nights < PACKAGE_LIMITS.minPackageDays || nights > PACKAGE_LIMITS.maxPackageDays) errors.push("duration");
     else if (c.stays.reduce((a, s) => a + s.nights, 0) !== nights) errors.push("nightsMismatch");
   }
-  const { adults, children, infants } = c.pax;
-  if (![adults, children, infants].every((n) => Number.isInteger(n) && n >= 0) || adults < 1) errors.push("pax");
-  if (adults > PACKAGE_LIMITS.maxAdults) errors.push("maxAdults");
-  if (children + infants > PACKAGE_LIMITS.maxMinors) errors.push("maxMinors");
-  if (infants > adults) errors.push("infants");
+  // Guests: adults (18+) and children's ages per room; fare categories must follow from them.
+  const roomErrors = validateRooms(c.rooms);
+  errors.push(...roomErrors);
+  if (!roomErrors.length) {
+    const expected = paxFromRooms(c.rooms);
+    if (!c.pax || c.pax.adults !== expected.adults || c.pax.children !== expected.children || c.pax.infants !== expected.infants)
+      errors.push("pax");
+  }
   if (!getCountry(c.nationality)) errors.push("nationality");
   return errors;
 }

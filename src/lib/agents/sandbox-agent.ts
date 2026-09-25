@@ -75,11 +75,11 @@ export function createSandboxAgent(opts: {
       return offers;
     },
 
-    async searchHotels({ city, checkIn, checkOut, pax }) {
+    async searchHotels({ city, checkIn, checkOut, rooms: occupancy }) {
       await wait();
       const r = rng(`${opts.id}|H|${city}|${checkIn}|${checkOut}`);
       const nights = Math.max(1, Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86_400_000));
-      const rooms = Math.max(1, Math.ceil((pax.adults + pax.children) / 3));
+      const rooms = occupancy.length;
       const count = r.int(3, 4);
       const used = new Set<number>();
       const offers = [];

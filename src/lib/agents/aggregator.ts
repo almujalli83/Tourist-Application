@@ -1,7 +1,8 @@
 import { PACKAGE_LIMITS } from "../config";
 import { signOffer } from "./offer-signing";
 import { priceFlightOffer } from "../pricing";
-import type { ActivityOffer, FlightOffer, HotelOffer, TravelAgentRef } from "../types";
+import { occupancyKey } from "../occupancy";
+import type { ActivityOffer, FlightOffer, HotelOffer, PaxCount, RoomOccupancy, TravelAgentRef } from "../types";
 import type { ActivitySearchRequest, FlightSearchRequest, HotelSearchRequest, TravelAgentProvider } from "./provider";
 import { AGENTS } from "./registry";
 
@@ -11,6 +12,8 @@ const PROVIDER_TIMEOUT_MS = 8000;
 const sign = <T extends object>(offer: T): T => signOffer(offer);
 
 export const paxKey = (p: { adults: number; children: number; infants: number }) => `${p.adults}-${p.children}-${p.infants}`;
+/** Hotel quotes are bound to the exact rooms and guests they were priced for. */
+export const hotelPaxKey = (p: PaxCount, rooms: RoomOccupancy[]) => `${paxKey(p)}|${occupancyKey(rooms)}`;
 
 function withTimeout<T>(p: Promise<T>): Promise<T> {
   return Promise.race([
@@ -61,7 +64,7 @@ export async function searchFlights(req: FlightSearchRequest): Promise<Aggregate
 export async function searchHotels(req: HotelSearchRequest): Promise<AggregateResult<HotelOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchHotels(req)).map(({ ref, ...o }) =>
-      ({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }) as HotelOffer,
+      ({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${hotelPaxKey(req.pax, req.rooms)}`, forPax: hotelPaxKey(req.pax, req.rooms) }) as HotelOffer,
     ),
   );
   // Packages require MT-licensed hotels of the minimum star rating (Key Package Requirements).

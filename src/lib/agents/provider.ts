@@ -1,4 +1,4 @@
-import type { ActivityOffer, CabinClass, FlightLeg, HotelOffer, PaxCount } from "../types";
+import type { ActivityOffer, CabinClass, FlightLeg, HotelOffer, PaxCount, RoomOccupancy } from "../types";
 
 export interface FlightSearchRequest {
   leg: FlightLeg;
@@ -11,6 +11,8 @@ export interface HotelSearchRequest {
   checkIn: string;
   checkOut: string;
   pax: PaxCount;
+  /** Rooms to book and their guests (adults 18+, children's ages). */
+  rooms: RoomOccupancy[];
 }
 
 export interface ActivitySearchRequest {

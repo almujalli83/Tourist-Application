@@ -14,6 +14,7 @@ import { Alert, Badge, Button, Card, Field, Input, SectionTitle, Stars } from ".
 import { useBooking } from "./booking-context";
 import { PackageRequirements, usePackageCheck } from "./package-requirements";
 import { useTravellerValidation } from "./travellers-step";
+import { travellerTypeLabel } from "./traveller-label";
 import { WizardShell } from "./wizard-shell";
 
 function PrivacyPolicy() {
@@ -182,7 +183,7 @@ export function ReviewStep() {
                 <div>
                   <p className="font-semibold">{[x.firstNameEn, x.familyNameEn].filter(Boolean).join(" ") || fmt(t.travellers.travellerN, { n: i + 1 })}</p>
                   <p className="text-xs text-slate-500">
-                    {[{ adult: t.common.adult, child: t.common.child, infant: t.common.infant }[x.paxType], x.passportNo, countryName(x.nationality, locale)]
+                    {[travellerTypeLabel(t, x), x.passportNo, countryName(x.nationality, locale)]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
