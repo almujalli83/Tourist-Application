@@ -19,9 +19,15 @@ export function SiteHeader() {
   const links = [
     { href: `/${locale}`, label: t.nav.home },
     { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
-    ...(user ? [{ href: `/${locale}/account`, label: t.nav.myBookings }] : []),
+    ...(user ? [{ href: `/${locale}/account`, label: t.nav.myBookings }, { href: `/${locale}/account/wallet`, label: t.wallet.nav }] : []),
     ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
   ];
+
+  // The most specific matching link is the active one (e.g. /account/wallet over /account).
+  const activeHref = links
+    .map((l) => l.href)
+    .filter((h) => (h === `/${locale}` ? pathname === h : pathname.startsWith(h)))
+    .sort((a, b) => b.length - a.length)[0];
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -65,7 +71,7 @@ export function SiteHeader() {
               href={l.href}
               className={cx(
                 "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10",
-                (l.href === `/${locale}` ? pathname === l.href : pathname.startsWith(l.href)) && "bg-white/10 text-gold-100",
+                l.href === activeHref && "bg-white/10 text-gold-100",
               )}
             >
               {l.label}
