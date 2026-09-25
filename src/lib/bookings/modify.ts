@@ -18,7 +18,7 @@ import { cityName, getSaudiCity } from "../data/cities";
 import { stayDates } from "../itinerary";
 import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildUpdateRequests } from "../mt-evisa/mapper";
-import { adultsOf } from "../occupancy";
+import { adultsOf, legacyRooms } from "../occupancy";
 import { minimumPackagePrice } from "../package-rules";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { computePackagePrice, type PriceBreakdown } from "../pricing";
@@ -55,6 +55,11 @@ export interface Eligibility {
   visaExpiryDate: string | null;
   lastCity: string;
   origin: string;
+}
+
+/** Bookings made before guests & rooms were introduced get rooms derived from their fare mix. */
+function withRooms(b: StoredBooking): StoredBooking {
+  return Array.isArray(b.criteria.rooms) ? b : { ...b, criteria: { ...b.criteria, rooms: legacyRooms(b.criteria.pax) } };
 }
 
 export function modificationEligibility(b: StoredBooking, now = new Date()): Eligibility {
@@ -130,7 +135,8 @@ function resolveTarget(b: StoredBooking, kind: ModificationKind, newReturnDate: 
 }
 
 /** Offers the customer can choose from for a new return date (and extension target). */
-export async function modificationOptions(b: StoredBooking, input: { newReturnDate: string; target?: ModificationTarget }, now = new Date()) {
+export async function modificationOptions(booking: StoredBooking, input: { newReturnDate: string; target?: ModificationTarget }, now = new Date()) {
+  const b = withRooms(booking);
   const el = modificationEligibility(b, now);
   if (!el.allowed) throw new BookingError(el.reason ?? "notAllowed");
   checkDate(b, el, input.newReturnDate);
@@ -145,19 +151,28 @@ export async function modificationOptions(b: StoredBooking, input: { newReturnDa
     { leg: { index: ret.legIndex + (addsLeg ? 1 : 0), kind: "return", from: t.departureCity, to: c.origin, date: input.newReturnDate }, pax: c.pax, cabin: c.cabin },
     [ret.agentId],
   );
+  // Lists that came back empty because the agents could not be reached (not for lack of inventory).
+  const unavailable: ("hotels" | "domesticFlights" | "returnFlights")[] = [];
   let hotels: Promise<HotelOffer[]> = Promise.resolve([]);
   let domesticFlights: Promise<FlightOffer[]> = Promise.resolve([]);
   if (kind === "extend") {
     const stay = { checkIn: c.returnDate, checkOut: input.newReturnDate, pax: c.pax, rooms: c.rooms };
     const lastHotel = b.hotels.find((h) => h.city === t.lastCity && h.checkOut === c.returnDate);
     const same = t.mode === "lastCity" && lastHotel ? quoteHotelExtension(lastHotel, input.newReturnDate) : Promise.resolve(null);
-    const others = searchHotels({ city: t.city!, ...stay }).then((r) => r.offers);
+    const others = searchHotels({ city: t.city!, ...stay }).then((r) => {
+      if (!r.offers.length && r.failedAgents.length) unavailable.push("hotels");
+      return r.offers;
+    });
     hotels = Promise.all([same, others]).then(([s, o]) => (s ? [s, ...o] : o));
     if (addsLeg)
-      domesticFlights = searchFlights({ leg: { index: ret.legIndex, kind: "domestic", from: t.lastCity, to: t.city!, date: c.returnDate }, pax: c.pax, cabin: c.cabin }).then((r) => r.offers);
+      domesticFlights = searchFlights({ leg: { index: ret.legIndex, kind: "domestic", from: t.lastCity, to: t.city!, date: c.returnDate }, pax: c.pax, cabin: c.cabin }).then((r) => {
+        if (!r.offers.length && r.failedAgents.length) unavailable.push("domesticFlights");
+        return r.offers;
+      });
   }
   const [r, h, d] = await Promise.all([returnFlights, hotels, domesticFlights]);
-  return { kind, eligibility: el, departureCity: t.departureCity, returnFlights: r.offers, hotels: h, domesticFlights: d };
+  if (!r.offers.length && r.failedAgents.length) unavailable.push("returnFlights");
+  return { kind, eligibility: el, departureCity: t.departureCity, returnFlights: r.offers, hotels: h, domesticFlights: d, unavailable };
 }
 
 export interface ModificationQuote {
@@ -190,7 +205,8 @@ const ticketNo = () => `ETKT${randomInt(100000, 999999)}${randomInt(1000, 9999)}
  * Prices a plan against the booking: validates the signed offers and applies the refund /
  * change policies of each service. Pure apart from reading the booking.
  */
-export function quoteModification(b: StoredBooking, plan: ModificationPlan, now = new Date()): ModificationQuote {
+export function quoteModification(booking: StoredBooking, plan: ModificationPlan, now = new Date()): ModificationQuote {
+  const b = withRooms(booking);
   const el = modificationEligibility(b, now);
   if (!el.allowed) throw new BookingError(el.reason ?? "notAllowed");
   checkDate(b, el, plan.newReturnDate);

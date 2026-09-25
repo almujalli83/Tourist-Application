@@ -16,6 +16,14 @@ export const adultsOf = (rooms: RoomOccupancy[]) => rooms.reduce((a, r) => a + r
 export const minorsOf = (rooms: RoomOccupancy[]) => rooms.reduce((a, r) => a + r.childAges.length, 0);
 export const travellersOf = (rooms: RoomOccupancy[]) => adultsOf(rooms) + minorsOf(rooms);
 
+/**
+ * Rooms for searches saved before guests & rooms existed: everyone in one room, children taken
+ * at a typical age for their fare category (child 8, infant 1). Keeps the fare mix unchanged.
+ */
+export function legacyRooms(pax: PaxCount): RoomOccupancy[] {
+  return [{ adults: pax.adults, childAges: [...Array(pax.children).fill(8), ...Array(pax.infants).fill(1)] }];
+}
+
 /** Fare categories for flight pricing. */
 export function paxFromRooms(rooms: RoomOccupancy[]): PaxCount {
   const ages = rooms.flatMap((r) => r.childAges);

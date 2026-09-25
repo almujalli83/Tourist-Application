@@ -438,6 +438,9 @@ const en: Dictionary = {
     returnTitle: "New return flight",
     returnAgentNote: "The return ticket is changed by the agent that issued it: {agent}",
     noOptions: "No options are available for this date, try another date",
+    agentsUnavailable: "The travel agents could not be reached right now, please try again shortly",
+    cannotComplete: "The change summary cannot be shown and confirmed because this is not available: {items}. Try another date or city.",
+    selectAll: "an option in every section",
     summary: "Change summary",
     lineTypes: {
       hotelAdded: "Hotel booking",

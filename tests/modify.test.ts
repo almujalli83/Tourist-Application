@@ -128,6 +128,18 @@ describe("package update quotes", () => {
     expect(q2.next.price.totalSAR).toBeGreaterThan(q2.next.price.flightsSAR + q2.next.price.hotelsSAR);
   });
 
+  it("works for bookings made before guests & rooms existed", async () => {
+    const b = await makeBooking();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { rooms: _, ...legacyCriteria } = b.criteria;
+    const legacy = { ...b, criteria: legacyCriteria as SearchCriteria };
+    const opts = await modificationOptions(legacy, { newReturnDate: "2026-10-18", target: { mode: "newCity", city: "MED", transport: "flight" } }, now);
+    expect(opts.hotels.length).toBeGreaterThan(0);
+    expect(opts.unavailable).toEqual([]);
+    const q = quoteModification(legacy, { newReturnDate: "2026-10-18", target: { mode: "newCity", city: "MED", transport: "flight" }, offers: { hotel: opts.hotels[0], domesticFlight: opts.domesticFlights[0], returnFlight: opts.returnFlights[0] } }, now);
+    expect(q.next.criteria.rooms).toEqual([{ adults: 2, childAges: [] }]);
+  });
+
   it("enforces the visa expiry and minimum duration", async () => {
     const b = await makeBooking({ applicants: (await makeBooking()).applicants.map((a) => ({ ...a, visaExpiryDate: "2026-10-18" })) });
     await expect(modificationOptions(b, { newReturnDate: "2026-10-19" }, now)).rejects.toThrow("beyondVisa");
