@@ -12,7 +12,9 @@ import type { EventOrder } from "@/lib/events/types";
 import type { TrainOrder } from "@/lib/trains/orders";
 import { EventTicketsPane } from "./events/ticket-view";
 import { TrainTicketsPane } from "./transport/train-ticket-view";
-import { PassportIcon, ShieldIcon, TicketIcon, TrainIcon, UserIcon } from "./icons";
+import { TableBookingsPane } from "./restaurants/table-booking-view";
+import type { RestaurantBooking } from "@/lib/restaurants/bookings";
+import { CalendarIcon, PassportIcon, ShieldIcon, TicketIcon, TrainIcon, UserIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Field, Input, SectionTitle, Select, Spinner } from "./ui";
 
 type Person = WalletPerson & { documents: PublicWalletDoc[] };
@@ -28,8 +30,8 @@ function expiryState(expiry: string | undefined, today: string) {
 }
 const STATE_TONE = { valid: "brand", expiring: "amber", expired: "red", none: "slate" } as const;
 
-type Pane = { kind: "person"; key: string } | { kind: "events" } | { kind: "trains" };
-const TICKETS_PANES = ["events", "trains"] as const;
+type Pane = { kind: "person"; key: string } | { kind: "events" } | { kind: "trains" } | { kind: "tables" };
+const TICKETS_PANES = ["events", "trains", "tables"] as const;
 
 /** Service 3 — digital wallet: travellers' documents, and the account's event and train tickets. */
 export function WalletView() {
@@ -41,6 +43,7 @@ export function WalletView() {
   const [error, setError] = useState(false);
   const [eventOrders, setEventOrders] = useState<EventOrder[] | null>(null);
   const [trainOrders, setTrainOrders] = useState<TrainOrder[] | null>(null);
+  const [tableBookings, setTableBookings] = useState<RestaurantBooking[] | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/wallet", { cache: "no-store" });
@@ -58,6 +61,7 @@ export function WalletView() {
       fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : { orders: [] })).then((d: { orders: T[] }) => set(d.orders)).catch(() => set([]));
     void orders<EventOrder>("/api/events/orders", setEventOrders);
     void orders<TrainOrder>("/api/trains/orders", setTrainOrders);
+    fetch("/api/restaurants/bookings", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { bookings: [] })).then((d: { bookings: RestaurantBooking[] }) => setTableBookings(d.bookings)).catch(() => setTableBookings([]));
   }, [load]);
 
   const needsAttention = (p: Person) =>
@@ -65,7 +69,7 @@ export function WalletView() {
 
   if (error) return <Alert tone="error">{t.review.errors.generic}</Alert>;
   if (!people) return <div className="grid min-h-[40vh] place-items-center text-brand-700"><Spinner className="size-8" /></div>;
-  const pane: Pane = selected === "events" || selected === "trains" ? { kind: selected } : { kind: "person", key: selected ?? "" };
+  const pane: Pane = selected === "events" || selected === "trains" || selected === "tables" ? { kind: selected } : { kind: "person", key: selected ?? "" };
   const person = pane.kind === "person" ? people.find((p) => p.key === pane.key) ?? null : null;
   const active = (key: string) => selected === key;
   const navItem = "flex w-full items-center justify-between gap-2 px-4 py-3 text-start hover:bg-slate-50";
@@ -119,6 +123,12 @@ export function WalletView() {
                 {countBadge(trainOrders)}
               </button>
             </li>
+            <li>
+              <button type="button" onClick={() => setSelected("tables")} aria-pressed={active("tables")} className={cx(navItem, active("tables") && "bg-brand-50")}>
+                <span className="flex items-center gap-2 font-semibold"><CalendarIcon className="size-4 text-brand-700" />{t.restaurants.booking.myBookings}</span>
+                {countBadge(tableBookings)}
+              </button>
+            </li>
           </ul>
         </Card>
 
@@ -126,6 +136,8 @@ export function WalletView() {
           <EventTicketsPane orders={eventOrders} />
         ) : pane.kind === "trains" ? (
           <TrainTicketsPane orders={trainOrders} />
+        ) : pane.kind === "tables" ? (
+          <TableBookingsPane bookings={tableBookings} />
         ) : person ? (
           <PersonWallet key={person.key} person={person} today={today} onChange={load} />
         ) : null}
