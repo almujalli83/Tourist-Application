@@ -10,5 +10,5 @@ next-env.d.ts
 data/*.json
 !data/.gitkeep
 .DS_Store
-.vitest-db.json
+.vitest-db*.json
 public/tesseract/
