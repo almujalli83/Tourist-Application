@@ -50,3 +50,11 @@ export async function chargeCard(card: CardInput, amountSAR: number, now = new D
   if (num.endsWith("0002")) return { ok: false, code: "declined" };
   return { ok: true, transactionId: `TXN-${randomUUID()}`, method: cardBrand(num), last4: num.slice(-4) };
 }
+
+export type RefundResult = { ok: true; refundId: string } | { ok: false; code: "invalid_amount" };
+
+/** Refunds part of a captured payment to the original card (sandbox: always approved). */
+export async function refundPayment(transactionId: string, amountSAR: number): Promise<RefundResult> {
+  if (!transactionId || !(amountSAR > 0)) return { ok: false, code: "invalid_amount" };
+  return { ok: true, refundId: `RFD-${randomUUID()}` };
+}

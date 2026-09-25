@@ -130,6 +130,24 @@ export interface SubmitTourismPackageRequest {
   visitorData: [MtVisitorData];
 }
 
+/** updateTravellerTravelDetails (§8): new travel details of one visa-granted applicant. */
+export interface UpdateTravelDetailsRequest {
+  dmcId: string;
+  packageId: string;
+  messageId: string;
+  visitorData: {
+    applicationNo: string;
+    generalPackageData: MtVisitorData["generalPackageData"];
+    arrivalAndDepartureData: MtVisitorData["arrivalAndDepartureData"];
+    accommodationData: MtVisitorData["accommodationData"];
+  };
+}
+
+export interface UpdateTravelDetailsResponse {
+  correlationId: string;
+  errorCodes: string[];
+}
+
 export interface SubmitTourismPackageResponse {
   correlationId: string;
   packageId?: string;

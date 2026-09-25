@@ -44,4 +44,50 @@ export interface StoredBooking {
     lastCheckedAt: string | null;
   };
   applicants: StoredApplicant[];
+  /** Ticket number per entry of `flights` (sent to MT as arrival/return ticket numbers). */
+  ticketNos?: string[];
+  /** Package updates (extensions / reductions) made after purchase, oldest first. */
+  modifications?: BookingModification[];
+}
+
+export type ModificationKind = "extend" | "shorten";
+export type TransportMode = "flight" | "car" | "train";
+
+export interface ModificationLine {
+  type: "hotelAdded" | "hotelExtended" | "hotelShortened" | "hotelCancelled" | "flightAdded" | "flightChanged" | "flightCancelled" | "activityCancelled" | "transport";
+  /** What the line refers to (hotel/flight/activity name, route…), for display. */
+  labelEn: string;
+  labelAr: string;
+  agentId: string | null;
+  agentNameEn: string | null;
+  agentNameAr: string | null;
+  /** Amount charged (positive) or refunded (negative) for this line, in SAR. */
+  amountSAR: number;
+  /** Amount lost under the cancellation / change policy, in SAR. */
+  nonRefundableSAR: number;
+  detail?: string;
+}
+
+export interface BookingModification {
+  id: string;
+  createdAt: string;
+  kind: ModificationKind;
+  previousReturnDate: string;
+  newReturnDate: string;
+  /** Extension target: the last city, or a new city reached by the chosen transport. */
+  target: { mode: "lastCity" | "newCity"; city: string; transport: TransportMode | null } | null;
+  lines: ModificationLine[];
+  chargeSAR: number;
+  refundSAR: number;
+  payment: { transactionId: string; method: string; last4: string; amountSAR: number } | null;
+  refund: { refundId: string; amountSAR: number } | null;
+  previousTotalSAR: number;
+  newTotalSAR: number;
+  mt: {
+    messageId: string;
+    status: "UPDATED" | "PARTIAL" | "FAILED";
+    results: { applicationNo: string; ok: boolean; errorCodes: string[] }[];
+  };
+  /** Emails notified once MT accepted the update. */
+  notified: { emails: string[]; at: string } | null;
 }

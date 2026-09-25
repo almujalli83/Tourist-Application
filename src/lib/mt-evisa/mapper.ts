@@ -7,10 +7,10 @@ import { diffDays } from "../dates";
 import { getSaudiCity } from "../data/cities";
 import { isArabCountry } from "../data/countries";
 import { applicantShare } from "../pricing";
-import type { ActivityOffer, FlightOffer, HotelOffer, Traveller } from "../types";
+import type { ActivityOffer, FlightOffer, HotelOffer, PaxType, Traveller } from "../types";
 import type { MtClient } from "./client";
 import { lookupId } from "./lookups";
-import type { MtVisitorData, SubmitTourismPackageRequest } from "./types";
+import type { MtVisitorData, SubmitTourismPackageRequest, UpdateTravelDetailsRequest } from "./types";
 
 const b64 = (dataUrl: string) => dataUrl.slice(dataUrl.indexOf(",") + 1);
 const orNull = (s: string) => (s.trim() ? s.trim() : null);
@@ -41,21 +41,10 @@ export async function buildSubmitRequests(client: MtClient, input: MapInput): Pr
     client.getLookup("getExitPort"),
     client.getLookup("getCompanionType"),
   ]);
-  const outboundIdx = input.flights.findIndex((f) => f.kind === "outbound");
-  const returnIdx = input.flights.findIndex((f) => f.kind === "return");
-  const outbound = input.flights[outboundIdx];
-  const ret = input.flights[returnIdx];
-  const travellersCount = input.travellers.length;
+  const lookups = { city, entry, exit };
 
   return input.travellers.map((t, i) => {
-    const share = applicantShare({
-      paxType: t.paxType,
-      travellers: travellersCount,
-      flights: input.flights,
-      hotels: input.hotels,
-      activities: input.activities,
-      visaFeeSAR: input.visaFeeSAR,
-    });
+    const travel = packageTravelData(lookups, input, t.paxType, input.travellers.length);
     const arab = isArabCountry(t.nationality);
     const visitor: MtVisitorData = {
       applicationNo: input.applicationNos[i],
@@ -85,36 +74,7 @@ export async function buildSubmitRequests(client: MtClient, input: MapInput): Pr
       companionType: t.sponsorIndex !== null ? lookupId(companion, t.companionType) : null,
       companionApplicationNo: t.sponsorIndex !== null ? input.applicationNos[t.sponsorIndex] : null,
       disclaimerAnswered: "Yes",
-      generalPackageData: {
-        purpose: "Tourism",
-        packagePurchaseDate: input.purchaseDate,
-        totalPackagePrice: money(share.total),
-        packageDuration: String(diffDays(input.departureDate, input.returnDate)),
-        ...(input.requestInitiatedBy ? { requestInitiatedBy: input.requestInitiatedBy } : {}),
-      },
-      accommodationData: input.hotels.map((h, hi) => ({
-        licenseNo: h.licenseNo,
-        hotelClassification: String(h.stars),
-        checkInDate: h.checkIn,
-        checkOutDate: h.checkOut,
-        city: lookupId(city, getSaudiCity(h.city)?.mtCityCode ?? h.city),
-        hotelPrice: money(share.hotelPrices[hi]),
-      })),
-      arrivalAndDepartureData: {
-        arrivalTicketNo: input.ticketNos[outboundIdx],
-        arrivalFlightDate: outbound.arriveAt.slice(0, 10),
-        arrivalFlightTime: outbound.arriveAt.slice(11, 16),
-        arrivalCarrier: outbound.carrierNameEn,
-        entryPort: lookupId(entry, outbound.to),
-        entryFlightNo: outbound.flightNo,
-        returnTicketNo: input.ticketNos[returnIdx],
-        departureDate: ret.departAt.slice(0, 10),
-        departureTime: ret.departAt.slice(11, 16),
-        departureCarrier: ret.carrierNameEn,
-        exitPort: lookupId(exit, ret.from),
-        departureFlightNo: ret.flightNo,
-        flightPrice: money(share.flightPrice),
-      },
+      ...travel,
       insuranceQuestionnaireData: {
         question1: t.insurance.question1 || "false",
         question2: t.insurance.question2 || "false",
@@ -144,6 +104,78 @@ export async function buildSubmitRequests(client: MtClient, input: MapInput): Pr
       applicationNoList: input.applicationNos,
       isResubmission: "false",
       visitorData: [visitor],
+    };
+  });
+}
+
+type Lookup = Awaited<ReturnType<MtClient["getLookup"]>>;
+
+export interface TravelInput {
+  flights: FlightOffer[];
+  hotels: HotelOffer[];
+  activities: ActivityOffer[];
+  ticketNos: string[]; // per flight offer
+  purchaseDate: string;
+  departureDate: string;
+  returnDate: string;
+  visaFeeSAR: number;
+  requestInitiatedBy?: string;
+}
+
+/** Package, flight and accommodation data of one applicant (shared by submit and update). */
+function packageTravelData(lk: { city: Lookup; entry: Lookup; exit: Lookup }, input: TravelInput, paxType: PaxType, travellers: number) {
+  const outboundIdx = input.flights.findIndex((f) => f.kind === "outbound");
+  const returnIdx = input.flights.findIndex((f) => f.kind === "return");
+  const outbound = input.flights[outboundIdx];
+  const ret = input.flights[returnIdx];
+  const share = applicantShare({ paxType, travellers, flights: input.flights, hotels: input.hotels, activities: input.activities, visaFeeSAR: input.visaFeeSAR });
+  return {
+    generalPackageData: {
+      purpose: "Tourism" as const,
+      packagePurchaseDate: input.purchaseDate,
+      totalPackagePrice: money(share.total),
+      packageDuration: String(diffDays(input.departureDate, input.returnDate)),
+      ...(input.requestInitiatedBy ? { requestInitiatedBy: input.requestInitiatedBy } : {}),
+    },
+    accommodationData: input.hotels.map((h, hi) => ({
+      licenseNo: h.licenseNo,
+      hotelClassification: String(h.stars),
+      checkInDate: h.checkIn,
+      checkOutDate: h.checkOut,
+      city: lookupId(lk.city, getSaudiCity(h.city)?.mtCityCode ?? h.city),
+      hotelPrice: money(share.hotelPrices[hi]),
+    })),
+    arrivalAndDepartureData: {
+      arrivalTicketNo: input.ticketNos[outboundIdx],
+      arrivalFlightDate: outbound.arriveAt.slice(0, 10),
+      arrivalFlightTime: outbound.arriveAt.slice(11, 16),
+      arrivalCarrier: outbound.carrierNameEn,
+      entryPort: lookupId(lk.entry, outbound.to),
+      entryFlightNo: outbound.flightNo,
+      returnTicketNo: input.ticketNos[returnIdx],
+      departureDate: ret.departAt.slice(0, 10),
+      departureTime: ret.departAt.slice(11, 16),
+      departureCarrier: ret.carrierNameEn,
+      exitPort: lookupId(lk.exit, ret.from),
+      departureFlightNo: ret.flightNo,
+      flightPrice: money(share.flightPrice),
+    },
+  };
+}
+
+/** updateTravellerTravelDetails requests (§8): one per applicant, sharing one messageId. */
+export async function buildUpdateRequests(
+  client: MtClient,
+  input: TravelInput & { packageId: string; messageId: string; applicants: { applicationNo: string; paxType: PaxType }[] },
+): Promise<UpdateTravelDetailsRequest[]> {
+  const [city, entry, exit] = await Promise.all([client.getLookup("getCity"), client.getLookup("getEntryPort"), client.getLookup("getExitPort")]);
+  return input.applicants.map((a) => {
+    const travel = packageTravelData({ city, entry, exit }, input, a.paxType, input.applicants.length);
+    return {
+      dmcId: mtConfig().dmcId || "SANDBOX-DMC",
+      packageId: input.packageId,
+      messageId: input.messageId,
+      visitorData: { applicationNo: a.applicationNo, ...travel },
     };
   });
 }

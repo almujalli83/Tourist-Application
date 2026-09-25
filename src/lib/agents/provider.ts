@@ -1,4 +1,4 @@
-import type { ActivityOffer, CabinClass, FlightLeg, HotelOffer, PaxCount, RoomOccupancy } from "../types";
+import type { ActivityOffer, CabinClass, FlightLeg, FlightOffer, HotelOffer, PaxCount, RoomOccupancy } from "../types";
 
 export interface FlightSearchRequest {
   leg: FlightLeg;
@@ -38,4 +38,8 @@ export interface TravelAgentProvider {
   searchFlights(req: FlightSearchRequest): Promise<(RawFlight & { ref: string })[]>;
   searchHotels(req: HotelSearchRequest): Promise<(RawHotel & { ref: string })[]>;
   searchActivities(req: ActivitySearchRequest): Promise<(RawActivity & { ref: string })[]>;
+  /** Price per night for staying longer in a hotel already booked with this agent. */
+  quoteStayExtension(req: { hotel: HotelOffer; newCheckOut: string }): Promise<{ pricePerNightSAR: number } | null>;
+  /** Fee charged per ticket (adults and children) to change the date or route of a ticket it issued. */
+  flightChangeFeeSAR(offer: FlightOffer): number;
 }

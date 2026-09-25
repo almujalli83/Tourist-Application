@@ -37,35 +37,40 @@ export interface AggregateResult<T> {
  */
 async function fanOut<T extends object>(
   run: (a: TravelAgentProvider) => Promise<T[]>,
+  agentIds?: string[],
 ): Promise<AggregateResult<T>> {
-  const settled = await Promise.allSettled(AGENTS.map((a) => withTimeout(run(a))));
+  const agents = agentIds ? AGENTS.filter((a) => agentIds.includes(a.id)) : AGENTS;
+  const settled = await Promise.allSettled(agents.map((a) => withTimeout(run(a))));
   const unsigned: T[] = [];
   const failedAgents: string[] = [];
   settled.forEach((s, i) => {
     if (s.status === "fulfilled") unsigned.push(...s.value);
     else {
-      failedAgents.push(AGENTS[i].id);
-      console.error(`travel agent ${AGENTS[i].id} failed:`, s.reason);
+      failedAgents.push(agents[i].id);
+      console.error(`travel agent ${agents[i].id} failed:`, s.reason);
     }
   });
   return { offers: unsigned.map(sign), failedAgents };
 }
 
-export async function searchFlights(req: FlightSearchRequest): Promise<AggregateResult<FlightOffer>> {
+/** Searches flights with every agent, or only with `agentIds` (e.g. the agent that issued a ticket). */
+export async function searchFlights(req: FlightSearchRequest, agentIds?: string[]): Promise<AggregateResult<FlightOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchFlights(req)).map(({ ref, ...o }) =>
       ({ ...o, ...agentRef(a), id: `F:${a.id}:${req.leg.date}:${req.leg.from}${req.leg.to}:${req.cabin}:${ref}`, totalSAR: priceFlightOffer(o.fare, req.pax) }) as FlightOffer,
     ),
+    agentIds,
   );
   res.offers.sort((x, y) => x.totalSAR - y.totalSAR);
   return res;
 }
 
-export async function searchHotels(req: HotelSearchRequest): Promise<AggregateResult<HotelOffer>> {
+export async function searchHotels(req: HotelSearchRequest, agentIds?: string[]): Promise<AggregateResult<HotelOffer>> {
   const res = await fanOut(async (a) =>
     (await a.searchHotels(req)).map(({ ref, ...o }) =>
       ({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${hotelPaxKey(req.pax, req.rooms)}`, forPax: hotelPaxKey(req.pax, req.rooms) }) as HotelOffer,
     ),
+    agentIds,
   );
   // Packages require MT-licensed hotels of the minimum star rating (Key Package Requirements).
   res.offers = res.offers.filter((h) => h.stars >= PACKAGE_LIMITS.minHotelStars && !!h.licenseNo);
@@ -81,4 +86,32 @@ export async function searchActivities(req: ActivitySearchRequest): Promise<Aggr
   );
   res.offers.sort((x, y) => x.date.localeCompare(y.date) || x.totalSAR - y.totalSAR);
   return res;
+}
+
+/**
+ * Quotes extra nights in a hotel already booked, with the agent that booked it. Returns a signed
+ * offer covering only the extra nights (from the current check-out to `newCheckOut`).
+ */
+export async function quoteHotelExtension(hotel: HotelOffer, newCheckOut: string): Promise<HotelOffer | null> {
+  const agent = AGENTS.find((a) => a.id === hotel.agentId);
+  if (!agent) return null;
+  const quote = await withTimeout(agent.quoteStayExtension({ hotel, newCheckOut })).catch(() => null);
+  if (!quote) return null;
+  const nights = Math.round((Date.parse(newCheckOut) - Date.parse(hotel.checkOut)) / 86_400_000);
+  if (nights < 1) return null;
+  return sign({
+    ...hotel,
+    id: `HX:${hotel.id}:${newCheckOut}`,
+    checkIn: hotel.checkOut,
+    checkOut: newCheckOut,
+    nights,
+    pricePerNightSAR: quote.pricePerNightSAR,
+    totalSAR: Math.round(quote.pricePerNightSAR * nights * 100) / 100,
+  });
+}
+
+/** Change fee (all tickets) for moving a ticket to another date or route, per the issuing agent. */
+export function flightChangeFee(offer: FlightOffer, pax: PaxCount): number {
+  const agent = AGENTS.find((a) => a.id === offer.agentId);
+  return (agent?.flightChangeFeeSAR(offer) ?? 0) * (pax.adults + pax.children);
 }

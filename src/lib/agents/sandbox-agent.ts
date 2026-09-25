@@ -143,8 +143,21 @@ export function createSandboxAgent(opts: {
           serviceChargeSAR: service,
           partySize: party,
           totalSAR: Math.round((price + vat + service) * party * 100) / 100,
+          // Event tickets are final; tours and restaurant bookings can be refunded.
+          refundable: a.kind !== "event",
         };
       });
+    },
+
+    async quoteStayExtension({ hotel }) {
+      await wait();
+      // Sandbox policy: extra nights at the booked nightly rate.
+      return hotel.agentId === opts.id ? { pricePerNightSAR: hotel.pricePerNightSAR } : null;
+    },
+
+    flightChangeFeeSAR(offer) {
+      // Sandbox policy: flexible (refundable) tickets change for free, others pay a fee per ticket.
+      return offer.refundable ? 0 : 150;
     },
   };
 }
