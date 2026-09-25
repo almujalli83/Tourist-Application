@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { computePackagePrice, type PriceBreakdown } from "@/lib/pricing";
 import type { ActivityOffer, FlightLeg, FlightOffer, HotelOffer, SearchCriteria, Traveller } from "@/lib/types";
+import { expectedTravellers } from "@/lib/occupancy";
 import { emptyTraveller } from "@/lib/visa-validation";
 
 const STORAGE_KEY = "ta_booking_v2";
@@ -24,7 +25,8 @@ interface Persisted {
 function restore(raw: string | null, now = Date.now()): State | null {
   if (!raw) return null;
   const saved = JSON.parse(raw) as Partial<Persisted>;
-  if (!saved.state) return null;
+  // Searches saved before rooms and children's ages were introduced cannot be restored.
+  if (!saved.state || (saved.state.criteria && !Array.isArray(saved.state.criteria.rooms))) return null;
   const s: State = { ...INITIAL, ...saved.state };
   const fresh = saved.build === BUILD_ID && typeof saved.savedAt === "number" && now - saved.savedAt < RESULTS_MAX_AGE_MS;
   if (fresh) return s;
@@ -73,13 +75,17 @@ interface BookingCtx extends State {
 
 const Ctx = createContext<BookingCtx | null>(null);
 
+/** One form per traveller of the search's rooms (adults 18+, then minors by age), keeping matching entries. */
 function travellersFor(c: SearchCriteria, prev: Traveller[]): Traveller[] {
-  const types: Traveller["paxType"][] = [
-    ...Array(c.pax.adults).fill("adult"),
-    ...Array(c.pax.children).fill("child"),
-    ...Array(c.pax.infants).fill("infant"),
-  ];
-  return types.map((type, i) => (prev[i]?.paxType === type ? prev[i] : emptyTraveller(type, c.nationality)));
+  return expectedTravellers(c.rooms).map(({ paxType, declaredAge }, i) => {
+    const p = prev[i];
+    if (p && p.paxType === paxType && p.declaredAge === declaredAge) return p;
+    const t = emptyTraveller(paxType, c.nationality);
+    // Teenagers (12–17) fly on adult fares but are minors: give them the minor defaults.
+    return declaredAge !== null && paxType === "adult"
+      ? { ...emptyTraveller("child", c.nationality), paxType, declaredAge }
+      : { ...t, declaredAge };
+  });
 }
 
 /** Images are kept in memory only (they can be several MB); everything else survives a refresh. */

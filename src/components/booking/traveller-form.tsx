@@ -89,7 +89,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
   const setSimple = (k: (typeof SECURITY_SIMPLE)[number], v: YesNo) => onChange({ security: { ...tr.security, [k]: v } });
   const setIns = (k: keyof Traveller["insurance"], v: string) => onChange({ insurance: { ...tr.insurance, [k]: v } });
   const yn = { yes: t.common.yes, no: t.common.no };
-  const sponsors = all.map((o, i) => ({ o, i })).filter(({ o, i }) => i !== index && o.paxType === "adult" && o.sponsorIndex === null);
+  const sponsors = all.map((o, i) => ({ o, i })).filter(({ o, i }) => i !== index && o.paxType === "adult" && o.declaredAge == null && o.sponsorIndex === null);
   const nameOf = (o: Traveller, i: number) => [o.firstNameEn, o.familyNameEn].filter(Boolean).join(" ") || t.travellers.travellerN.replace("{n}", String(i + 1));
 
   return (

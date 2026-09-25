@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildLegs, splitNights, stayDates, validateCriteria } from "@/lib/itinerary";
 import { addDays } from "@/lib/dates";
+import { paxFromRooms } from "@/lib/occupancy";
 import type { SearchCriteria } from "@/lib/types";
 
 const base: SearchCriteria = {
@@ -8,6 +9,7 @@ const base: SearchCriteria = {
   stays: [{ city: "RUH", nights: 3 }, { city: "ULH", nights: 2 }, { city: "JED", nights: 2 }],
   departureDate: "2026-10-10",
   returnDate: "2026-10-17",
+  rooms: [{ adults: 2, childAges: [5, 1] }],
   pax: { adults: 2, children: 1, infants: 1 },
   cabin: "economy",
   nationality: "EG",
@@ -54,9 +56,14 @@ describe("itinerary", () => {
     // All regions: Madinah is allowed; unknown or non-airport destinations are not
     expect(validateCriteria({ ...base, stays: [{ city: "MED", nights: 7 }] }, today)).toEqual([]);
     expect(validateCriteria({ ...base, stays: [{ city: "MKK", nights: 7 }] }, today)).toContain("cities");
-    expect(validateCriteria({ ...base, pax: { adults: 10, children: 0, infants: 0 } }, today)).toContain("maxAdults");
-    expect(validateCriteria({ ...base, pax: { adults: 2, children: 4, infants: 2 } }, today)).toContain("maxMinors");
-    expect(validateCriteria({ ...base, pax: { adults: 1, children: 0, infants: 2 } }, today)).toContain("infants");
+    const withRooms = (rooms: SearchCriteria["rooms"]) => ({ ...base, rooms, pax: paxFromRooms(rooms) });
+    expect(validateCriteria(withRooms([{ adults: 4, childAges: [] }, { adults: 4, childAges: [] }, { adults: 2, childAges: [] }]), today)).toContain("maxAdults");
+    expect(validateCriteria(withRooms([{ adults: 2, childAges: [3, 4, 5, 6] }, { adults: 1, childAges: [8, 9] }]), today)).toContain("maxMinors");
+    expect(validateCriteria(withRooms([{ adults: 1, childAges: [0, 1] }]), today)).toContain("infants");
+    expect(validateCriteria(withRooms([{ adults: 1, childAges: [15, 0] }]), today)).toEqual([]); // a 15-year-old flies on an adult fare
+    expect(validateCriteria(withRooms([{ adults: 1, childAges: [-1] }]), today)).toContain("childAges");
+    expect(validateCriteria(withRooms([{ adults: 0, childAges: [10] }]), today)).toContain("rooms");
+    expect(validateCriteria({ ...base, pax: { adults: 3, children: 1, infants: 1 } }, today)).toContain("pax");
     expect(validateCriteria({ ...base, stays: [{ city: "RUH", nights: 3 }] }, today)).toContain("nightsMismatch");
   });
 });

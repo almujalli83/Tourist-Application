@@ -6,29 +6,15 @@ import { PACKAGE_LIMITS } from "@/lib/config";
 import { ORIGIN_CITIES, SAUDI_CITIES } from "@/lib/data/cities";
 import { addDays, diffDays, isValidISODate, todayISO } from "@/lib/dates";
 import { splitNights, validateCriteria, type SearchError } from "@/lib/itinerary";
-import type { CabinClass, CityStay, PaxCount, SearchCriteria } from "@/lib/types";
+import { paxFromRooms } from "@/lib/occupancy";
+import type { CabinClass, CityStay, RoomOccupancy, SearchCriteria } from "@/lib/types";
 import { useApp } from "../app-provider";
 import { PlaneIcon, UsersIcon } from "../icons";
 import { Alert, Button, Card, cx, Field, Input, Select } from "../ui";
 import { useBooking } from "./booking-context";
 import { CityMultiSelect } from "./city-multi-select";
 import { CountrySelect } from "./country-select";
-
-function Counter({ label, hint, value, min, max, onChange }: { label: string; hint: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
-      <div>
-        <p className="text-sm font-semibold">{label}</p>
-        <p className="text-xs text-slate-500">{hint}</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="grid size-8 place-items-center rounded-full border border-slate-300 text-lg leading-none text-brand-800 disabled:opacity-30" aria-label={`- ${label}`}>−</button>
-        <span className="w-5 text-center font-bold tabular-nums">{value}</span>
-        <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="grid size-8 place-items-center rounded-full border border-slate-300 text-lg leading-none text-brand-800 disabled:opacity-30" aria-label={`+ ${label}`}>+</button>
-      </div>
-    </div>
-  );
-}
+import { GuestsRoomsPicker } from "./guests-rooms-picker";
 
 export function SearchForm() {
   const { t, locale } = useApp();
@@ -42,7 +28,7 @@ export function SearchForm() {
   const [departureDate, setDeparture] = useState(prev?.departureDate ?? addDays(today, 14));
   const [returnDate, setReturn] = useState(prev?.returnDate ?? addDays(today, 21));
   const [stays, setStays] = useState<CityStay[]>(prev?.stays ?? []);
-  const [pax, setPax] = useState<PaxCount>(prev?.pax ?? { adults: 2, children: 0, infants: 0 });
+  const [rooms, setRooms] = useState<RoomOccupancy[]>(prev?.rooms ?? [{ adults: 2, childAges: [] }]);
   const [cabin, setCabin] = useState<CabinClass>(prev?.cabin ?? "economy");
   const [nationality, setNationality] = useState(prev?.nationality ?? "");
   const [errors, setErrors] = useState<SearchError[]>([]);
@@ -62,8 +48,8 @@ export function SearchForm() {
   }
 
   const criteria: SearchCriteria = useMemo(
-    () => ({ origin, stays, departureDate, returnDate, pax, cabin, nationality }),
-    [origin, stays, departureDate, returnDate, pax, cabin, nationality],
+    () => ({ origin, stays, departureDate, returnDate, rooms, pax: paxFromRooms(rooms), cabin, nationality }),
+    [origin, stays, departureDate, returnDate, rooms, cabin, nationality],
   );
 
   function submit(e: React.FormEvent) {
@@ -132,15 +118,14 @@ export function SearchForm() {
             </div>
           )}
 
-          <div className="lg:col-span-2">
-            <Field label={t.search.passengers} required error={err("pax") ?? err("maxAdults") ?? err("maxMinors") ?? err("infants")}>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Counter label={t.common.adults} hint={t.search.adultsHint} value={pax.adults} min={1} max={PACKAGE_LIMITS.maxAdults} onChange={(v) => setPax({ ...pax, adults: v, infants: Math.min(pax.infants, v) })} />
-                <Counter label={t.common.children} hint={t.search.childrenHint} value={pax.children} min={0} max={PACKAGE_LIMITS.maxMinors - pax.infants} onChange={(v) => setPax({ ...pax, children: v })} />
-                <Counter label={t.common.infants} hint={t.search.infantsHint} value={pax.infants} min={0} max={Math.min(pax.adults, PACKAGE_LIMITS.maxMinors - pax.children)} onChange={(v) => setPax({ ...pax, infants: v })} />
-              </div>
-            </Field>
-          </div>
+          <Field label={t.search.guests.label} required error={err("rooms") ?? err("childAges") ?? err("maxAdults") ?? err("maxMinors") ?? err("infants") ?? err("pax")} htmlFor="guests">
+            <GuestsRoomsPicker
+              id="guests"
+              value={rooms}
+              onChange={setRooms}
+              invalid={!!(err("rooms") || err("childAges") || err("maxAdults") || err("maxMinors") || err("infants") || err("pax"))}
+            />
+          </Field>
 
           <Field label={t.search.cabin} required htmlFor="cabin">
             <Select id="cabin" value={cabin} onChange={(e) => setCabin(e.target.value as CabinClass)}>
@@ -150,7 +135,7 @@ export function SearchForm() {
             </Select>
           </Field>
 
-          <div className="flex items-end">
+          <div className="flex items-end lg:col-span-2">
             <Button type="submit" size="lg" className="w-full">
               <UsersIcon className="size-5" />
               {t.search.submit}

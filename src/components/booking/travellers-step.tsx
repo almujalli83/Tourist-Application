@@ -18,6 +18,7 @@ import { useBooking } from "./booking-context";
 import { PackageRequirements, usePackageCheck } from "./package-requirements";
 import { SavedTravellerPicker } from "./saved-traveller-picker";
 import { TravellerForm } from "./traveller-form";
+import { travellerTypeLabel } from "./traveller-label";
 import { WizardShell } from "./wizard-shell";
 
 function useArrivalDate() {
@@ -107,7 +108,6 @@ function TravellersForms() {
   const { errors, composition, valid } = useTravellerValidation();
   const arrivalDate = useArrivalDate();
   const saved = useSavedTravellers(true);
-  const typeLabel = { adult: t.common.adult, child: t.common.child, infant: t.common.infant };
 
   // Images are not kept across page reloads; restore those of travellers picked from the account.
   const restored = useRef(false);
@@ -204,7 +204,7 @@ function TravellersForms() {
               </span>
               <span className="flex flex-col">
                 <span className="text-sm font-semibold">{name || fmt(t.travellers.travellerN, { n: i + 1 })}</span>
-                <span className="text-xs text-slate-500">{typeLabel[x.paxType]} · {ok ? t.travellers.complete : t.travellers.incomplete}</span>
+                <span className="text-xs text-slate-500">{travellerTypeLabel(t, x)} · {ok ? t.travellers.complete : t.travellers.incomplete}</span>
               </span>
             </button>
           );

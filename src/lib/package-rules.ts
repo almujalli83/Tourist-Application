@@ -5,6 +5,7 @@
 import { PACKAGE_LIMITS } from "./config";
 import { ageOn, diffDays, isValidISODate } from "./dates";
 import { buildLegs } from "./itinerary";
+import { adultsOf, minorsOf } from "./occupancy";
 import type { FlightOffer, HotelOffer, SearchCriteria, Traveller } from "./types";
 
 export type RequirementId = "duration" | "leadTime" | "composition" | "flights" | "hotels" | "minPrice";
@@ -39,11 +40,11 @@ export function minimumPackagePrice(adults: number): number {
 
 /**
  * Adults counted in the minimum price: from the travellers' dates of birth (18+) once they are
- * all entered in the visa form, otherwise from the number of adults chosen in the search.
+ * all entered in the visa form, otherwise the adults (18+) chosen in the search's rooms.
  */
 export function adultsForPricing(c: SearchCriteria, travellers: Pick<Traveller, "birthDate">[] = [], on = c.departureDate) {
   const known = travellers.length > 0 && travellers.every((t) => isValidISODate(t.birthDate));
-  if (!known) return { adults: c.pax.adults, fromAges: false };
+  if (!known) return { adults: adultsOf(c.rooms), fromAges: false };
   return { adults: travellers.filter((t) => ageOn(t.birthDate, on) >= PACKAGE_LIMITS.minorAgeLimit).length, fromAges: true };
 }
 
@@ -62,14 +63,15 @@ export function checkPackageRequirements(input: {
   const { adults, fromAges } = adultsForPricing(c, input.travellers, input.arrivalDate ?? c.departureDate);
   const minPriceSAR = minimumPackagePrice(adults);
   const legs = buildLegs(c);
-  const minors = c.pax.children + c.pax.infants;
+  const adults18 = adultsOf(c.rooms);
+  const minors = minorsOf(c.rooms);
 
   const checks: RequirementCheck[] = [
     { id: "duration", ok: days >= PACKAGE_LIMITS.minPackageDays && days <= PACKAGE_LIMITS.maxPackageDays },
     { id: "leadTime", ok: lead >= PACKAGE_LIMITS.minLeadDays && lead <= PACKAGE_LIMITS.maxLeadDays },
     {
       id: "composition",
-      ok: c.pax.adults >= 1 && c.pax.adults <= PACKAGE_LIMITS.maxAdults && minors <= PACKAGE_LIMITS.maxMinors,
+      ok: adults18 >= 1 && adults18 <= PACKAGE_LIMITS.maxAdults && minors <= PACKAGE_LIMITS.maxMinors,
     },
     { id: "flights", ok: legs.every((l) => flights.some((f) => f.legIndex === l.index)) },
     {

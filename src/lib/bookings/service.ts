@@ -1,11 +1,12 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { paxKey } from "../agents/aggregator";
+import { hotelPaxKey, paxKey } from "../agents/aggregator";
 import { verifyOffer } from "../agents/offer-signing";
 import type { PublicUser } from "../auth/types";
 import { VISA_INSURANCE_FEE_SAR } from "../config";
 import { getBookingForUser, listBookingsByUser, saveBooking, updateBooking } from "../repo";
 import { todayISO } from "../dates";
 import { buildLegs, stayDates, validateCriteria } from "../itinerary";
+import { expectedTravellers } from "../occupancy";
 import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildSubmitRequests } from "../mt-evisa/mapper";
 import { checkPackageRequirements } from "../package-rules";
@@ -63,7 +64,7 @@ export function resolveSelection(sel: BookingSelection) {
   });
   const hotels = stays.map((st) => {
     const o = pick<HotelOffer>(offers.hotels, sel.hotels[st.city]);
-    if (!o || !verifyOffer(o) || o.city !== st.city || o.checkIn !== st.checkIn || o.checkOut !== st.checkOut || o.forPax !== pax)
+    if (!o || !verifyOffer(o) || o.city !== st.city || o.checkIn !== st.checkIn || o.checkOut !== st.checkOut || o.forPax !== hotelPaxKey(sel.criteria.pax, sel.criteria.rooms))
       throw new BookingError("offerExpired");
     return o;
   });
@@ -98,20 +99,17 @@ export function evaluatePackage(sel: BookingSelection, travellers?: Pick<Travell
 }
 
 export async function createBooking(user: PublicUser, input: CreateBookingInput): Promise<StoredBooking> {
-  const { selection, travellers } = input;
+  const { selection } = input;
   const today = todayISO();
   const criteriaErrors = validateCriteria(selection.criteria, today);
   if (criteriaErrors.length) throw new BookingError("invalidCriteria", criteriaErrors);
   if (!input.disclaimerAccepted) throw new BookingError("disclaimerRequired");
 
-  const { pax } = selection.criteria;
-  const expectedTypes = [
-    ...Array(pax.adults).fill("adult"),
-    ...Array(pax.children).fill("child"),
-    ...Array(pax.infants).fill("infant"),
-  ];
-  if (travellers.length !== expectedTypes.length || travellers.some((t, i) => t.paxType !== expectedTypes[i]))
+  // Travellers follow the search's rooms: adults (18+), then minors by declared age.
+  const expected = expectedTravellers(selection.criteria.rooms);
+  if (input.travellers.length !== expected.length || input.travellers.some((t, i) => t.paxType !== expected[i].paxType))
     throw new BookingError("travellerMismatch");
+  const travellers = input.travellers.map((t, i) => ({ ...t, declaredAge: expected[i].declaredAge }));
 
   const { flights, hotels, activities, price } = resolveSelection(selection);
   const arrivalDate = flights[0].arriveAt.slice(0, 10);

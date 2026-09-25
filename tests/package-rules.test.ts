@@ -7,6 +7,7 @@ const criteria: SearchCriteria = {
   stays: [{ city: "RUH", nights: 5 }],
   departureDate: "2026-10-10",
   returnDate: "2026-10-15",
+  rooms: [{ adults: 2, childAges: [7] }],
   pax: { adults: 2, children: 1, infants: 0 },
   cabin: "economy",
   nationality: "EG",

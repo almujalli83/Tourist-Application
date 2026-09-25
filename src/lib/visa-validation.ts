@@ -80,6 +80,9 @@ export function validateTraveller(t: Traveller, index: number, all: Traveller[],
     if (t.paxType === "infant" && age >= 2) e.birthDate = "infantAge";
     if (t.paxType === "child" && (ageAtDeparture < 2 || ageAtDeparture >= 12)) e.birthDate = "childAge";
     if (t.paxType === "adult" && ageAtDeparture < 12) e.birthDate = "adultAge";
+    // The date of birth must match the age chosen in the search (it sets the fare and package rules).
+    if (t.declaredAge === null && ageAtDeparture < PACKAGE_LIMITS.minorAgeLimit) e.birthDate = "adult18";
+    else if (typeof t.declaredAge === "number" && ageAtDeparture !== t.declaredAge) e.birthDate = "declaredAge";
   }
 
   if (!getCountry(t.birthplace)) e.birthplace = "required";
