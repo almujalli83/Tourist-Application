@@ -13,7 +13,7 @@ import { useApp } from "../app-provider";
 import { AuthForm } from "../auth-form";
 import { CheckIcon, LockIcon } from "../icons";
 import { fetchSavedTraveller, saveTraveller, useSavedTravellers } from "../saved-travellers-api";
-import { Alert, Button, Card, cx, SectionTitle } from "../ui";
+import { Alert, Button, Card, cx, SectionTitle, Spinner } from "../ui";
 import { useBooking } from "./booking-context";
 import { PackageRequirements, usePackageCheck } from "./package-requirements";
 import { SavedTravellerPicker } from "./saved-traveller-picker";
@@ -43,10 +43,17 @@ export function TravellersStep() {
   const { t, locale, user } = useApp();
   const check = usePackageCheck();
   // Only packages meeting the key package requirements reach the sign-in and visa form.
-  if (check && !check.ok) {
+  if (check.loading && !check.check) {
     return (
-      <WizardShell step={4} title={t.packageRules.blockedTitle} subtitle={t.packageRules.notMet}>
-        <PackageRequirements check={check} />
+      <WizardShell step={4} title={t.travellers.title} subtitle={t.travellers.subtitle}>
+        <div className="grid place-items-center py-16"><Spinner className="size-8 text-brand-700" /></div>
+      </WizardShell>
+    );
+  }
+  if (!check.loading && !check.ok) {
+    return (
+      <WizardShell step={4} title={t.packageRules.blockedTitle}>
+        <PackageRequirements state={check} />
         <Link href={`/${locale}/package-visa/activities`} className="mt-4 inline-flex h-11 items-center rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
           {t.packageRules.fixPackage}
         </Link>

@@ -59,7 +59,7 @@ export function ReviewStep() {
   const { valid } = useTravellerValidation();
   // Re-checked with the travellers' ages: minors (under 18) do not count towards the minimum price.
   const check = usePackageCheck({ useAges: true });
-  const packageOk = !!check?.ok;
+  const packageOk = check.ok;
   const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [clientReference, setClientReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -192,7 +192,7 @@ export function ReviewStep() {
           </ul>
         </Card>
 
-        {check && !check.ok && <PackageRequirements check={check} />}
+        <PackageRequirements state={check} />
 
         <PrivacyPolicy />
 

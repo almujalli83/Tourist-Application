@@ -32,15 +32,14 @@ export function packageDays(c: SearchCriteria): number {
   return diffDays(c.departureDate, c.returnDate);
 }
 
-/** 2,000 SAR per adult for the minimum duration, plus 1,000 SAR per adult for each additional day. */
-export function minimumPackagePrice(adults: number, days: number): number {
-  const extraDays = Math.max(0, days - PACKAGE_LIMITS.minPackageDays);
-  return adults * (PACKAGE_LIMITS.minPricePerAdultSAR + extraDays * PACKAGE_LIMITS.extraDayPerAdultSAR);
+/** The package price starts from 2,000 SAR per adult (18+); minors are not counted. */
+export function minimumPackagePrice(adults: number): number {
+  return adults * PACKAGE_LIMITS.minPricePerAdultSAR;
 }
 
 /**
- * Adults counted in the minimum price. Minors (under 18) are not counted; until every
- * traveller's birth date is known, all flight "adults" (12+) are counted.
+ * Adults counted in the minimum price: from the travellers' dates of birth (18+) once they are
+ * all entered in the visa form, otherwise from the number of adults chosen in the search.
  */
 export function adultsForPricing(c: SearchCriteria, travellers: Pick<Traveller, "birthDate">[] = [], on = c.departureDate) {
   const known = travellers.length > 0 && travellers.every((t) => isValidISODate(t.birthDate));
@@ -61,7 +60,7 @@ export function checkPackageRequirements(input: {
   const days = packageDays(c);
   const lead = diffDays(today, c.departureDate);
   const { adults, fromAges } = adultsForPricing(c, input.travellers, input.arrivalDate ?? c.departureDate);
-  const minPriceSAR = minimumPackagePrice(adults, days);
+  const minPriceSAR = minimumPackagePrice(adults);
   const legs = buildLegs(c);
   const minors = c.pax.children + c.pax.infants;
 

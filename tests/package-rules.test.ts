@@ -17,10 +17,10 @@ const today = "2026-09-24";
 const failed = (r: ReturnType<typeof checkPackageRequirements>) => r.checks.filter((c) => !c.ok).map((c) => c.id);
 
 describe("key package requirements", () => {
-  it("prices 2,000 SAR per adult plus 1,000 SAR per adult for each day beyond 2", () => {
-    expect(minimumPackagePrice(1, 2)).toBe(2000);
-    expect(minimumPackagePrice(2, 5)).toBe(2 * (2000 + 3 * 1000));
-    expect(minimumPackagePrice(0, 5)).toBe(0);
+  it("starts the package price from 2,000 SAR per adult, whatever the duration", () => {
+    expect(minimumPackagePrice(1)).toBe(2000);
+    expect(minimumPackagePrice(2)).toBe(4000);
+    expect(minimumPackagePrice(0)).toBe(0);
   });
 
   it("counts search adults until birth dates are known, then only travellers aged 18+", () => {
@@ -31,18 +31,18 @@ describe("key package requirements", () => {
   });
 
   it("passes a complete package priced at or above the minimum (happy path)", () => {
-    const r = checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(3)], totalSAR: 10_000, today });
+    const r = checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(3)], totalSAR: 4_000, today });
     expect(r.ok).toBe(true);
-    expect(r).toMatchObject({ days: 5, adults: 2, minPriceSAR: 10_000, shortfallSAR: 0 });
+    expect(r).toMatchObject({ days: 5, adults: 2, minPriceSAR: 4_000, shortfallSAR: 0 });
   });
 
   it("blocks packages below the minimum price, with the shortfall", () => {
-    const r = checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(4)], totalSAR: 9_250.5, today });
+    const r = checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(4)], totalSAR: 3_250.5, today });
     expect(failed(r)).toEqual(["minPrice"]);
     expect(r.shortfallSAR).toBe(749.5);
-    // With ages known (one 18+ adult), the same total is enough.
+    // With dates of birth entered (one traveller aged 18+), the same total is enough.
     const withAges = checkPackageRequirements({
-      criteria, flights: [flight(0), flight(1)], hotels: [hotel(4)], totalSAR: 9_250.5, today,
+      criteria, flights: [flight(0), flight(1)], hotels: [hotel(4)], totalSAR: 3_250.5, today,
       travellers: [{ birthDate: "1990-01-01" }, { birthDate: "2010-01-01" }, { birthDate: "2018-01-01" }],
     });
     expect(withAges.ok).toBe(true);

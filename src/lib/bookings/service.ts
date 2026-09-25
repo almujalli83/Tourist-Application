@@ -51,6 +51,7 @@ export function resolveSelection(sel: BookingSelection) {
   const legs = buildLegs(sel.criteria);
   const stays = stayDates(sel.criteria);
   const pax = paxKey(sel.criteria.pax);
+  const travellerCount = sel.criteria.pax.adults + sel.criteria.pax.children + sel.criteria.pax.infants;
   const offers = sel.offers ?? { flights: [], hotels: [], activities: [] };
   const pick = <T extends { id: string }>(list: T[] | undefined, id: string | undefined) => (id ? (list ?? []).find((o) => o.id === id) : undefined);
 
@@ -69,10 +70,31 @@ export function resolveSelection(sel: BookingSelection) {
   const activities = [...new Set(sel.activities)].map((id) => {
     const o = pick<ActivityOffer>(offers.activities, id);
     if (!o || !verifyOffer(o) || o.forPax !== pax || !stays.some((st) => st.city === o.city)) throw new BookingError("offerExpired");
+    // Activity tickets are bought for every traveller in the package.
+    if (o.partySize !== travellerCount) throw new BookingError("offerExpired");
     return o;
   });
   const price = computePackagePrice({ pax: sel.criteria.pax, flights, hotels, activities, visaFeeSAR: VISA_INSURANCE_FEE_SAR });
   return { flights, hotels, activities, price };
+}
+
+/**
+ * Server-side check of the key package requirements on the signed offers. Until the travellers'
+ * dates of birth are known, adults are counted from the search.
+ */
+export function evaluatePackage(sel: BookingSelection, travellers?: Pick<Traveller, "birthDate">[]) {
+  const criteriaErrors = validateCriteria(sel.criteria, todayISO());
+  if (criteriaErrors.length) throw new BookingError("invalidCriteria", criteriaErrors);
+  const { flights, hotels, price } = resolveSelection(sel);
+  return checkPackageRequirements({
+    criteria: sel.criteria,
+    flights,
+    hotels,
+    totalSAR: price.totalSAR,
+    today: todayISO(),
+    travellers,
+    arrivalDate: flights[0]?.arriveAt.slice(0, 10),
+  });
 }
 
 export async function createBooking(user: PublicUser, input: CreateBookingInput): Promise<StoredBooking> {
