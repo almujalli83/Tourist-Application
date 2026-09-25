@@ -23,10 +23,8 @@ export const PACKAGE_LIMITS = {
   maxLeadDays: 80,
   /** Accommodation: MT-licensed hotels of 3 stars or more. */
   minHotelStars: 3,
-  /** Minimum package price per adult (18+) for the minimum duration; covers flights, hotels, activities and visa & insurance. */
+  /** Package price starts from 2,000 SAR per adult (18+); covers flights, hotels, activities and visa & insurance. */
   minPricePerAdultSAR: 2000,
-  /** Added to the per-adult minimum for each day beyond the minimum duration. */
-  extraDayPerAdultSAR: 1000,
   passportValidityMonths: 6,
 } as const;
 

@@ -120,7 +120,8 @@ export function createSandboxAgent(opts: {
     async searchActivities({ city, from, pax }) {
       await wait();
       const r = rng(`${opts.id}|A|${city}|${from}`);
-      const party = pax.adults + pax.children;
+      // One ticket per traveller in the package.
+      const party = pax.adults + pax.children + pax.infants;
       const picks = ACTIVITIES.filter(() => r.next() < 0.45).slice(0, 3);
       return picks.map((a, i) => {
         const price = Math.round(a.price * opts.priceFactor);
