@@ -48,6 +48,8 @@ export interface StoredBooking {
   ticketNos?: string[];
   /** Package updates (extensions / reductions) made after purchase, oldest first. */
   modifications?: BookingModification[];
+  /** eSIMs bought with the package (separate from the package price). */
+  esim?: { orderId: string | null; amountSAR: number; failed?: boolean };
   /** Incremented by every package change; a change must be priced on the current version. */
   version?: number;
   /** Held while a package change is being applied (prevents concurrent changes). */

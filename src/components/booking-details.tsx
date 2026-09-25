@@ -86,6 +86,16 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
       )}
 
       {updated && <Alert tone="success">{t.modify.updated}</Alert>}
+      {booking.esim?.failed && <Alert tone="warning">{t.esim.order.esimFailed} <Link href={`/${locale}/esim`} className="font-semibold underline">{t.esim.order.buy}</Link></Alert>}
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5" data-testid="booking-esim">
+        <div className="text-sm">
+          <p className="font-bold text-ink">{t.esim.title}</p>
+          <p className="text-slate-600">{booking.esim?.orderId ? `${t.esim.order.status.CONFIRMED} · ${money(booking.esim.amountSAR)}` : t.esim.subtitle}</p>
+        </div>
+        <Link href={booking.esim?.orderId ? `/${locale}/account/esim/${booking.esim.orderId}` : `/${locale}/esim`} className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
+          {booking.esim?.orderId ? t.wallet.view : t.esim.order.buy}
+        </Link>
+      </Card>
       {eligibility?.allowed && (
         <Card className="flex flex-wrap items-center justify-between gap-3 border-gold-500/30 bg-gold-50 p-4 sm:p-5">
           <div className="text-sm">

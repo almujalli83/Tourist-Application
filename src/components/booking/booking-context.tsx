@@ -48,11 +48,15 @@ interface State {
   activities: string[];
   travellers: Traveller[];
   disclaimerAccepted: boolean;
+  /** Optional eSIMs (Tygo) for some travellers — paid with the package, not part of its price. */
+  esim: EsimChoice | null;
 }
+
+export interface EsimChoice { planId: string; priceSAR: number; travellers: number[] }
 
 const INITIAL: State = {
   criteria: null, flightResults: null, hotelResults: null, activityResults: null,
-  flights: {}, hotels: {}, activities: [], travellers: [], disclaimerAccepted: false,
+  flights: {}, hotels: {}, activities: [], travellers: [], disclaimerAccepted: false, esim: null,
 };
 
 interface BookingCtx extends State {
@@ -66,11 +70,15 @@ interface BookingCtx extends State {
   toggleActivity: (id: string) => void;
   updateTraveller: (i: number, patch: Partial<Traveller>) => void;
   setDisclaimer: (v: boolean) => void;
+  setEsim: (e: EsimChoice | null) => void;
   reset: () => void;
   selectedFlights: FlightOffer[];
   selectedHotels: HotelOffer[];
   selectedActivities: ActivityOffer[];
   price: PriceBreakdown | null;
+  /** eSIM amount (0 when none) and the amount charged: package price + eSIMs. */
+  esimSAR: number;
+  amountToPaySAR: number;
 }
 
 const Ctx = createContext<BookingCtx | null>(null);
@@ -142,6 +150,7 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
     updateTraveller: (i: number, patch: Partial<Traveller>) =>
       setState((s) => ({ ...s, travellers: s.travellers.map((t, idx) => (idx === i ? { ...t, ...patch } : t)) })),
     setDisclaimer: (v: boolean) => setState((s) => ({ ...s, disclaimerAccepted: v })),
+    setEsim: (e: EsimChoice | null) => setState((s) => ({ ...s, esim: e && e.travellers.length ? e : null })),
     reset: () => {
       setState(INITIAL);
       try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
@@ -160,7 +169,9 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
     const price = state.criteria
       ? computePackagePrice({ pax: state.criteria.pax, flights: selectedFlights, hotels: selectedHotels, activities: selectedActivities, visaFeeSAR })
       : null;
-    return { selectedFlights, selectedHotels, selectedActivities, price };
+    const esimSAR = state.esim ? Math.round(state.esim.priceSAR * state.esim.travellers.length * 100) / 100 : 0;
+    const amountToPaySAR = price ? Math.round((price.totalSAR + esimSAR) * 100) / 100 : 0;
+    return { selectedFlights, selectedHotels, selectedActivities, price, esimSAR, amountToPaySAR };
   }, [state, visaFeeSAR]);
 
   const value = useMemo(() => ({ ...state, ...api, ...derived, hydrated, setCriteria }), [state, api, derived, hydrated, setCriteria]);

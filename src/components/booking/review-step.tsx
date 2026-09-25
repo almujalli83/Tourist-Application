@@ -93,6 +93,7 @@ export function ReviewStep() {
           travellers: booking.travellers,
           disclaimerAccepted: booking.disclaimerAccepted,
           expectedTotalSAR: price.totalSAR,
+          esim: booking.esim ? { planId: booking.esim.planId, travellers: booking.esim.travellers, expectedSAR: booking.esimSAR } : undefined,
           displayCurrency: currency,
           clientReference: clientReference || undefined,
           card: { holder: card.holder, number: card.number, expMonth, expYear, cvc: card.cvc },
@@ -111,7 +112,7 @@ export function ReviewStep() {
   const errorText = error ? (t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic : null;
 
   return (
-    <WizardShell step={5} title={t.review.title} subtitle={t.review.subtitle}>
+    <WizardShell step={6} title={t.review.title} subtitle={t.review.subtitle}>
       <div className="grid gap-4">
         {!valid && (
           <Alert tone="error">
@@ -242,7 +243,7 @@ export function ReviewStep() {
               {errorText && <Alert tone="error" className="mt-4">{errorText}</Alert>}
               <Button type="submit" size="lg" variant="gold" className="mt-5 w-full" loading={submitting} disabled={!valid || !price || !packageOk}>
                 <LockIcon className="size-5" />
-                {submitting ? t.review.paying : fmt(t.review.pay, { amount: price ? money(price.totalSAR) : "" })}
+                {submitting ? t.review.paying : fmt(t.review.pay, { amount: price ? money(booking.amountToPaySAR) : "" })}
               </Button>
             </Card>
           </form>

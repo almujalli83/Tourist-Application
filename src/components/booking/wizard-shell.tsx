@@ -57,7 +57,7 @@ export function TripSummaryBar() {
 
 export function PriceSummary({ footer }: { footer?: ReactNode }) {
   const { t, money, currency } = useApp();
-  const { price } = useBooking();
+  const { price, esim, esimSAR, amountToPaySAR } = useBooking();
   if (!price) return null;
   const rows = [
     { label: t.review.flights, v: price.flightsSAR },
@@ -81,15 +81,30 @@ export function PriceSummary({ footer }: { footer?: ReactNode }) {
       </dl>
       <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
         <span className="font-bold">{t.common.total}</span>
-        <span className="ltr-nums text-lg font-bold text-brand-800 tabular-nums">{money(price.totalSAR)}</span>
+        <span className="ltr-nums text-lg font-bold text-brand-800 tabular-nums" data-testid="package-total">{money(price.totalSAR)}</span>
       </div>
+      {esim && esimSAR > 0 && (
+        <div className="mt-3 space-y-2 border-t border-dashed border-slate-200 pt-3 text-sm" data-testid="esim-summary">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-slate-600">
+              {fmt(t.esim.summaryLine, { n: esim.travellers.length })}
+              <span className="mt-0.5 block text-xs text-slate-400">{t.esim.notInPackage}</span>
+            </span>
+            <span className="ltr-nums font-medium tabular-nums">{money(esimSAR)}</span>
+          </div>
+          <div className="flex items-center justify-between font-bold">
+            <span>{t.esim.totalToPay}</span>
+            <span className="ltr-nums text-brand-800 tabular-nums" data-testid="amount-to-pay">{money(amountToPaySAR)}</span>
+          </div>
+        </div>
+      )}
       {currency !== "SAR" && <p className="mt-2 text-xs text-slate-500">{t.review.chargedInSAR}</p>}
       {footer && <div className="mt-4">{footer}</div>}
     </Card>
   );
 }
 
-const STEP_PATHS = ["", "/flights", "/hotels", "/activities", "/travellers", "/review"];
+const STEP_PATHS = ["", "/flights", "/hotels", "/activities", "/esim", "/travellers", "/review"];
 
 /** Layout for every step after search: stepper, trip summary, main column and price sidebar. */
 export function WizardShell({ step, title, subtitle, children, sidebar = true, sidebarFooter }: {
