@@ -49,3 +49,9 @@ export function mtConfig() {
     mock: !process.env.MT_CLIENT_ID,
   };
 }
+
+/** Back-office (operations) access: comma-separated emails in ADMIN_EMAILS. */
+export function isAdminEmail(email: string): boolean {
+  const list = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return list.includes(email.trim().toLowerCase());
+}

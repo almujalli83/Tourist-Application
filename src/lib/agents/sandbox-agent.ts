@@ -159,5 +159,19 @@ export function createSandboxAgent(opts: {
       // Sandbox policy: flexible (refundable) tickets change for free, others pay a fee per ticket.
       return offer.refundable ? 0 : 150;
     },
+
+    async requestChange({ items }) {
+      await wait();
+      // Sandbox: approves every change (a real agent may reject, e.g. no availability).
+      return items.length
+        ? { approved: true as const, reference: `${opts.id.toUpperCase()}-CHG-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
+        : { approved: false as const, reason: "empty" };
+    },
+    async confirmChange() {
+      await wait();
+    },
+    async releaseChange() {
+      await wait();
+    },
   };
 }

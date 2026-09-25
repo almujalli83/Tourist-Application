@@ -20,6 +20,7 @@ export function SiteHeader() {
     { href: `/${locale}`, label: t.nav.home },
     { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
     ...(user ? [{ href: `/${locale}/account`, label: t.nav.myBookings }] : []),
+    ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
   ];
 
   async function logout() {

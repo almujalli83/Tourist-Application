@@ -1,3 +1,4 @@
+import { isAdminEmail } from "../config";
 import type { AccountType } from "../types";
 
 export interface IndividualProfile {
@@ -28,12 +29,13 @@ export interface StoredUser {
   createdAt: string;
 }
 
-export type PublicUser = Omit<StoredUser, "passwordHash">;
+export type PublicUser = Omit<StoredUser, "passwordHash"> & { isAdmin?: boolean };
 
+/** Server-side only (reads ADMIN_EMAILS). */
 export function toPublicUser(u: StoredUser): PublicUser {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { passwordHash, ...rest } = u;
-  return rest;
+  return isAdminEmail(u.email) ? { ...rest, isAdmin: true } : rest;
 }
 
 export function displayName(u: PublicUser): string {

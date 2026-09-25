@@ -48,6 +48,18 @@ export interface StoredBooking {
   ticketNos?: string[];
   /** Package updates (extensions / reductions) made after purchase, oldest first. */
   modifications?: BookingModification[];
+  /** Incremented by every package change; a change must be priced on the current version. */
+  version?: number;
+  /** Held while a package change is being applied (prevents concurrent changes). */
+  lock?: { token: string; at: string } | null;
+}
+
+export interface AgentApproval {
+  agentId: string;
+  agentNameEn: string;
+  agentNameAr: string;
+  reference: string;
+  status: "APPROVED" | "RELEASED";
 }
 
 export type ModificationKind = "extend" | "shorten";
@@ -70,6 +82,8 @@ export interface ModificationLine {
 
 export interface BookingModification {
   id: string;
+  /** Client-supplied key: the same request is applied only once. */
+  idempotencyKey?: string;
   createdAt: string;
   kind: ModificationKind;
   previousReturnDate: string;
@@ -83,11 +97,13 @@ export interface BookingModification {
   refund: { refundId: string; amountSAR: number } | null;
   previousTotalSAR: number;
   newTotalSAR: number;
+  /** Approvals of the travel agents, obtained before MT is updated. */
+  agents?: AgentApproval[];
   mt: {
     messageId: string;
     status: "UPDATED" | "PARTIAL" | "FAILED";
     results: { applicationNo: string; ok: boolean; errorCodes: string[] }[];
   };
   /** Emails notified once MT accepted the update. */
-  notified: { emails: string[]; at: string } | null;
+  notified: { emails: string[]; at: string; delivered?: boolean } | null;
 }

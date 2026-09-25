@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { searchActivities, searchFlights, searchHotels } from "@/lib/agents/aggregator";
-import { modificationEligibility, modificationOptions, quoteModification } from "@/lib/bookings/modify";
+import { executeModification, modificationEligibility, modificationOptions, quoteModification } from "@/lib/bookings/modify";
+import { AGENTS } from "@/lib/agents/registry";
+import type { PublicUser } from "@/lib/auth/types";
+import { getBookingForUser, saveBooking, upsertSandboxPackage } from "@/lib/repo";
 import type { StoredBooking } from "@/lib/bookings/types";
 import { addDays } from "@/lib/dates";
 import { buildLegs, stayDates } from "@/lib/itinerary";
@@ -109,7 +112,8 @@ describe("package update quotes", () => {
     const q = quoteModification(b, { newReturnDate: "2026-10-14", offers: { returnFlight: opts.returnFlights[0] } }, now);
     const hotelLine = q.lines.find((l) => l.type === "hotelShortened")!;
     expect(hotelLine).toMatchObject({ amountSAR: 0, nonRefundableSAR: 600 }); // 2 of 3 nights, non-refundable
-    expect(q.next.hotels[1]).toMatchObject({ checkOut: "2026-10-14", nights: 1, totalSAR: 300 });
+    // Non-refundable: the nights are cancelled but the paid amount stays in the package price.
+    expect(q.next.hotels[1]).toMatchObject({ checkOut: "2026-10-14", nights: 1, totalSAR: 900 });
     expect(q.next.activities).toEqual([]);
     expect(q.lines.filter((l) => l.type === "activityCancelled").every((l) => l.amountSAR < 0)).toBe(true);
     expect(q.next.criteria).toMatchObject({ returnDate: "2026-10-14", stays: [{ city: "RUH", nights: 3 }, { city: "JED", nights: 1 }] });
@@ -119,11 +123,82 @@ describe("package update quotes", () => {
     const q2 = quoteModification(b, { newReturnDate: "2026-10-13", offers: { returnFlight: early.returnFlights[0] } }, now);
     expect(q2.lines.map((l) => l.type)).toContain("flightCancelled");
     expect(q2.lines.map((l) => l.type)).toContain("hotelCancelled");
+    // The cancelled non-refundable Jeddah hotel is retained in the price.
+    expect(q2.next.price.retainedSAR).toBeGreaterThanOrEqual(900);
+    expect(q2.next.price.totalSAR).toBeGreaterThan(q2.next.price.flightsSAR + q2.next.price.hotelsSAR);
   });
 
   it("enforces the visa expiry and minimum duration", async () => {
     const b = await makeBooking({ applicants: (await makeBooking()).applicants.map((a) => ({ ...a, visaExpiryDate: "2026-10-18" })) });
     await expect(modificationOptions(b, { newReturnDate: "2026-10-19" }, now)).rejects.toThrow("beyondVisa");
     await expect(modificationOptions(b, { newReturnDate: "2026-10-11" }, now)).rejects.toThrow("tooShort");
+  });
+});
+
+describe("applying a package change", () => {
+  const user = { id: "u1", accountType: "individual", email: "u1@example.com" } as PublicUser;
+  const card = { holder: "A B", number: "4111111111111111", expMonth: "12", expYear: "29", cvc: "123" };
+
+  async function setup(id: string) {
+    const b = await makeBooking({ id });
+    // Visas issued far ahead; the change deadline depends on the real clock here.
+    const ret = b.flights.find((f) => f.kind === "return")!;
+    expect(Date.parse(`${ret.departAt}:00+03:00`)).toBeGreaterThan(Date.now());
+    await saveBooking(b);
+    // The package exists in the MT sandbox with visas issued.
+    await upsertSandboxPackage("pkg-1", (p) => ({
+      ...p,
+      submittedAt: new Date(Date.now() - 86_400_000).toISOString(),
+      applications: b.applicants.map((a) => ({ applicationNo: a.applicationNo, name: a.nameEn, countryId: "EG", passportNo: a.passportNo })),
+    }));
+    const opts = await modificationOptions(b, { newReturnDate: "2026-10-18", target: { mode: "lastCity" } });
+    const plan = { newReturnDate: "2026-10-18", target: { mode: "lastCity" as const }, offers: { hotel: opts.hotels[0], returnFlight: opts.returnFlights[0] } };
+    const q = quoteModification(b, plan);
+    return { b, plan, q, input: { plan, expectedChargeSAR: q.chargeSAR, expectedRefundSAR: q.refundSAR, bookingVersion: q.bookingVersion, card } };
+  }
+
+  it("applies once per idempotency key and bumps the booking version", async () => {
+    const { input } = await setup("exec-1");
+    const first = await executeModification(user, "exec-1", { ...input, idempotencyKey: "key-1" });
+    expect(first.replayed).toBe(false);
+    expect(first.modification.agents?.length).toBeGreaterThan(0);
+    expect(first.modification.mt.status).toBe("UPDATED");
+    const again = await executeModification(user, "exec-1", { ...input, idempotencyKey: "key-1" });
+    expect(again).toMatchObject({ replayed: true, modification: { id: first.modification.id } });
+    const saved = await getBookingForUser("u1", "exec-1");
+    expect(saved?.modifications).toHaveLength(1);
+    expect(saved).toMatchObject({ version: 1, lock: null });
+    // A second change priced on the old version is refused.
+    await expect(executeModification(user, "exec-1", { ...input, idempotencyKey: "key-2" })).rejects.toThrow("bookingChanged");
+  });
+
+  it("refuses a change while another one is being applied", async () => {
+    const { b, input } = await setup("exec-2");
+    await saveBooking({ ...b, lock: { token: "other", at: new Date().toISOString() } });
+    await expect(executeModification(user, "exec-2", { ...input, idempotencyKey: "k" })).rejects.toThrow("inProgress");
+  });
+
+  it("charges nothing when an agent rejects, and releases the other approvals", async () => {
+    const { b, input } = await setup("exec-3");
+    const hotelAgent = AGENTS.find((a) => a.id === b.hotels[1].agentId)!;
+    const reject = vi.spyOn(hotelAgent, "requestChange").mockResolvedValue({ approved: false, reason: "noAvailability" });
+    const released = AGENTS.map((a) => vi.spyOn(a, "releaseChange"));
+    await expect(executeModification(user, "exec-3", { ...input, idempotencyKey: "k" })).rejects.toThrow("agentRejected");
+    const saved = await getBookingForUser("u1", "exec-3");
+    expect(saved?.modifications ?? []).toHaveLength(0);
+    expect(saved?.lock ?? null).toBeNull();
+    const returnAgentDiffers = b.flights.find((f) => f.kind === "return")!.agentId !== hotelAgent.id;
+    if (returnAgentDiffers) expect(released.some((s) => s.mock.calls.length > 0)).toBe(true);
+    reject.mockRestore();
+    released.forEach((s) => s.mockRestore());
+  });
+
+  it("releases the agents when the payment is declined", async () => {
+    const { input } = await setup("exec-4");
+    const released = AGENTS.map((a) => vi.spyOn(a, "releaseChange"));
+    await expect(executeModification(user, "exec-4", { ...input, card: { ...card, number: "4000000000000002" }, idempotencyKey: "k" })).rejects.toThrow("payment_declined");
+    expect(released.some((s) => s.mock.calls.length > 0)).toBe(true);
+    expect((await getBookingForUser("u1", "exec-4"))?.modifications ?? []).toHaveLength(0);
+    released.forEach((s) => s.mockRestore());
   });
 });

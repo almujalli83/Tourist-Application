@@ -6,7 +6,10 @@
  * with updateTravellerTravelDetails (§8).
  */
 import { randomInt, randomUUID } from "node:crypto";
-import { flightChangeFee, hotelPaxKey, quoteHotelExtension, searchFlights, searchHotels } from "../agents/aggregator";
+import {
+  AgentRejectedError, confirmAgentChanges, flightChangeFee, hotelPaxKey, quoteHotelExtension, releaseAgentChanges,
+  requestAgentChanges, searchFlights, searchHotels,
+} from "../agents/aggregator";
 import { verifyOffer } from "../agents/offer-signing";
 import type { PublicUser } from "../auth/types";
 import { PACKAGE_LIMITS } from "../config";
@@ -20,7 +23,7 @@ import { minimumPackagePrice } from "../package-rules";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { computePackagePrice, type PriceBreakdown } from "../pricing";
 import { notifyTravellers } from "../notify";
-import { getBookingForUser, updateBooking } from "../repo";
+import { getBookingForUser, getUserById, updateBooking } from "../repo";
 import type { ActivityOffer, CityStay, FlightOffer, HotelOffer, SearchCriteria } from "../types";
 import { BookingError } from "./service";
 import type { BookingModification, ModificationKind, ModificationLine, StoredBooking, TransportMode } from "./types";
@@ -158,6 +161,8 @@ export async function modificationOptions(b: StoredBooking, input: { newReturnDa
 }
 
 export interface ModificationQuote {
+  /** Version of the booking the quote was priced on (a change applies only to that version). */
+  bookingVersion: number;
   kind: ModificationKind;
   newReturnDate: string;
   target: BookingModification["target"];
@@ -201,6 +206,8 @@ export function quoteModification(b: StoredBooking, plan: ModificationPlan, now 
   let hotels = b.hotels.map((h) => ({ ...h }));
   let activities = [...b.activities];
   let stays: CityStay[] = c.stays.map((s) => ({ ...s }));
+  // Non-refundable amounts of cancelled services stay part of the package price.
+  let retained = b.price.retainedSAR ?? 0;
 
   if (kind === "extend") {
     const extra = diffDays(c.returnDate, newReturnDate);
@@ -244,8 +251,11 @@ export function quoteModification(b: StoredBooking, plan: ModificationPlan, now 
     }
   } else {
     // Shorten: cancel everything from the new return date, per each service's refund policy.
-    const refundOrLose = (value: number, refundable: boolean | undefined) =>
-      refundable ? { amountSAR: -round2(value), nonRefundableSAR: 0 } : { amountSAR: 0, nonRefundableSAR: round2(value) };
+    const refundOrLose = (value: number, refundable: boolean | undefined, keptInLine = false) => {
+      if (refundable) return { amountSAR: -round2(value), nonRefundableSAR: 0 };
+      if (!keptInLine) retained += value;
+      return { amountSAR: 0, nonRefundableSAR: round2(value) };
+    };
     hotels = hotels.flatMap((h) => {
       if (h.checkIn >= newReturnDate) {
         lines.push({ type: "hotelCancelled", ...hotelLabel(h), ...agentOf(h), ...refundOrLose(h.totalSAR, h.refundable), detail: `${h.checkIn} → ${h.checkOut}` });
@@ -254,8 +264,9 @@ export function quoteModification(b: StoredBooking, plan: ModificationPlan, now 
       if (h.checkOut > newReturnDate) {
         const cancelled = diffDays(newReturnDate, h.checkOut);
         const value = round2((h.totalSAR / h.nights) * cancelled);
-        lines.push({ type: "hotelShortened", ...hotelLabel(h), ...agentOf(h), ...refundOrLose(value, h.refundable), detail: `-${cancelled}` });
-        return [{ ...h, checkOut: newReturnDate, nights: h.nights - cancelled, totalSAR: round2(h.totalSAR - value) }];
+        lines.push({ type: "hotelShortened", ...hotelLabel(h), ...agentOf(h), ...refundOrLose(value, h.refundable, true), detail: `-${cancelled}` });
+        // A non-refundable stay keeps its full (paid) price.
+        return [{ ...h, checkOut: newReturnDate, nights: h.nights - cancelled, totalSAR: h.refundable ? round2(h.totalSAR - value) : h.totalSAR }];
       }
       return [h];
     });
@@ -280,6 +291,7 @@ export function quoteModification(b: StoredBooking, plan: ModificationPlan, now 
   const fee = flightChangeFee(oldRet, c.pax);
   const diff = round2(r.totalSAR - oldRet.totalSAR);
   const lost = diff < 0 && !oldRet.refundable ? -diff : 0;
+  retained += lost;
   lines.push({
     type: "flightChanged",
     ...flightLabel(r),
@@ -292,7 +304,7 @@ export function quoteModification(b: StoredBooking, plan: ModificationPlan, now 
 
   const newFlights = flights.map(({ f }) => f);
   const criteria: SearchCriteria = { ...c, stays, returnDate: newReturnDate };
-  const price = computePackagePrice({ pax: c.pax, flights: newFlights, hotels, activities, visaFeeSAR: b.price.visaFeePerTravellerSAR });
+  const price = computePackagePrice({ pax: c.pax, flights: newFlights, hotels, activities, visaFeeSAR: b.price.visaFeePerTravellerSAR, retainedSAR: round2(retained) });
 
   // Key package requirements still apply after the change.
   const days = diffDays(c.departureDate, newReturnDate);
@@ -301,6 +313,7 @@ export function quoteModification(b: StoredBooking, plan: ModificationPlan, now 
 
   const net = round2(lines.reduce((a, l) => a + l.amountSAR, 0));
   return {
+    bookingVersion: b.version ?? 0,
     kind,
     newReturnDate,
     target: kind === "extend" ? { mode: t.mode!, city: t.city!, transport: t.transport } : null,
@@ -332,6 +345,7 @@ async function pushToMt(b: StoredBooking, applicationNos: string[], requestIniti
     departureDate: b.criteria.departureDate,
     returnDate: b.criteria.returnDate,
     visaFeeSAR: b.price.visaFeePerTravellerSAR,
+    retainedSAR: b.price.retainedSAR,
     requestInitiatedBy,
   });
   const results = await Promise.all(
@@ -350,100 +364,159 @@ async function pushToMt(b: StoredBooking, applicationNos: string[], requestIniti
 const mtStatus = (results: { ok: boolean }[]): BookingModification["mt"]["status"] =>
   results.every((r) => r.ok) ? "UPDATED" : results.some((r) => r.ok) ? "PARTIAL" : "FAILED";
 
-async function notifyIfUpdated(b: StoredBooking, m: BookingModification) {
+async function notifyIfUpdated(b: StoredBooking, m: BookingModification): Promise<BookingModification["notified"]> {
   if (m.mt.status !== "UPDATED" || m.notified) return m.notified;
   const emails = [...new Set(b.applicants.map((a) => a.email).filter(Boolean))];
-  await notifyTravellers(emails, {
-    subject: `Saudi Trip ${b.reference}: your package was updated / تم تحديث باقتك`,
-    text: [
-      `Booking ${b.reference}: return date ${m.previousReturnDate} → ${m.newReturnDate}. The Ministry of Tourism has updated your visa travel details.`,
-      `الحجز ${b.reference}: تاريخ العودة ${m.previousReturnDate} ← ${m.newReturnDate}. تم تحديث بيانات السفر في تأشيرتك لدى وزارة السياحة.`,
-    ].join("\n"),
-  });
-  return { emails, at: new Date().toISOString() };
+  const kindAr = m.kind === "extend" ? "تمديد" : "تقليص";
+  const entry = await notifyTravellers(
+    emails,
+    {
+      subject: `Saudi Trip ${b.reference} — package updated / تم تحديث الباقة`,
+      text: [
+        `Booking ${b.reference}: your package was ${m.kind === "extend" ? "extended" : "shortened"}. New return date: ${m.newReturnDate} (was ${m.previousReturnDate}).`,
+        `Your travel details were updated with the Ministry of Tourism; your visa remains valid until its expiry date.`,
+        "",
+        `الحجز ${b.reference}: تم ${kindAr} باقتك. تاريخ العودة الجديد: ${m.newReturnDate} (بدلًا من ${m.previousReturnDate}).`,
+        `تم تحديث بيانات سفرك لدى وزارة السياحة، وتبقى تأشيرتك سارية حتى تاريخ انتهائها.`,
+      ].join("\n"),
+    },
+    { bookingId: b.id },
+  );
+  return entry ? { emails: entry.to, at: entry.createdAt, delivered: entry.status === "sent" } : null;
 }
 
+const LOCK_TTL_MS = 2 * 60_000;
+
+/** Takes the booking's change lock, checking it is still the version the quote was priced on. */
+async function acquireLock(bookingId: string, expectedVersion: number, token: string, idempotencyKey: string) {
+  let existing: BookingModification | undefined;
+  const locked = await updateBooking(bookingId, (cur) => {
+    existing = cur.modifications?.find((m) => m.idempotencyKey === idempotencyKey);
+    if (existing) return cur;
+    if (cur.lock && Date.now() - Date.parse(cur.lock.at) < LOCK_TTL_MS) throw new BookingError("inProgress");
+    if ((cur.version ?? 0) !== expectedVersion) throw new BookingError("bookingChanged");
+    return { ...cur, lock: { token, at: new Date().toISOString() } };
+  });
+  if (!locked) throw new BookingError("notFound");
+  return { booking: locked, existing };
+}
+
+async function releaseLock(bookingId: string, token: string) {
+  await updateBooking(bookingId, (cur) => (cur.lock?.token === token ? { ...cur, lock: null } : cur)).catch(() => undefined);
+}
+
+/**
+ * Applies a package change, in order: agents' approval → payment (or refund) → agents' final
+ * confirmation → MT update per applicant → saved change history → traveller email.
+ * A request is applied once per idempotency key, only on the booking version it was priced on,
+ * and never concurrently with another change of the same booking.
+ */
 export async function executeModification(
   user: PublicUser,
   bookingId: string,
-  input: { plan: ModificationPlan; expectedChargeSAR: number; expectedRefundSAR: number; card?: CardInput },
-): Promise<{ booking: StoredBooking; modification: BookingModification }> {
-  const b = await getBookingForUser(user.id, bookingId);
-  if (!b) throw new BookingError("notFound");
-  const q = quoteModification(b, input.plan);
-  if (Math.abs(q.chargeSAR - input.expectedChargeSAR) > 0.009 || Math.abs(q.refundSAR - input.expectedRefundSAR) > 0.009)
-    throw new BookingError("priceChanged", { chargeSAR: q.chargeSAR, refundSAR: q.refundSAR });
+  input: { plan: ModificationPlan; expectedChargeSAR: number; expectedRefundSAR: number; bookingVersion: number; idempotencyKey: string; card?: CardInput },
+): Promise<{ booking: StoredBooking; modification: BookingModification; replayed: boolean }> {
+  const owned = await getBookingForUser(user.id, bookingId);
+  if (!owned) throw new BookingError("notFound");
+  if (!input.idempotencyKey || input.idempotencyKey.length > 100) throw new BookingError("idempotencyKey");
+  const token = randomUUID();
+  const { booking: b, existing } = await acquireLock(bookingId, input.bookingVersion, token, input.idempotencyKey);
+  if (existing) return { booking: b, modification: existing, replayed: true };
 
-  let payment: BookingModification["payment"] = null;
-  if (q.chargeSAR > 0) {
-    if (!input.card) throw new BookingError("cardRequired");
-    const p = await chargeCard(input.card, q.chargeSAR);
-    if (!p.ok) throw new BookingError(`payment_${p.code}`);
-    payment = { transactionId: p.transactionId, method: p.method, last4: p.last4, amountSAR: q.chargeSAR };
+  let approvals: Awaited<ReturnType<typeof requestAgentChanges>> = [];
+  let committed = false; // true once the customer has paid / the agents confirmed
+  try {
+    const q = quoteModification(b, input.plan);
+    if (Math.abs(q.chargeSAR - input.expectedChargeSAR) > 0.009 || Math.abs(q.refundSAR - input.expectedRefundSAR) > 0.009)
+      throw new BookingError("priceChanged", { chargeSAR: q.chargeSAR, refundSAR: q.refundSAR });
+    if (q.chargeSAR > 0 && !input.card) throw new BookingError("cardRequired");
+
+    // 1) The travel agents approve their part of the change first.
+    try {
+      approvals = await requestAgentChanges(b.reference, q.lines);
+    } catch (err) {
+      if (err instanceof AgentRejectedError) throw new BookingError("agentRejected", err.agents);
+      throw err;
+    }
+
+    // 2) Payment of the difference (or refund to the original card).
+    let payment: BookingModification["payment"] = null;
+    if (q.chargeSAR > 0) {
+      const p = await chargeCard(input.card!, q.chargeSAR);
+      if (!p.ok) throw new BookingError(`payment_${p.code}`);
+      payment = { transactionId: p.transactionId, method: p.method, last4: p.last4, amountSAR: q.chargeSAR };
+    }
+    let refund: BookingModification["refund"] = null;
+    if (q.refundSAR > 0) {
+      const r = await refundPayment(b.payment.transactionId, q.refundSAR);
+      if (r.ok) refund = { refundId: r.refundId, amountSAR: q.refundSAR };
+    }
+    await confirmAgentChanges(approvals);
+    committed = true;
+
+    // 3) MT: the new travel details of every applicant (within the visa validity).
+    const updated: StoredBooking = { ...b, criteria: q.next.criteria, flights: q.next.flights, hotels: q.next.hotels, activities: q.next.activities, price: q.next.price, ticketNos: q.next.ticketNos };
+    const requestInitiatedBy = user.accountType === "company" ? user.company?.companyName : undefined;
+    const mt = await pushToMt(updated, updated.applicants.map((a) => a.applicationNo), requestInitiatedBy);
+    const modification: BookingModification = {
+      id: randomUUID(),
+      idempotencyKey: input.idempotencyKey,
+      createdAt: new Date().toISOString(),
+      kind: q.kind,
+      previousReturnDate: b.criteria.returnDate,
+      newReturnDate: q.newReturnDate,
+      target: q.target,
+      lines: q.lines,
+      chargeSAR: q.chargeSAR,
+      refundSAR: q.refundSAR,
+      payment,
+      refund,
+      previousTotalSAR: q.previousTotalSAR,
+      newTotalSAR: q.newTotalSAR,
+      agents: approvals.map((a) => ({ ...a, status: "APPROVED" as const })),
+      mt: { messageId: mt.messageId, status: mtStatus(mt.results), results: mt.results },
+      notified: null,
+    };
+    modification.notified = await notifyIfUpdated(updated, modification);
+
+    const saved = await updateBooking(b.id, (cur) => ({
+      ...cur,
+      criteria: updated.criteria,
+      flights: updated.flights,
+      hotels: updated.hotels,
+      activities: updated.activities,
+      price: updated.price,
+      ticketNos: updated.ticketNos,
+      modifications: [...(cur.modifications ?? []), modification],
+      version: (cur.version ?? 0) + 1,
+      lock: null,
+    }));
+    return { booking: saved ?? updated, modification, replayed: false };
+  } catch (err) {
+    // Before payment nothing is final: withdraw the agents' approvals. Always free the booking.
+    if (!committed && approvals.length) await releaseAgentChanges(approvals);
+    await releaseLock(bookingId, token);
+    throw err;
   }
-  let refund: BookingModification["refund"] = null;
-  if (q.refundSAR > 0) {
-    const r = await refundPayment(b.payment.transactionId, q.refundSAR);
-    if (r.ok) refund = { refundId: r.refundId, amountSAR: q.refundSAR };
-  }
-  // Agent-side changes (ticket reissue, hotel amendment/cancellation, new bookings) are
-  // performed by each agent's integration; the sandbox agents confirm them immediately.
-
-  const updated: StoredBooking = {
-    ...b,
-    criteria: q.next.criteria,
-    flights: q.next.flights,
-    hotels: q.next.hotels,
-    activities: q.next.activities,
-    price: q.next.price,
-    ticketNos: q.next.ticketNos,
-  };
-  const requestInitiatedBy = user.accountType === "company" ? user.company?.companyName : undefined;
-  const mt = await pushToMt(updated, updated.applicants.map((a) => a.applicationNo), requestInitiatedBy);
-  const modification: BookingModification = {
-    id: randomUUID(),
-    createdAt: new Date().toISOString(),
-    kind: q.kind,
-    previousReturnDate: b.criteria.returnDate,
-    newReturnDate: q.newReturnDate,
-    target: q.target,
-    lines: q.lines,
-    chargeSAR: q.chargeSAR,
-    refundSAR: q.refundSAR,
-    payment,
-    refund,
-    previousTotalSAR: q.previousTotalSAR,
-    newTotalSAR: q.newTotalSAR,
-    mt: { messageId: mt.messageId, status: mtStatus(mt.results), results: mt.results },
-    notified: null,
-  };
-  modification.notified = await notifyIfUpdated(updated, modification);
-
-  const saved = await updateBooking(b.id, (cur) => ({
-    ...cur,
-    criteria: updated.criteria,
-    flights: updated.flights,
-    hotels: updated.hotels,
-    activities: updated.activities,
-    price: updated.price,
-    ticketNos: updated.ticketNos,
-    modifications: [...(cur.modifications ?? []), modification],
-  }));
-  return { booking: saved ?? updated, modification };
 }
 
-/** Re-sends the travel details to MT for the applicants a modification could not update. */
-export async function retryModificationMt(user: PublicUser, bookingId: string, modificationId: string) {
-  const b = await getBookingForUser(user.id, bookingId);
-  const m = b?.modifications?.find((x) => x.id === modificationId);
-  if (!b || !m) throw new BookingError("notFound");
+/** Re-sends a modification's travel details to MT for the applicants that were not updated. */
+export async function retryMtForBooking(b: StoredBooking, modificationId: string) {
+  const m = b.modifications?.find((x) => x.id === modificationId);
+  if (!m) throw new BookingError("notFound");
   if (m !== b.modifications![b.modifications!.length - 1]) throw new BookingError("notLatest");
   const failed = m.mt.results.filter((r) => !r.ok).map((r) => r.applicationNo);
   if (!failed.length) return b;
-  const requestInitiatedBy = user.accountType === "company" ? user.company?.companyName : undefined;
-  const mt = await pushToMt(b, failed, requestInitiatedBy);
+  const owner = b.accountType === "company" ? await getUserById(b.userId) : null;
+  const mt = await pushToMt(b, failed, owner?.company?.companyName);
   const results = m.mt.results.map((r) => mt.results.find((x) => x.applicationNo === r.applicationNo) ?? r);
   const next: BookingModification = { ...m, mt: { messageId: mt.messageId, status: mtStatus(results), results } };
   next.notified = await notifyIfUpdated(b, next);
   return (await updateBooking(b.id, (cur) => ({ ...cur, modifications: cur.modifications!.map((x) => (x.id === m.id ? next : x)) })))!;
+}
+
+export async function retryModificationMt(user: PublicUser, bookingId: string, modificationId: string) {
+  const b = await getBookingForUser(user.id, bookingId);
+  if (!b) throw new BookingError("notFound");
+  return retryMtForBooking(b, modificationId);
 }

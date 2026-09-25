@@ -21,6 +21,7 @@ function suite(name: string, make: () => DocStore) {
       expect(await s.update("users", "missing", (d) => d)).toBeNull();
       await s.put("users", id, { id, n: -1 });
       expect(await s.get("users", id)).toMatchObject({ n: -1 });
+      expect((await s.list<{ id: string }>("users")).some((d) => d.id === id)).toBe(true);
       expect(await s.delete("users", id)).toBe(true);
       expect(await s.delete("users", id)).toBe(false);
       expect(await s.get("users", id)).toBeNull();

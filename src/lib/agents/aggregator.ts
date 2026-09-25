@@ -115,3 +115,55 @@ export function flightChangeFee(offer: FlightOffer, pax: PaxCount): number {
   const agent = AGENTS.find((a) => a.id === offer.agentId);
   return (agent?.flightChangeFeeSAR(offer) ?? 0) * (pax.adults + pax.children);
 }
+
+export interface AgentChangeLine {
+  agentId: string | null;
+  type: string;
+  labelEn: string;
+  amountSAR: number;
+  nonRefundableSAR: number;
+}
+
+export class AgentRejectedError extends Error {
+  constructor(public agents: { agentId: string; reason: string }[]) {
+    super("agentRejected");
+  }
+}
+
+/**
+ * Asks every agent involved in a change for approval (in parallel). If any agent rejects or
+ * fails, the approvals already given are released and AgentRejectedError is thrown.
+ */
+export async function requestAgentChanges(bookingReference: string, lines: AgentChangeLine[]) {
+  const byAgent = new Map<string, AgentChangeLine[]>();
+  for (const l of lines) if (l.agentId) byAgent.set(l.agentId, [...(byAgent.get(l.agentId) ?? []), l]);
+  const results = await Promise.all(
+    [...byAgent].map(async ([agentId, items]) => {
+      const agent = AGENTS.find((a) => a.id === agentId);
+      if (!agent) return { agentId, ok: false as const, reason: "unknownAgent" };
+      try {
+        const res = await withTimeout(
+          agent.requestChange({ bookingReference, items: items.map((i) => ({ type: i.type, description: i.labelEn, amountSAR: i.amountSAR })) }),
+        );
+        return res.approved ? { agentId, ok: true as const, agent, reference: res.reference } : { agentId, ok: false as const, reason: res.reason };
+      } catch (err) {
+        return { agentId, ok: false as const, reason: (err as Error).message };
+      }
+    }),
+  );
+  const approved = results.filter((r) => r.ok);
+  const rejected = results.filter((r) => !r.ok);
+  if (rejected.length) {
+    await releaseAgentChanges(approved.map((a) => ({ agentId: a.agentId, reference: a.reference })));
+    throw new AgentRejectedError(rejected.map((r) => ({ agentId: r.agentId, reason: r.reason })));
+  }
+  return approved.map((a) => ({ ...agentRef(a.agent), reference: a.reference }));
+}
+
+export async function releaseAgentChanges(approvals: { agentId: string; reference: string }[]) {
+  await Promise.allSettled(approvals.map((a) => AGENTS.find((x) => x.id === a.agentId)?.releaseChange(a.reference)));
+}
+
+export async function confirmAgentChanges(approvals: { agentId: string; reference: string }[]) {
+  await Promise.allSettled(approvals.map((a) => AGENTS.find((x) => x.id === a.agentId)?.confirmChange(a.reference)));
+}

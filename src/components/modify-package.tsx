@@ -63,6 +63,8 @@ export function ModifyPackage({ id }: { id: string }) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [submitting, setSubmitting] = useState(false);
+  // One key per priced change: resending the same request (double click, network retry) applies it once.
+  const idempotencyKey = useMemo(() => (quote ? crypto.randomUUID() : ""), [quote]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -164,6 +166,8 @@ export function ModifyPackage({ id }: { id: string }) {
           plan,
           expectedChargeSAR: quote.chargeSAR,
           expectedRefundSAR: quote.refundSAR,
+          bookingVersion: quote.bookingVersion,
+          idempotencyKey,
           card: quote.chargeSAR > 0 ? { holder: card.holder, number: card.number, expMonth, expYear, cvc: card.cvc } : undefined,
         }),
       });

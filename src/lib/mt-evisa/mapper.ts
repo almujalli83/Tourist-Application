@@ -119,6 +119,8 @@ export interface TravelInput {
   departureDate: string;
   returnDate: string;
   visaFeeSAR: number;
+  /** Non-refundable amounts of cancelled services, still part of the package price. */
+  retainedSAR?: number;
   requestInitiatedBy?: string;
 }
 
@@ -128,7 +130,7 @@ function packageTravelData(lk: { city: Lookup; entry: Lookup; exit: Lookup }, in
   const returnIdx = input.flights.findIndex((f) => f.kind === "return");
   const outbound = input.flights[outboundIdx];
   const ret = input.flights[returnIdx];
-  const share = applicantShare({ paxType, travellers, flights: input.flights, hotels: input.hotels, activities: input.activities, visaFeeSAR: input.visaFeeSAR });
+  const share = applicantShare({ paxType, travellers, flights: input.flights, hotels: input.hotels, activities: input.activities, visaFeeSAR: input.visaFeeSAR, retainedSAR: input.retainedSAR });
   return {
     generalPackageData: {
       purpose: "Tourism" as const,
