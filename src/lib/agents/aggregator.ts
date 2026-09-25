@@ -64,8 +64,8 @@ export async function searchHotels(req: HotelSearchRequest): Promise<AggregateRe
       ({ ...o, ...agentRef(a), id: `H:${a.id}:${req.checkIn}:${req.checkOut}:${ref}:${paxKey(req.pax)}`, forPax: paxKey(req.pax) }) as HotelOffer,
     ),
   );
-  // MT rejects packages with hotels rated below 4 stars (VTP003).
-  res.offers = res.offers.filter((h) => h.stars >= PACKAGE_LIMITS.minHotelStars);
+  // Packages require MT-licensed hotels of the minimum star rating (Key Package Requirements).
+  res.offers = res.offers.filter((h) => h.stars >= PACKAGE_LIMITS.minHotelStars && !!h.licenseNo);
   res.offers.sort((x, y) => x.totalSAR - y.totalSAR);
   return res;
 }

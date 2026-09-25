@@ -8,19 +8,25 @@ export const VISA_INSURANCE_FEE_SAR =
     : DEFAULT_VISA_FEE_SAR;
 
 /** Package constraints from MT eVisa guide §10.4.2 and business validation codes §10.1. */
+/** Key package rules (MT "Key Package Requirements" v1.3). */
 export const PACKAGE_LIMITS = {
   maxTravellers: 14,
   maxAdults: 9,
   maxMinors: 5,
+  /** Travellers under 18 are minors: max 5 per package and not counted in the minimum price. */
   minorAgeLimit: 18,
-  /** VTP004: package duration must be between 2 and 21 days. */
+  /** Package duration: 2 to 88 days. */
   minPackageDays: 2,
-  maxPackageDays: 21,
-  /** VTP010: purchase-to-travel window must be between 2 and 80 days. */
-  minLeadDays: 2,
+  maxPackageDays: 88,
+  /** Purchase-to-travel window: at least 3 days (the 80-day maximum is from the eVisa integration guide, VTP010). */
+  minLeadDays: 3,
   maxLeadDays: 80,
-  /** VTP003: hotel star rating must be 4 or above. */
-  minHotelStars: 4,
+  /** Accommodation: MT-licensed hotels of 3 stars or more. */
+  minHotelStars: 3,
+  /** Minimum package price per adult (18+) for the minimum duration; covers flights, hotels, activities and visa & insurance. */
+  minPricePerAdultSAR: 2000,
+  /** Added to the per-adult minimum for each day beyond the minimum duration. */
+  extraDayPerAdultSAR: 1000,
   passportValidityMonths: 6,
 } as const;
 

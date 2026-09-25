@@ -12,6 +12,7 @@ import { AuthForm } from "../auth-form";
 import { CardIcon, HotelIcon, LockIcon, PlaneIcon, ShieldIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Button, Card, Field, Input, SectionTitle, Stars } from "../ui";
 import { useBooking } from "./booking-context";
+import { PackageRequirements, usePackageCheck } from "./package-requirements";
 import { useTravellerValidation } from "./travellers-step";
 import { WizardShell } from "./wizard-shell";
 
@@ -56,6 +57,9 @@ export function ReviewStep() {
   const booking = useBooking();
   const router = useRouter();
   const { valid } = useTravellerValidation();
+  // Re-checked with the travellers' ages: minors (under 18) do not count towards the minimum price.
+  const check = usePackageCheck({ useAges: true });
+  const packageOk = !!check?.ok;
   const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [clientReference, setClientReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -188,6 +192,8 @@ export function ReviewStep() {
           </ul>
         </Card>
 
+        {check && !check.ok && <PackageRequirements check={check} />}
+
         <PrivacyPolicy />
 
         {!user ? (
@@ -232,7 +238,7 @@ export function ReviewStep() {
               </div>
               <Alert tone="info" className="mt-4"><Badge tone="gold" className="me-2">{t.common.sandbox}</Badge>{t.review.testCards}</Alert>
               {errorText && <Alert tone="error" className="mt-4">{errorText}</Alert>}
-              <Button type="submit" size="lg" variant="gold" className="mt-5 w-full" loading={submitting} disabled={!valid || !price}>
+              <Button type="submit" size="lg" variant="gold" className="mt-5 w-full" loading={submitting} disabled={!valid || !price || !packageOk}>
                 <LockIcon className="size-5" />
                 {submitting ? t.review.paying : fmt(t.review.pay, { amount: price ? money(price.totalSAR) : "" })}
               </Button>

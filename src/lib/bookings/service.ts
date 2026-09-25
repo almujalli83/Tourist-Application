@@ -8,6 +8,7 @@ import { todayISO } from "../dates";
 import { buildLegs, stayDates, validateCriteria } from "../itinerary";
 import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildSubmitRequests } from "../mt-evisa/mapper";
+import { checkPackageRequirements } from "../package-rules";
 import { chargeCard, type CardInput } from "../payment";
 import { computePackagePrice } from "../pricing";
 import type { ActivityOffer, BookingSelection, FlightOffer, HotelOffer, Traveller } from "../types";
@@ -97,6 +98,10 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
   if (fieldErrors.some((e) => Object.keys(e).length)) throw new BookingError("invalidTravellers", fieldErrors);
   const composition = validatePackageComposition(travellers, arrivalDate);
   if (composition.errors.length) throw new BookingError("invalidComposition", composition.errors);
+
+  // Key package requirements, with the minimum price counted on the travellers' actual ages.
+  const rules = checkPackageRequirements({ criteria: selection.criteria, flights, hotels, totalSAR: price.totalSAR, today, travellers, arrivalDate });
+  if (!rules.ok) throw new BookingError("packageRequirements", rules.checks.filter((c) => !c.ok).map((c) => c.id));
 
   if (Math.abs(price.totalSAR - input.expectedTotalSAR) > 0.009) throw new BookingError("priceChanged", price);
 
