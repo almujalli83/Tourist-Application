@@ -33,3 +33,25 @@ export function decryptJson<T>(payload: string): T | null {
     return null;
   }
 }
+
+const FILE_MAGIC = Buffer.from("STF1");
+
+/** Encrypts a file (AES-256-GCM): "STF1" + iv + tag + ciphertext. */
+export function encryptBytes(data: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  const body = Buffer.concat([cipher.update(data), cipher.final()]);
+  return Buffer.concat([FILE_MAGIC, iv, cipher.getAuthTag(), body]);
+}
+
+/** Returns null when the payload is not an encrypted file or was encrypted with another key. */
+export function decryptBytes(payload: Buffer): Buffer | null {
+  if (payload.length < 32 || !payload.subarray(0, 4).equals(FILE_MAGIC)) return null;
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key(), payload.subarray(4, 16));
+    decipher.setAuthTag(payload.subarray(16, 32));
+    return Buffer.concat([decipher.update(payload.subarray(32)), decipher.final()]);
+  } catch {
+    return null;
+  }
+}

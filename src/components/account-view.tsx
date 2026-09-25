@@ -9,7 +9,7 @@ import { PhoneInput, phoneHint } from "./phone-input";
 import { BackLink } from "./back-link";
 import { StatusBadge } from "./booking-details";
 import { CountrySelect } from "./booking/country-select";
-import { BuildingIcon, UserIcon, UsersIcon } from "./icons";
+import { BuildingIcon, PassportIcon, UserIcon, UsersIcon } from "./icons";
 import { Alert, Badge, Button, Card, Field, Input } from "./ui";
 
 export interface BookingRow {
@@ -144,6 +144,13 @@ export function AccountView({ bookings, savedTravellers }: { bookings: BookingRo
           )}
         </Card>
         <div className="space-y-6">
+          <Card className="p-5 sm:p-6">
+            <h2 className="flex items-center gap-2 font-bold"><PassportIcon className="size-5 text-brand-700" />{t.wallet.title}</h2>
+            <p className="mt-2 text-sm text-slate-500">{t.wallet.subtitle}</p>
+            <Link href={`/${locale}/account/wallet`} className="mt-4 inline-flex h-10 items-center rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800">
+              {t.wallet.nav}
+            </Link>
+          </Card>
           <Card className="p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-bold">

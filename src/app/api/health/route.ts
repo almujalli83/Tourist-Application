@@ -27,6 +27,8 @@ export async function GET() {
       sessionSecret: !secretError && source !== "missing",
       sessionSecretSource: secretError ? "database-error" : source,
       dataEncryptionKey: !!process.env.DATA_ENCRYPTION_KEY?.trim(),
+      fileStorage: process.env.BLOB_READ_WRITE_TOKEN?.trim() ? "vercel-blob" : "database",
+      centralPlatform: process.env.CENTRAL_PLATFORM_URL?.trim() && process.env.CENTRAL_PLATFORM_TOKEN?.trim() ? "live" : "sandbox",
       emailProvider: !!(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_FROM?.trim()),
       adminEmails: (process.env.ADMIN_EMAILS ?? "").split(",").filter((e) => e.trim()).length,
       database: Boolean(databaseUrl()),

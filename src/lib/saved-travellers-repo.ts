@@ -18,9 +18,9 @@ interface StoredSavedTraveller {
   data: string;
 }
 
-type SummaryWithKey = SavedTravellerSummary & { passportKey: string };
+export type SummaryWithKey = SavedTravellerSummary & { passportKey: string };
 
-const passportKey = (d: SavedTravellerData) => `${d.nationality}:${d.passportNo.toUpperCase()}`;
+export const passportKey = (d: { nationality: string; passportNo: string }) => `${d.nationality}:${d.passportNo.trim().toUpperCase()}`;
 
 function toStored(userId: string, id: string, d: SavedTravellerData, createdAt: string): StoredSavedTraveller {
   const updatedAt = new Date().toISOString();
@@ -28,7 +28,8 @@ function toStored(userId: string, id: string, d: SavedTravellerData, createdAt: 
   return { id, userId, createdAt, updatedAt, summary: encryptJson(summary), data: encryptJson(d) };
 }
 
-async function listWithKeys(userId: string): Promise<SummaryWithKey[]> {
+/** Summaries with the nationality + passport key used to match documents to a traveller. */
+export async function listWithKeys(userId: string): Promise<SummaryWithKey[]> {
   const docs = await store().findBy<StoredSavedTraveller>("travellers", "userId", userId);
   return docs
     .map((d) => decryptJson<SummaryWithKey>(d.summary))

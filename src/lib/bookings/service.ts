@@ -11,6 +11,7 @@ import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildSubmitRequests } from "../mt-evisa/mapper";
 import { checkPackageRequirements } from "../package-rules";
 import { chargeCard, type CardInput } from "../payment";
+import { syncIssuedDocuments } from "../wallet";
 import { computePackagePrice } from "../pricing";
 import type { ActivityOffer, BookingSelection, FlightOffer, HotelOffer, Traveller } from "../types";
 import { validatePackageComposition, validateTraveller } from "../visa-validation";
@@ -247,5 +248,8 @@ export async function refreshBookingStatus(userId: string, id: string): Promise<
     if (b.mt.packageStatus === "CANCELLED") b.status = "CANCELLED";
     return b;
   });
+  // Issued visas and insurance policies go straight into the buyer's digital wallet.
+  if (updated?.applicants.some((a) => a.visaNumber))
+    await syncIssuedDocuments(updated.userId, [updated]).catch((err) => console.error("wallet sync failed", err));
   return updated ?? undefined;
 }
