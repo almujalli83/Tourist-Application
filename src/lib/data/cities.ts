@@ -3,8 +3,9 @@
  * Saudi cities carry the MT City lookup code (getCity) and the airport code used as
  * entry / exit port (getEntryPort / getExitPort).
  * Packages may cover all regions of Saudi Arabia (Key Package Requirements v1.3). Destinations are
- * airport cities because the itinerary is built from flights; Makkah (no airport) is reached by
- * ground from Jeddah and is not yet offered as a stop.
+ * every Saudi city with a civil airport, because the itinerary is built from flights; Makkah (no
+ * airport) is reached by ground from Jeddah and is not yet offered as a stop.
+ * The mtCityCode values of cities added without an MT lookup must be checked against getCity.
  */
 export interface City {
   code: string; // IATA city/airport code
@@ -40,6 +41,17 @@ export const SAUDI_CITIES: SaudiCity[] = [
   { code: "ABT", mtCityCode: "ALBAHA", en: "Al Baha", ar: "الباحة", country: "SA", airportEn: "King Saud bin Abdulaziz", airportAr: "مطار الملك سعود بن عبدالعزيز", descriptionEn: "Forests, Dhee Ain village and mountain views", descriptionAr: "الغابات وقرية ذي عين الأثرية" },
   { code: "AJF", mtCityCode: "SAKAKA", en: "Al Jouf (Sakaka)", ar: "الجوف (سكاكا)", country: "SA", airportEn: "Al Jouf Domestic", airportAr: "مطار الجوف", descriptionEn: "Dumat Al-Jandal and the Rajajil pillars", descriptionAr: "دومة الجندل وأعمدة الرجاجيل" },
   { code: "RAE", mtCityCode: "ARAR", en: "Arar", ar: "عرعر", country: "SA", airportEn: "Arar Domestic", airportAr: "مطار عرعر", descriptionEn: "Northern Borders region and desert spring", descriptionAr: "منطقة الحدود الشمالية وربيع الصحراء" },
+  { code: "RSI", mtCityCode: "REDSEA", en: "Red Sea", ar: "البحر الأحمر", country: "SA", airportEn: "Red Sea International", airportAr: "مطار البحر الأحمر الدولي", descriptionEn: "Island resorts and coral reefs of the Red Sea destination", descriptionAr: "منتجعات الجزر والشعاب المرجانية في وجهة البحر الأحمر" },
+  { code: "NUM", mtCityCode: "NEOM", en: "NEOM", ar: "نيوم", country: "SA", airportEn: "NEOM Bay", airportAr: "مطار خليج نيوم", descriptionEn: "Gulf of Aqaba coast, Sindalah and mountains", descriptionAr: "ساحل خليج العقبة وسندالة والجبال" },
+  { code: "EJH", mtCityCode: "ALWAJH", en: "Al Wajh", ar: "الوجه", country: "SA", airportEn: "Al Wajh Domestic", airportAr: "مطار الوجه", descriptionEn: "Historic port town and Red Sea islands", descriptionAr: "البلدة الساحلية التاريخية وجزر البحر الأحمر" },
+  { code: "URY", mtCityCode: "QURAYYAT", en: "Al Qurayyat", ar: "القريات", country: "SA", airportEn: "Gurayat Domestic", airportAr: "مطار القريات", descriptionEn: "Northern gateway and Kaf palace", descriptionAr: "البوابة الشمالية وقصر كاف" },
+  { code: "TUI", mtCityCode: "TURAIF", en: "Turaif", ar: "طريف", country: "SA", airportEn: "Turaif Domestic", airportAr: "مطار طريف", descriptionEn: "Northern Borders desert and winter camping", descriptionAr: "صحراء الحدود الشمالية والتخييم الشتوي" },
+  { code: "RAH", mtCityCode: "RAFHA", en: "Rafha", ar: "رفحاء", country: "SA", airportEn: "Rafha Domestic", airportAr: "مطار رفحاء", descriptionEn: "Darb Zubaydah pilgrim route heritage", descriptionAr: "آثار درب زبيدة التاريخي" },
+  { code: "AQI", mtCityCode: "HAFARALBATIN", en: "Hafar Al-Batin", ar: "حفر الباطن", country: "SA", airportEn: "Al Qaisumah Domestic", airportAr: "مطار القيصومة", descriptionEn: "Wadi Al-Batin and desert spring festivals", descriptionAr: "وادي الباطن ومهرجانات الربيع الصحراوية" },
+  { code: "DWD", mtCityCode: "DAWADMI", en: "Al Dawadmi", ar: "الدوادمي", country: "SA", airportEn: "King Salman bin Abdulaziz Domestic", airportAr: "مطار الملك سلمان بن عبدالعزيز", descriptionEn: "Najd highlands and horse heritage", descriptionAr: "مرتفعات نجد وتراث الخيل" },
+  { code: "WAE", mtCityCode: "WADIALDAWASIR", en: "Wadi Al-Dawasir", ar: "وادي الدواسر", country: "SA", airportEn: "Wadi Al-Dawasir Domestic", airportAr: "مطار وادي الدواسر", descriptionEn: "Oasis farms and the Empty Quarter edge", descriptionAr: "مزارع الواحة وأطراف الربع الخالي" },
+  { code: "BHH", mtCityCode: "BISHA", en: "Bisha", ar: "بيشة", country: "SA", airportEn: "Bisha Domestic", airportAr: "مطار بيشة", descriptionEn: "Palm groves and Asir foothills", descriptionAr: "بساتين النخيل وسفوح عسير" },
+  { code: "SHW", mtCityCode: "SHARURAH", en: "Sharurah", ar: "شرورة", country: "SA", airportEn: "Sharurah Domestic", airportAr: "مطار شرورة", descriptionEn: "Gateway to the Empty Quarter dunes", descriptionAr: "بوابة كثبان الربع الخالي" },
 ];
 
 export const ORIGIN_CITIES: City[] = [
