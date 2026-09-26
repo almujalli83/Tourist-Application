@@ -1628,8 +1628,8 @@ const en: Dictionary = {
       title: "How it works",
       earn: "Earning",
       earnLines: [
-        "2 points per riyal on tourism packages, excluding visa & insurance fees.",
-        "1 point per riyal on event tickets, train tickets and eSIMs.",
+        "2 points per SAR 50 on tourism packages, excluding visa & insurance fees.",
+        "1 point per SAR 20 on event tickets, train tickets and eSIMs.",
         "{review} points for each verified review that is published.",
         "Points are counted on the amount paid by card and become available once the trip or service is over.",
       ],

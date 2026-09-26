@@ -201,7 +201,7 @@ export function validateCampaign(input: Partial<LoyaltyCampaign>): Omit<LoyaltyC
   const nameAr = String(input.nameAr ?? "").trim().slice(0, 80);
   const nameEn = String(input.nameEn ?? "").trim().slice(0, 80);
   const multiplier = Number(input.multiplier);
-  const services = (Array.isArray(input.services) ? input.services : []).filter((s): s is EarnService => s in LOYALTY.pointsPerSAR);
+  const services = (Array.isArray(input.services) ? input.services : []).filter((s): s is EarnService => s in LOYALTY.earnRates);
   const cities = (Array.isArray(input.cities) ? input.cities : []).map((c) => String(c).trim().toUpperCase()).filter((c) => /^[A-Z]{3}$/.test(c));
   if (!nameAr || !nameEn) throw new LoyaltyError("campaignName", 400);
   if (!date.test(String(input.from)) || !date.test(String(input.to)) || input.from! > input.to!) throw new LoyaltyError("campaignDates", 400);

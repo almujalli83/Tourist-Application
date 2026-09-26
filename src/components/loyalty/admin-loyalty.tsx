@@ -13,7 +13,7 @@ import { Alert, Badge, Button, Card, cx, Field, Input, Spinner } from "../ui";
 
 type Overview = Awaited<ReturnType<typeof loyaltyOverview>>;
 type Member = NonNullable<Awaited<ReturnType<typeof memberDetails>>>;
-const SERVICES = Object.keys(LOYALTY.pointsPerSAR) as EarnService[];
+const SERVICES = Object.keys(LOYALTY.earnRates) as EarnService[];
 const n = (x: number) => x.toLocaleString("en");
 
 function MemberPanel() {

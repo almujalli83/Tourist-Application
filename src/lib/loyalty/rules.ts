@@ -12,8 +12,16 @@ export const LOYALTY = {
    * price sent to the Ministry of Tourism is what the traveller pays; eSIMs only earn.
    */
   redeemableOn: ["event", "train"] as EarnService[],
-  /** Points per riyal paid by card (visa & insurance fees are not counted). */
-  pointsPerSAR: { package: 2, event: 1, train: 1, esim: 1 } as Record<EarnService, number>,
+  /**
+   * Points for each full block of riyals paid by card (visa & insurance fees are not counted):
+   * packages 2 points per 50 SAR; event tickets, train tickets and eSIMs 1 point per 20 SAR.
+   */
+  earnRates: {
+    package: { points: 2, perSAR: 50 },
+    event: { points: 1, perSAR: 20 },
+    train: { points: 1, perSAR: 20 },
+    esim: { points: 1, perSAR: 20 },
+  } as Record<EarnService, { points: number; perSAR: number }>,
   /** 100 points = 5 SAR. */
   sarPerPoint: 0.05,
   minRedeemPoints: 500,
@@ -50,7 +58,9 @@ export function tierFor(spendSAR: number) {
 /** Points earned for a card payment (after the points discount, without government fees). */
 export function earnPoints(input: { service: EarnService; eligibleSAR: number; tierMultiplier?: number; campaignMultiplier?: number }): number {
   if (!(input.eligibleSAR > 0)) return 0;
-  const raw = input.eligibleSAR * LOYALTY.pointsPerSAR[input.service] * (input.tierMultiplier ?? 1) * (input.campaignMultiplier ?? 1);
+  const rate = LOYALTY.earnRates[input.service];
+  const blocks = Math.floor(input.eligibleSAR / rate.perSAR + 1e-9);
+  const raw = blocks * rate.points * (input.tierMultiplier ?? 1) * (input.campaignMultiplier ?? 1);
   return Math.floor(raw + 1e-9);
 }
 
