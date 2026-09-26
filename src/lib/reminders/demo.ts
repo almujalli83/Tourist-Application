@@ -39,10 +39,12 @@ function sampleTrip(userId: string, today: string): StoredBooking {
   } as unknown as StoredBooking;
 }
 
-/** Adds the samples once for a traveller who has never had a notification. */
+/** Adds the samples (once each) for a traveller without real notifications. */
 export async function seedDemoNotifications(userId: string, now = new Date()): Promise<void> {
   if (!demoNotificationsEnabled()) return;
-  if ((await store().findBy<AppNotification>(COL, "userId", userId)).length) return;
+  const existing = await store().findBy<AppNotification>(COL, "userId", userId);
+  if (existing.some((n) => !n.demo)) return;
+  const has = new Set(existing.map((n) => n.id));
   const today = new Date(now.getTime() + 3 * 3600_000).toISOString().slice(0, 10);
   const trip = sampleTrip(userId, today);
   // The moment each reminder would be sent for this trip.
@@ -53,6 +55,7 @@ export async function seedDemoNotifications(userId: string, now = new Date()): P
     visa1: addDays(trip.applicants[0].visaExpiryDate!, -1),
   };
   for (const [i, kind] of KINDS.entries()) {
+    if (has.has(`demo:${userId}:${kind}`)) continue;
     const c = await content(trip, kind, new Date(`${at[kind]}T09:00:00+03:00`));
     if (kind === "arrival") {
       // As for a package booked from the trip planner.
@@ -68,5 +71,26 @@ export async function seedDemoNotifications(userId: string, now = new Date()): P
       readAt: null, deletedAt: null, email: null, demo: true,
     };
     await store().insert(COL, doc.id, doc);
+  }
+  // A request to rate the sample trip (the ratings service, with sample items to rate).
+  const reviewId = `demo:${userId}:review`;
+  if (!has.has(reviewId)) {
+    await store().insert<AppNotification>(COL, reviewId, {
+      id: reviewId, userId, kind: "review", bookingId: "demo", reference: trip.reference, createdAt: now.toISOString(),
+      titleAr: "قيّم تجربتك مع سعودي تريب", titleEn: "Rate your experience with Saudi Trip",
+      linesAr: [
+        "رأيك يساعد المسافرين ويرفع جودة الخدمات السياحية في المملكة. يمكنك تقييم:",
+        "⭐ رحلة الرياض والعُلا (رحلة تجريبية TA-DEMO2026)",
+        "⭐ فندق نجد الكبير، والسعودية، وجولة الطريف الليلية، ومطعم ومَعلم في الرياض",
+        "⭐ خدمة الباقات السياحية والتأشيرة، ومخطط الرحلة الذكي",
+      ],
+      linesEn: [
+        "Your opinion helps other travellers and raises the quality of tourism services in Saudi Arabia. You can rate:",
+        "⭐ Trip to Riyadh & AlUla (sample trip TA-DEMO2026)",
+        "⭐ Najd Grand Hotel, Saudia, At-Turaif Night Tour, a restaurant and a landmark in Riyadh",
+        "⭐ Tourism package & visa service, and the smart trip planner",
+      ],
+      href: "/account/reviews", readAt: null, deletedAt: null, email: null, demo: true,
+    });
   }
 }

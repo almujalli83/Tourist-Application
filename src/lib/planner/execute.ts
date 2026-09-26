@@ -6,7 +6,7 @@
 import { searchActivities, searchFlights, searchHotels } from "../agents/aggregator";
 import type { CardInput } from "../payment";
 import type { PublicUser } from "../auth/types";
-import { PACKAGE_LIMITS, VISA_INSURANCE_FEE_SAR } from "../config";
+import { hotelClassAllowed, PACKAGE_LIMITS, VISA_INSURANCE_FEE_SAR } from "../config";
 import { addDays, todayISO } from "../dates";
 import { availability as eventAvailability, EventOrderError, getEvent, holdTickets, openSessions, orderIdFor, placeOrder } from "../events/orders";
 import type { EventItem } from "../events/types";
@@ -69,7 +69,7 @@ export const pickFlight = (offers: FlightOffer[]) => [...offers].sort((a, b) => 
 
 /** Licensed hotel of the wanted class (or the nearest class), best reviewed among the good-value ones. */
 export function pickHotel(offers: HotelOffer[], wanted: number): HotelOffer | null {
-  const ok = offers.filter((h) => h.stars >= PACKAGE_LIMITS.minHotelStars && h.licenseNo);
+  const ok = offers.filter(hotelClassAllowed);
   if (!ok.length) return null;
   const classes = [...new Set(ok.map((h) => h.stars))].sort((a, b) => Math.abs(a - wanted) - Math.abs(b - wanted) || (wanted >= 5 ? b - a : a - b));
   const group = ok.filter((h) => h.stars === classes[0]);

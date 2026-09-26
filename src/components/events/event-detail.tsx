@@ -9,6 +9,7 @@ import { SAUDI_CITIES } from "@/lib/data/cities";
 import { fmtKsa, ksaDay } from "@/lib/events/format";
 import type { SeatSection } from "@/lib/events/types";
 import { useApp } from "../app-provider";
+import { RatingBadge, ReviewsSection, useSummaries } from "../reviews/shared";
 import { BackLink } from "../back-link";
 import { CalendarIcon, ClockIcon, LockIcon, MapPinIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Field, Input, Spinner } from "../ui";
@@ -36,6 +37,7 @@ export function EventDetail({ id }: { id: string }) {
   const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [paying, setPaying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const verified = useSummaries("event", [id])[id];
   const key = useRef(newKey());
 
   useEffect(() => {
@@ -157,6 +159,7 @@ export function EventDetail({ id }: { id: string }) {
             <span className="inline-flex items-center gap-1"><ClockIcon className="size-4" />{fmt(d.durationValue, { n: event.durationMins })}</span>
             <span className="inline-flex items-center gap-1"><TicketIcon className="size-4" />{fmt(ev.via, { provider: ev.providers[event.provider] })}</span>
           </p>
+          <RatingBadge summary={verified} light className="mt-2" />
         </div>
       </div>
 
@@ -244,6 +247,7 @@ export function EventDetail({ id }: { id: string }) {
               )}
             </Card>
           )}
+          <ReviewsSection type="event" id={event.id} />
         </div>
 
         {/* Summary & payment */}

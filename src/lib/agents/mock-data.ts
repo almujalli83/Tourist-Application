@@ -1,3 +1,5 @@
+import { hashString } from "./rng";
+
 /** Static inventory used by the sandbox travel-agent providers. */
 
 export const CARRIERS = [
@@ -25,6 +27,11 @@ export const ORIGIN_BLOCK_MIN: Record<string, number> = {
 export const ORIGIN_HOME_CARRIER: Record<string, string> = {
   CAI: "MS", DXB: "EK", AMM: "RJ", IST: "TK", BOM: "AI", DEL: "AI", KHI: "PK", LHE: "PK",
 };
+
+/** MT tourism licence of a sandbox hotel (brand index in HOTEL_BRANDS) in a city. */
+export function sandboxHotelLicense(city: string, brandIndex: number): string {
+  return String(10000000 + (hashString(`hotel:${city}:${brandIndex}`) % 89_999_999));
+}
 
 export const HOTEL_BRANDS = [
   { en: "Al Faisaliah Residence", ar: "مساكن الفيصلية", stars: 5 },

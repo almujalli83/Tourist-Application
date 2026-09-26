@@ -3,6 +3,7 @@
  * (with their sessions) per city. The planner (Claude or the rules) only picks from these, so a
  * plan never mentions a place the app doesn't know; each pick is resolved here into a plan item.
  */
+import { summaries } from "../reviews/summaries";
 import { randomUUID } from "node:crypto";
 import { eventsCatalog, minPriceSAR, openSessions } from "../events/orders";
 import { ksaDay } from "../events/format";
@@ -17,6 +18,8 @@ export interface CityPool {
   places: PublicPlace[];
   restaurants: Restaurant[];
   events: { event: EventItem; slots: EventSlot[] }[];
+  /** Verified traveller ratings by ref ("place:…", "restaurant:…", "event:…"). */
+  ratings: Record<string, { avg: number; count: number }>;
 }
 export type Pools = Map<string, CityPool>;
 
@@ -41,7 +44,16 @@ export async function loadPools(cities: string[], from: string, to: string, now 
           .filter((s) => s.date >= from && s.date <= to),
       }))
       .filter((e) => e.slots.length);
-    pools.set(city, { city, places: await publishedPlaces(city), restaurants: restaurants.filter((r) => r.city === city), events });
+    const places = await publishedPlaces(city);
+    const cityRestaurants = restaurants.filter((r) => r.city === city);
+    const ratings: CityPool["ratings"] = {};
+    const add = (kind: string, map: Record<string, { avg: number; count: number }>) => {
+      for (const [id, s] of Object.entries(map)) if (s.count) ratings[`${kind}:${id}`] = { avg: s.avg, count: s.count };
+    };
+    add("place", await summaries("place", places.map((p) => p.id)));
+    add("restaurant", await summaries("restaurant", cityRestaurants.map((r) => r.id)));
+    add("event", await summaries("event", events.map((e) => e.event.id)));
+    pools.set(city, { city, places, restaurants: cityRestaurants, events, ratings });
   }
   return pools;
 }

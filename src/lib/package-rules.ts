@@ -2,7 +2,7 @@
  * Key package requirements (MT "Key Package Requirements" v1.3), checked before the visa form
  * is opened and again when the booking is created.
  */
-import { PACKAGE_LIMITS } from "./config";
+import { hotelClassAllowed, PACKAGE_LIMITS } from "./config";
 import { ageOn, diffDays, isValidISODate } from "./dates";
 import { buildLegs } from "./itinerary";
 import { adultsOf, minorsOf } from "./occupancy";
@@ -76,7 +76,7 @@ export function checkPackageRequirements(input: {
     { id: "flights", ok: legs.every((l) => flights.some((f) => f.legIndex === l.index)) },
     {
       id: "hotels",
-      ok: c.stays.every((s) => hotels.some((h) => h.city === s.city && h.stars >= PACKAGE_LIMITS.minHotelStars && !!h.licenseNo)),
+      ok: c.stays.every((s) => hotels.some((h) => h.city === s.city && hotelClassAllowed(h))),
     },
     { id: "minPrice", ok: totalSAR >= minPriceSAR },
   ];

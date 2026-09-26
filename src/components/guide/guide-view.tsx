@@ -15,6 +15,7 @@ import { useApp } from "../app-provider";
 import { ChevronIcon, ClockIcon, DirectionsIcon, GlobeIcon, HeartIcon, LocateIcon, MapPinIcon, PhoneIcon, SearchIcon, ShareIcon, TicketIcon, XIcon } from "../icons";
 import { Alert, Badge, Button, cx, Spinner } from "../ui";
 import { CATEGORY_COLORS, GuideMap, type GuideCategory } from "./guide-map";
+import { ReviewsSection } from "../reviews/shared";
 
 /** A guide place, or an event on sale shown on the map (category "event"). */
 type GuidePlace = Omit<PublicPlace, "category"> & { category: GuideCategory; eventId?: string; nextStart?: string; minPriceSAR?: number; trainStation?: string; transit?: boolean; restaurantId?: string };
@@ -672,6 +673,7 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
         </div>
       )}
       <p className="mt-5 text-xs text-slate-500">{g.timesNote}</p>
+      {!p.eventId && !p.transit && !p.restaurantId && <ReviewsSection type="place" id={p.id} className="mt-5 border-0 p-0" />}
     </article>
   );
 }

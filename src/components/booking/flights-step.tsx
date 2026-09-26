@@ -6,6 +6,8 @@ import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
 import type { FlightOffer } from "@/lib/types";
 import { useApp } from "../app-provider";
+import { RatingBadge, useSummaries } from "../reviews/shared";
+import type { ReviewSummary } from "@/lib/reviews/types";
 import { PlaneIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Select, Spinner } from "../ui";
 import { useBooking, type FlightLegResult } from "./booking-context";
@@ -20,7 +22,7 @@ function dur(min: number) {
   return `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}m`;
 }
 
-function FlightCard({ offer, selected, onSelect }: { offer: FlightOffer; selected: boolean; onSelect: () => void }) {
+function FlightCard({ offer, selected, onSelect, verified }: { offer: FlightOffer; selected: boolean; onSelect: () => void; verified?: ReviewSummary }) {
   const { t, locale, money } = useApp();
   const dayShift = offer.arriveAt.slice(0, 10) !== offer.departAt.slice(0, 10);
   return (
@@ -31,6 +33,7 @@ function FlightCard({ offer, selected, onSelect }: { offer: FlightOffer; selecte
           <div>
             <p className="text-sm font-semibold">{locale === "ar" ? offer.carrierNameAr : offer.carrierNameEn}</p>
             <p className="ltr-nums text-xs text-slate-500">{offer.flightNo} · {t.search.cabins[offer.cabin]}</p>
+            <RatingBadge summary={verified} />
           </div>
         </div>
         <Badge tone="gold">{t.common.agent}: {locale === "ar" ? offer.agentNameAr : offer.agentNameEn}</Badge>
@@ -87,6 +90,7 @@ function LegSection({ result, onRetry }: { result: FlightLegResult; onRetry?: ()
     return [...list].sort((a, b) => key(a) - key(b));
   }, [result.offers, sort, agent]);
   const { leg } = result;
+  const verified = useSummaries("airline", result.offers.map((o) => o.carrierCode));
   const label = leg.kind === "outbound" ? t.flights.legOutbound : leg.kind === "return" ? t.flights.legReturn : t.flights.legDomestic;
   const selected = flights[leg.index];
 
@@ -121,7 +125,7 @@ function LegSection({ result, onRetry }: { result: FlightLegResult; onRetry?: ()
       )}
       {offers.length === 0 && <p className="text-sm text-slate-500">{t.common.noResults}</p>}
       <div className="grid gap-3 xl:grid-cols-2">
-        {offers.map((o) => <FlightCard key={o.id} offer={o} selected={selected === o.id} onSelect={() => selectFlight(leg.index, o.id)} />)}
+        {offers.map((o) => <FlightCard key={o.id} offer={o} verified={verified[o.carrierCode]} selected={selected === o.id} onSelect={() => selectFlight(leg.index, o.id)} />)}
       </div>
     </section>
   );

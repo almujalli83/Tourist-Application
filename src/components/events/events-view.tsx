@@ -8,6 +8,7 @@ import { addDaysISO, fmtDay, fmtKsa, ksaDay, weekendRange } from "@/lib/events/f
 import { EVENT_CATEGORIES, type EventCategory, type EventItem, type Season } from "@/lib/events/types";
 import { normalizeSearch } from "@/lib/guide/search";
 import { useApp } from "../app-provider";
+import { RatingBadge, useSummaries } from "../reviews/shared";
 import { CalendarIcon, MapPinIcon, SearchIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Card, cx, Spinner } from "../ui";
 
@@ -91,6 +92,7 @@ export function EventsView() {
   }, [data]);
 
   const cities = useMemo(() => [...new Set((data?.events ?? []).map((e) => e.city))], [data]);
+  const verified = useSummaries("event", (data?.events ?? []).map((e) => e.id));
   const activeSeason = data?.seasons.find((s) => s.id === season) ?? null;
 
   if (failed) return <Alert tone="error">{ev.loadError}</Alert>;
@@ -195,6 +197,7 @@ export function EventsView() {
                     </div>
                     <div className="flex flex-1 flex-col p-4">
                       <h2 className="font-bold text-ink group-hover:text-brand-800">{ar ? e.titleAr : e.titleEn}</h2>
+                      <RatingBadge summary={verified[e.id]} className="mt-1" />
                       <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><MapPinIcon className="size-3.5 shrink-0" />{ar ? e.venueAr : e.venueEn} · {cityName(e.city)}</p>
                       <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
                         <CalendarIcon className="size-3.5 shrink-0" />

@@ -110,7 +110,9 @@ describe("sample reminders (sandbox)", () => {
     const now = at("2026-09-26T09:00:00");
     await seedDemoNotifications("demo-user", now);
     const list = await listNotifications("demo-user", now);
-    expect(list.map((n) => n.kind)).toEqual(["arrival", "departure", "visa7", "visa1"]);
+    expect(list.map((n) => n.kind)).toEqual(["review", "arrival", "departure", "visa7", "visa1"]);
+    expect(list[0]).toMatchObject({ href: "/account/reviews", demo: true });
+    await deleteNotification("demo-user", list.shift()!.id, now);
     expect(list.every((n) => n.demo && !n.email)).toBe(true);
     expect(list[0].titleAr).toBe("رحلتك إلى السعودية بعد 3 أيام — TA-DEMO2026");
     expect(list[0].linesAr.join("\n")).toContain("السعودية SV306");

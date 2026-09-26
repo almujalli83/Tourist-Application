@@ -49,10 +49,13 @@ describe("key package requirements", () => {
     expect(withAges.ok).toBe(true);
   });
 
-  it("requires every flight leg, a licensed 3★+ hotel per city and the purchase window", () => {
+  it("requires every flight leg, a licensed 3–5★ hotel per city and the purchase window", () => {
     expect(failed(checkPackageRequirements({ criteria, flights: [flight(0)], hotels: [hotel(3)], totalSAR: 20_000, today }))).toEqual(["flights"]);
     expect(failed(checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(2)], totalSAR: 20_000, today }))).toEqual(["hotels"]);
     expect(failed(checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(5, "")], totalSAR: 20_000, today }))).toEqual(["hotels"]);
+    // Only hotels classified 3 to 5 stars.
+    expect(failed(checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(6)], totalSAR: 20_000, today }))).toEqual(["hotels"]);
+    expect(failed(checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(5)], totalSAR: 20_000, today }))).toEqual([]);
     expect(failed(checkPackageRequirements({ criteria, flights: [flight(0), flight(1)], hotels: [hotel(3)], totalSAR: 20_000, today: "2026-10-08" }))).toEqual(["leadTime"]);
   });
 });
