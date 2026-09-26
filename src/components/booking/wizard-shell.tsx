@@ -12,12 +12,13 @@ import { CheckIcon } from "../icons";
 import { Card, cx, Spinner } from "../ui";
 import { useBooking } from "./booking-context";
 
-export function Stepper({ current }: { current: number }) {
+export function Stepper({ current, labels }: { current: number; labels?: string[] }) {
   const { t } = useApp();
+  const steps = labels ?? t.steps;
   return (
     <nav aria-label="progress" className="overflow-x-auto">
       <ol className="flex min-w-max items-center gap-2 sm:gap-3">
-        {t.steps.map((label, i) => (
+        {steps.map((label, i) => (
           <li key={label} className="flex items-center gap-2 sm:gap-3">
             <span
               className={cx(
@@ -30,7 +31,7 @@ export function Stepper({ current }: { current: number }) {
             <span className={cx("text-xs font-semibold sm:text-sm", i === current ? "text-ink" : "text-slate-500", i !== current && "hidden sm:inline")}>
               {label}
             </span>
-            {i < t.steps.length - 1 && <span className="h-px w-5 bg-slate-300 sm:w-8" />}
+            {i < steps.length - 1 && <span className="h-px w-5 bg-slate-300 sm:w-8" />}
           </li>
         ))}
       </ol>
@@ -57,7 +58,7 @@ export function TripSummaryBar() {
 
 export function PriceSummary({ footer }: { footer?: ReactNode }) {
   const { t, money, currency } = useApp();
-  const { price, esim, esimSAR, amountToPaySAR } = useBooking();
+  const { price, esim, esimSAR, amountToPaySAR, planAuto, planExtrasSAR } = useBooking();
   if (!price) return null;
   const rows = [
     { label: t.review.flights, v: price.flightsSAR },
@@ -98,6 +99,18 @@ export function PriceSummary({ footer }: { footer?: ReactNode }) {
           </div>
         </div>
       )}
+      {planAuto && planExtrasSAR > 0 && (
+        <div className="mt-3 space-y-2 border-t border-dashed border-slate-200 pt-3 text-sm" data-testid="plan-extras-summary">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-slate-600">{t.planner.exec.totals.extras}</span>
+            <span className="ltr-nums font-medium tabular-nums">{money(planExtrasSAR)}</span>
+          </div>
+          <div className="flex items-center justify-between font-bold">
+            <span>{t.planner.exec.totals.pay}</span>
+            <span className="ltr-nums text-brand-800 tabular-nums" data-testid="plan-amount-to-pay">{money(amountToPaySAR)}</span>
+          </div>
+        </div>
+      )}
       {currency !== "SAR" && <p className="mt-2 text-xs text-slate-500">{t.review.chargedInSAR}</p>}
       {footer && <div className="mt-4">{footer}</div>}
     </Card>
@@ -107,11 +120,13 @@ export function PriceSummary({ footer }: { footer?: ReactNode }) {
 const STEP_PATHS = ["", "/flights", "/hotels", "/activities", "/esim", "/travellers", "/review"];
 
 /** Layout for every step after search: stepper, trip summary, main column and price sidebar. */
-export function WizardShell({ step, title, subtitle, children, sidebar = true, sidebarFooter }: {
+export function WizardShell({ step, title, subtitle, children, sidebar = true, sidebarFooter, back }: {
   step: number; title: string; subtitle?: string; children: ReactNode; sidebar?: boolean; sidebarFooter?: ReactNode;
+  /** Overrides the back link (e.g. the plan summary goes back to the plan). */
+  back?: string;
 }) {
   const { locale, t } = useApp();
-  const { criteria, hydrated } = useBooking();
+  const { criteria, hydrated, planAuto } = useBooking();
   const router = useRouter();
 
   useEffect(() => {
@@ -126,12 +141,21 @@ export function WizardShell({ step, title, subtitle, children, sidebar = true, s
     );
   }
 
-  const backHref = `/${locale}/package-visa${STEP_PATHS[Math.max(0, step - 1)]}`;
+  // A plan carried out by the system has its own steps: summary (changes on the search steps), visa details, payment.
+  const planMode = !!planAuto;
+  const planStep = step <= 4 ? 0 : step === 5 ? 1 : 2;
+  const backHref = back ?? (planMode
+    ? step <= 5 ? `/${locale}/package-visa/plan` : `/${locale}/package-visa/documents`
+    : `/${locale}/package-visa${STEP_PATHS[Math.max(0, step - 1)]}`);
+  const onChangeStep = planMode && step >= 1 && step <= 4 && !back;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
       <BackLink href={backHref} className="-ms-2.5 mb-3" />
-      <Stepper current={step} />
+      <Stepper current={planMode ? planStep : step} labels={planMode ? t.planner.exec.steps : undefined} />
+      {onChangeStep && (
+        <Link href={`/${locale}/package-visa/plan`} className="mt-4 inline-flex h-10 items-center rounded-lg bg-gold-500 px-4 text-sm font-semibold text-ink hover:bg-gold-600" data-testid="back-to-plan-summary">{t.planner.exec.backToSummary}</Link>
+      )}
       <div className="mt-6 flex flex-col gap-1">
         <h1 className="text-xl font-bold text-ink sm:text-2xl">{title}</h1>
         {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}

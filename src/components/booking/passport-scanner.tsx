@@ -113,11 +113,13 @@ async function ocrMrz(img: HTMLImageElement): Promise<PassportScan | null> {
   }
 }
 
-export function PassportScanner({ value, onImage, onParsed, error }: {
+export function PassportScanner({ value, onImage, onParsed, error, onDone }: {
   value: string;
   onImage: (dataUrl: string) => void;
   onParsed: (r: PassportScan) => void;
   error?: string;
+  /** Called once the reading is over (whether the passport could be read). */
+  onDone?: (read: boolean) => void;
 }) {
   const { t } = useApp();
   const input = useRef<HTMLInputElement>(null);
@@ -140,8 +142,10 @@ export function PassportScanner({ value, onImage, onParsed, error }: {
         onParsed(res);
         setStatus(res.mrz.confidence === 1 ? "success" : "partial");
       } else setStatus("failed");
+      onDone?.(!!res);
     } catch (err) {
       setStatus(err instanceof OcrEngineError ? "engine" : "failed");
+      onDone?.(false);
     }
   }
 

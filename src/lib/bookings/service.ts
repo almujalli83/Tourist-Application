@@ -17,7 +17,9 @@ import { computePackagePrice } from "../pricing";
 import type { ActivityOffer, BookingSelection, FlightOffer, HotelOffer, Traveller } from "../types";
 import { validatePackageComposition, validateTraveller } from "../visa-validation";
 import type { StoredApplicant, StoredBooking } from "./types";
-import { linkPlanToBooking } from "../planner/plans";
+import { bookPlanExtras, planExtras, type PlanExtras } from "../planner/execute";
+import { bookingMatchesPlan, getPlan, linkPlanToBooking } from "../planner/plans";
+import type { TripPlan } from "../planner/types";
 
 export class BookingError extends Error {
   constructor(public code: string, public details?: unknown) {
@@ -37,6 +39,8 @@ export interface CreateBookingInput {
   esim?: { planId: string; travellers: number[]; expectedSAR: number };
   /** Trip plan the package was built from (attached to the booking when it still matches). */
   tripPlanId?: string;
+  /** Carry out the plan's event tickets and table bookings with the same card (amount shown to the traveller). */
+  planExtras?: { expectedSAR: number };
 }
 
 /** Numeric application number (STP015: numbers only). */
@@ -141,6 +145,16 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
   }
   const esimSAR = esimSel ? esimTotal(esimSel.plan, esimSel.indexes.length) : 0;
   if (Math.abs(esimSAR - (esimSel ? Number(input.esim?.expectedSAR) : 0)) > 0.009) throw new BookingError("priceChanged", price);
+
+  // The approved plan's tickets and tables, bought right after the package with the same card.
+  let extras: PlanExtras | null = null;
+  let plan: TripPlan | null = null;
+  if (input.planExtras && input.tripPlanId) {
+    plan = await getPlan(user.id, input.tripPlanId);
+    if (!plan || plan.status !== "draft" || !bookingMatchesPlan(plan, selection.criteria)) throw new BookingError("planChanged");
+    extras = await planExtras(plan);
+    if (Math.abs(extras.totalSAR - Number(input.planExtras.expectedSAR)) > 0.009) throw new BookingError("planExtrasChanged", extras);
+  }
 
   const payment = await chargeCard(input.card, Math.round((price.totalSAR + esimSAR) * 100) / 100);
   if (!payment.ok) throw new BookingError(`payment_${payment.code}`);
@@ -250,6 +264,10 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
       return false;
     });
     if (linked) booking.tripPlanId = input.tripPlanId;
+    if (linked && plan && extras && (extras.events.length || extras.tables.length)) {
+      const done = await bookPlanExtras(user, plan, extras, input.card, booking.id);
+      booking.planExtras = { ...done, issues: extras.issues };
+    } else if (linked && extras) booking.planExtras = { events: [], tables: [], issues: extras.issues };
   }
 
   // Passport images and photos are sent to MT only and are not retained.

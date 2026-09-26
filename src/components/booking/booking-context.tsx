@@ -5,6 +5,7 @@ import { computePackagePrice, type PriceBreakdown } from "@/lib/pricing";
 import type { ActivityOffer, FlightLeg, FlightOffer, HotelOffer, SearchCriteria, Traveller } from "@/lib/types";
 import { expectedTravellers } from "@/lib/occupancy";
 import { emptyTraveller } from "@/lib/visa-validation";
+import type { AutoNote, PlanExtras } from "@/lib/planner/execute";
 
 const STORAGE_KEY = "ta_booking_v2";
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
@@ -30,7 +31,7 @@ function restore(raw: string | null, now = Date.now()): State | null {
   const s: State = { ...INITIAL, ...saved.state };
   const fresh = saved.build === BUILD_ID && typeof saved.savedAt === "number" && now - saved.savedAt < RESULTS_MAX_AGE_MS;
   if (fresh) return s;
-  return { ...INITIAL, criteria: s.criteria, travellers: s.travellers, disclaimerAccepted: s.disclaimerAccepted, tripPlanId: s.tripPlanId };
+  return { ...INITIAL, criteria: s.criteria, travellers: s.travellers, disclaimerAccepted: s.disclaimerAccepted, tripPlanId: s.tripPlanId, planAuto: s.planAuto };
 }
 
 export interface FlightLegResult { leg: FlightLeg; offers: FlightOffer[]; failedAgents: string[] }
@@ -52,13 +53,29 @@ interface State {
   esim: EsimChoice | null;
   /** Trip plan (smart planner) this package is built from; attached to the booking when it matches. */
   tripPlanId: string | null;
+  /** Set when an approved plan is carried out by the system: its tickets / tables and what changed. */
+  planAuto: PlanAuto | null;
+}
+
+export interface PlanAuto { extras: PlanExtras; notes: AutoNote[] }
+
+export interface PlanAutoInput {
+  criteria: SearchCriteria;
+  flightResults: FlightLegResult[];
+  hotelResults: HotelStayResult[];
+  activityResults: ActivityStayResult[];
+  flights: Record<number, string>;
+  hotels: Record<string, string>;
+  activities: string[];
+  extras: PlanExtras;
+  notes: AutoNote[];
 }
 
 export interface EsimChoice { planId: string; priceSAR: number; travellers: number[] }
 
 const INITIAL: State = {
   criteria: null, flightResults: null, hotelResults: null, activityResults: null,
-  flights: {}, hotels: {}, activities: [], travellers: [], disclaimerAccepted: false, esim: null, tripPlanId: null,
+  flights: {}, hotels: {}, activities: [], travellers: [], disclaimerAccepted: false, esim: null, tripPlanId: null, planAuto: null,
 };
 
 interface BookingCtx extends State {
@@ -66,6 +83,11 @@ interface BookingCtx extends State {
   setCriteria: (c: SearchCriteria) => void;
   /** Starts a booking from an approved trip plan (its dates, cities and travellers). */
   startFromPlan: (c: SearchCriteria, planId: string) => void;
+  /** Carries out an approved plan: the system's package choice plus the plan's tickets and tables. */
+  startFromPlanAuto: (a: PlanAutoInput, planId: string) => void;
+  setPlanExtras: (x: PlanExtras) => void;
+  /** Plan tickets and table fees paid with the package (0 outside a carried-out plan). */
+  planExtrasSAR: number;
   setFlightResults: (r: FlightLegResult[]) => void;
   setHotelResults: (r: HotelStayResult[]) => void;
   setActivityResults: (r: ActivityStayResult[]) => void;
@@ -145,6 +167,18 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
     }));
   }, []);
 
+  const startFromPlanAuto = useCallback((a: PlanAutoInput, planId: string) => {
+    setState((s) => ({
+      ...INITIAL,
+      criteria: a.criteria,
+      travellers: travellersFor(a.criteria, s.travellers),
+      flightResults: a.flightResults, hotelResults: a.hotelResults, activityResults: a.activityResults,
+      flights: a.flights, hotels: a.hotels, activities: a.activities,
+      tripPlanId: planId,
+      planAuto: { extras: a.extras, notes: a.notes },
+    }));
+  }, []);
+
   const startFromPlan = useCallback((c: SearchCriteria, planId: string) => {
     setState((s) => ({ ...INITIAL, criteria: c, travellers: travellersFor(c, s.travellers), tripPlanId: planId }));
   }, []);
@@ -161,6 +195,7 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
       setState((s) => ({ ...s, travellers: s.travellers.map((t, idx) => (idx === i ? { ...t, ...patch } : t)) })),
     setDisclaimer: (v: boolean) => setState((s) => ({ ...s, disclaimerAccepted: v })),
     setEsim: (e: EsimChoice | null) => setState((s) => ({ ...s, esim: e && e.travellers.length ? e : null })),
+    setPlanExtras: (x: PlanExtras) => setState((s) => (s.planAuto ? { ...s, planAuto: { ...s.planAuto, extras: x } } : s)),
     reset: () => {
       setState(INITIAL);
       try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
@@ -180,11 +215,12 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
       ? computePackagePrice({ pax: state.criteria.pax, flights: selectedFlights, hotels: selectedHotels, activities: selectedActivities, visaFeeSAR })
       : null;
     const esimSAR = state.esim ? Math.round(state.esim.priceSAR * state.esim.travellers.length * 100) / 100 : 0;
-    const amountToPaySAR = price ? Math.round((price.totalSAR + esimSAR) * 100) / 100 : 0;
-    return { selectedFlights, selectedHotels, selectedActivities, price, esimSAR, amountToPaySAR };
+    const planExtrasSAR = state.planAuto?.extras.totalSAR ?? 0;
+    const amountToPaySAR = price ? Math.round((price.totalSAR + esimSAR + planExtrasSAR) * 100) / 100 : 0;
+    return { selectedFlights, selectedHotels, selectedActivities, price, esimSAR, planExtrasSAR, amountToPaySAR };
   }, [state, visaFeeSAR]);
 
-  const value = useMemo(() => ({ ...state, ...api, ...derived, hydrated, setCriteria, startFromPlan }), [state, api, derived, hydrated, setCriteria, startFromPlan]);
+  const value = useMemo(() => ({ ...state, ...api, ...derived, hydrated, setCriteria, startFromPlan, startFromPlanAuto }), [state, api, derived, hydrated, setCriteria, startFromPlan, startFromPlanAuto]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

@@ -52,6 +52,12 @@ export interface StoredBooking {
   esim?: { orderId: string | null; amountSAR: number; failed?: boolean };
   /** Trip plan (smart planner) the package was built from. */
   tripPlanId?: string | null;
+  /** The plan's event tickets and table bookings bought with the package (and those that couldn't be). */
+  planExtras?: {
+    events: { itemId: string; titleAr: string; titleEn: string; orderId: string | null; error?: string }[];
+    tables: { itemId: string; titleAr: string; titleEn: string; bookingId: string | null; error?: string }[];
+    issues: { itemId: string; titleAr: string; titleEn: string; reason: string }[];
+  };
   /** Incremented by every package change; a change must be priced on the current version. */
   version?: number;
   /** Held while a package change is being applied (prevents concurrent changes). */
