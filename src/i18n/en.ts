@@ -1174,6 +1174,18 @@ const en: Dictionary = {
     },
   },
   account: {
+    notifications: {
+      nav: "Notifications",
+      title: "Notifications",
+      intro: "Your trip reminders: before arrival, before departure and before your visa expires. You get them here and by email.",
+      empty: "No notifications yet. Reminders for your upcoming trip will appear here.",
+      open: "View details",
+      delete: "Delete",
+      deleted: "Notification deleted.",
+      unread: "New",
+      bell: "Notifications ({n} unread)",
+      kinds: { arrival: "Before arrival", departure: "Before departure", visa7: "Visa expiry", visa1: "Visa expiry" },
+    },
     all: {
       tabs: { all: "All", package: "Packages", event: "Events", train: "Trains", table: "Restaurants", esim: "eSIM" },
       inTrip: "In this trip ({n})",

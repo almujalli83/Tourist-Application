@@ -53,3 +53,5 @@ export const PhoneIcon = (p: P) => (<svg {...base(p)}><path d="M22 16.9v3a2 2 0 
 export const TrainIcon = (p: P) => (<svg {...base(p)}><rect x="5" y="3" width="14" height="14" rx="3" /><path d="M5 11h14M9 21l-2-4M15 21l2-4M9 14h.01M15 14h.01" /></svg>);
 export const BusIcon = (p: P) => (<svg {...base(p)}><rect x="4" y="3" width="16" height="15" rx="2" /><path d="M4 11h16M8 21v-3M16 21v-3M8 15h.01M16 15h.01" /></svg>);
 export const CarIcon = (p: P) => (<svg {...base(p)}><path d="M5 17h14M3 13l2-6a2 2 0 0 1 2-1.4h10A2 2 0 0 1 19 7l2 6v4a1 1 0 0 1-1 1h-1M3 13v4a1 1 0 0 0 1 1h1M3 13h18" /><circle cx="7" cy="17" r="1.5" /><circle cx="17" cy="17" r="1.5" /></svg>);
+export const BellIcon = (p: P) => (<svg {...base(p)}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg>);
+export const TrashIcon = (p: P) => (<svg {...base(p)}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" /></svg>);

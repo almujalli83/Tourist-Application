@@ -35,6 +35,7 @@ const PAGES = [
   ["My bookings: packages (and package changes), event tickets, train tickets, restaurant tables, eSIMs", "/{locale}/account"],
   ["Digital wallet: travellers' documents (passports, visas, insurance policies)", "/{locale}/account/wallet"],
   ["Saved travellers", "/{locale}/account/travellers"],
+  ["Notifications: trip reminders (before arrival, before departure, visa expiry)", "/{locale}/account/notifications"],
   ["Events & Saudi seasons tickets", "/{locale}/events"],
   ["Event page", "/{locale}/events/{eventId}"],
   ["Restaurants & table booking", "/{locale}/restaurants"],
