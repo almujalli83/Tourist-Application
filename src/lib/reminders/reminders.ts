@@ -37,6 +37,8 @@ export interface AppNotification {
   /** Deleted by the traveller: hidden, and kept so it isn't created again. */
   deletedAt: string | null;
   email: { to: string[]; status: string } | null;
+  /** Sample notification shown in sandbox mode (see demo.ts). */
+  demo?: boolean;
 }
 
 /** Be at the airport this long before an international take-off. */
@@ -83,7 +85,7 @@ export function dueReminders(b: StoredBooking, now: Date): { kind: ReminderKind;
 
 /* ---------------------------------------------------------------- content */
 
-type Content = Pick<AppNotification, "titleAr" | "titleEn" | "linesAr" | "linesEn" | "href">;
+export type Content = Pick<AppNotification, "titleAr" | "titleEn" | "linesAr" | "linesEn" | "href">;
 
 async function arrivalContent(b: StoredBooking, now: Date): Promise<Content> {
   const today = ksaToday(now);
@@ -177,7 +179,7 @@ function visaContent(b: StoredBooking, kind: "visa7" | "visa1", now: Date): Cont
   };
 }
 
-function content(b: StoredBooking, kind: ReminderKind, now: Date): Promise<Content> | Content {
+export function content(b: StoredBooking, kind: ReminderKind, now: Date): Promise<Content> | Content {
   return kind === "arrival" ? arrivalContent(b, now) : kind === "departure" ? departureContent(b, now) : visaContent(b, kind, now);
 }
 
