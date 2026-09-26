@@ -106,6 +106,8 @@ export interface TripPlan {
   bookingReference?: string | null;
   /** Times of the booked flights (set when booked); the days are fitted to them. */
   flightTimes?: import("./schedule").FlightTimes | null;
+  /** Token of the read-only share link (null when not shared). */
+  shareToken?: string | null;
 }
 
 /** Most activities a day can hold (meals and events included). */

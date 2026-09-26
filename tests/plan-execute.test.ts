@@ -175,7 +175,7 @@ describe("flights, dates and holds", () => {
       const movedRefs = moved.days.flatMap((d) => d.items.map((i) => i.ref));
       expect(movedRefs.some((r) => r.startsWith("restaurant:"))).toBe(true);
       expect(dropped.length + movedRefs.filter((r) => r.startsWith("event:")).length).toBe(1);
-      expect((await autoSelect(moved)).flightTimes?.arriveAt.slice(0, 10) >= alts[0].departureDate).toBe(true);
+      expect((await autoSelect(moved)).flightTimes!.arriveAt.slice(0, 10) >= alts[0].departureDate).toBe(true);
     } finally {
       delete process.env.SANDBOX_NO_FLIGHT_DATES;
     }

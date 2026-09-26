@@ -11,13 +11,14 @@ import { CITY_CENTERS } from "@/lib/guide/centers";
 import { directionsLinks } from "@/lib/guide/geo";
 import { validateCriteria } from "@/lib/itinerary";
 import { withActivities } from "@/lib/planner/budget";
+import { planToIcs } from "@/lib/planner/ics";
 import { planCriteria, writeGuestPlan } from "@/lib/planner/handoff";
 import { dayWarnings, fmtMin, scheduleDay, type ScheduledEntry } from "@/lib/planner/schedule";
 import { isFlexible, maxItems, type PlanDay, type PlanItem, type TripPlan } from "@/lib/planner/types";
 import { STATIONS, LINES } from "@/lib/trains/network";
 import { useApp } from "../app-provider";
 import { GuideMap, type GuideCategory, type MapPoint } from "../guide/guide-map";
-import { CalendarIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon } from "../icons";
+import { CalendarIcon, ShareIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "../ui";
 import { ActivityPicker } from "./activity-picker";
 
@@ -41,7 +42,7 @@ const payloadDays = (days: PlanDay[]) => days.map((d) => ({ date: d.date, title:
 type Picker = { mode: "swap" | "add"; date: string; itemId?: string } | null;
 
 /** A plan: summary, budget, day-by-day programme with map, editing (drafts) and approval. */
-export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; warning?: string | null; onNew?: () => void }) {
+export function PlanEditor({ initial, warning, onNew, readOnly = false }: { initial: TripPlan; warning?: string | null; onNew?: () => void; readOnly?: boolean }) {
   const { t, locale, money, user } = useApp();
   const pl = t.planner;
   const p = pl.plan;
@@ -58,7 +59,12 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setPlan(initial), [initial]);
-  const editable = plan.status === "draft";
+  const editable = plan.status === "draft" && !readOnly;
+  const [chatText, setChatText] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatReply, setChatReply] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(initial.shareToken ?? null);
+  const [copied, setCopied] = useState(false);
   const day = plan.days[Math.min(dayIdx, plan.days.length - 1)];
   const kids = plan.request.rooms.some((r) => r.childAges.length > 0);
   // Once booked, the days follow the booked flights' times.
@@ -69,8 +75,8 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
 
   // Guests' plans live in the browser until they sign in.
   useEffect(() => {
-    if (!plan.id) writeGuestPlan(plan);
-  }, [plan]);
+    if (!plan.id && !readOnly) writeGuestPlan(plan);
+  }, [plan, readOnly]);
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
   }, []);
@@ -109,6 +115,62 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
       return next;
     });
   };
+
+  /** Replaces several days at once (e.g. after a change asked in the chat). */
+  const commitDays = (days: PlanDay[]) => {
+    setErr(null);
+    setApproveErrors([]);
+    setPlan((cur) => {
+      const next = { ...cur, days, budget: withActivities(cur.budget, days, cur.request.maxBudgetSAR) };
+      save(next);
+      return next;
+    });
+  };
+
+  async function sendChat(e: React.FormEvent) {
+    e.preventDefault();
+    const message = chatText.trim();
+    if (!message || chatBusy) return;
+    setChatBusy(true);
+    setChatReply(null);
+    setErr(null);
+    try {
+      const r = await fetch("/api/planner/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan, message }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setErr((pl.errors as Record<string, string>)[d.error] ?? pl.errors.generic);
+        return;
+      }
+      if (d.changed?.length) {
+        commitDays(d.days);
+        const first = plan.days.findIndex((x) => d.changed.includes(x.date));
+        if (first >= 0) setDayIdx(first);
+      }
+      const names = (d.changed ?? []).map((date: string) => fmt(p.dayN, { n: plan.days.findIndex((x) => x.date === date) + 1 })).join("، ");
+      setChatReply([d.reply, d.changed?.length ? fmt(p.chat.changed, { days: names }) : ""].filter(Boolean).join(" — "));
+      setChatText("");
+    } finally {
+      setChatBusy(false);
+    }
+  }
+
+  async function toggleShare(on: boolean) {
+    if (!plan.id) return;
+    const r = await fetch(`/api/planner/plans/${plan.id}/share`, { method: on ? "POST" : "DELETE" });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) setShareToken(on ? d.token : null);
+  }
+  const shareUrl = shareToken && typeof window !== "undefined" ? `${window.location.origin}/${locale}/planner/shared/${shareToken}` : "";
+
+  function exportCalendar() {
+    const ics = planToIcs(plan, schedules, window.location.origin);
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `saudi-trip-${plan.request.departureDate}.ics`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   const move = (date: string, id: string, dir: -1 | 1) =>
     commit(date, (items) => {
@@ -197,11 +259,11 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
         <div className="flex items-center gap-2 print:hidden">
           {saveState === "saving" && <span className="flex items-center gap-1 text-xs text-slate-500"><Spinner className="size-3.5" />{p.saving}</span>}
           {saveState === "saved" && <span className="text-xs text-brand-700">{p.saved}</span>}
-          <Button variant="ghost" size="sm" onClick={() => window.print()}>{p.print}</Button>
-          {onNew ? <Button variant="secondary" size="sm" onClick={onNew}>{p.newPlan}</Button> : <Link href={`/${locale}/planner`} className="inline-flex h-9 items-center rounded-lg border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-50">{p.newPlan}</Link>}
+          {readOnly ? <Link href={`/${locale}/planner`} className="inline-flex h-9 items-center rounded-lg bg-brand-700 px-3 text-sm font-semibold text-white hover:bg-brand-800">{p.share.makeYours}</Link> : onNew ? <Button variant="secondary" size="sm" onClick={onNew}>{p.newPlan}</Button> : <Link href={`/${locale}/planner`} className="inline-flex h-9 items-center rounded-lg border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-50">{p.newPlan}</Link>}
         </div>
       </div>
 
+      {readOnly && <Alert tone="info">{p.share.viewOnly}</Alert>}
       {warning === "aiUnavailable" && <Alert tone="warning">{pl.errors.aiUnavailable}</Alert>}
       {plan.status === "booked" && (
         <Alert tone="success">
@@ -235,6 +297,42 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
           <p className="mt-2 text-xs text-slate-500">{fmt(p.budget.min, { amount: money(plan.budget.packageMinSAR) })}</p>
           {plan.budget.overBudget && plan.request.maxBudgetSAR && <p className="mt-2 text-xs font-medium text-red-700">{fmt(p.budget.over, { max: money(plan.request.maxBudgetSAR) })}</p>}
           <p className="mt-2 text-xs text-slate-500">{p.budget.note}</p>
+        </Card>
+      </div>
+
+      <div className={cx("grid gap-6 print:hidden", editable && "lg:grid-cols-[1fr_360px]")}>
+        {editable && (
+          <Card className="p-5" data-testid="plan-chat">
+            <h2 className="font-bold">{p.chat.title}</h2>
+            <p className="mt-1 text-xs text-slate-500">{p.chat.hint}</p>
+            <form onSubmit={sendChat} className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input value={chatText} onChange={(e) => setChatText(e.target.value.slice(0, 500))} placeholder={p.chat.placeholder} aria-label={p.chat.title}
+                className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30" data-testid="plan-chat-input" />
+              <Button type="submit" loading={chatBusy} disabled={!chatText.trim()}>{chatBusy ? p.chat.working : p.chat.send}</Button>
+            </form>
+            {chatReply && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-ink" dir="auto" data-testid="plan-chat-reply">{chatReply}</p>}
+          </Card>
+        )}
+        <Card className="space-y-3 p-5" data-testid="plan-share">
+          <h2 className="font-bold">{p.share.title}</h2>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={exportCalendar} data-testid="plan-ics"><CalendarIcon className="size-4" />{p.share.calendar}</Button>
+            <Button size="sm" variant="secondary" onClick={() => window.print()}>{p.share.pdf}</Button>
+          </div>
+          {plan.id && !readOnly && (
+            shareToken ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input readOnly value={shareUrl} className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs" dir="ltr" aria-label={p.share.copy} data-testid="plan-share-url" />
+                  <Button size="sm" onClick={async () => { await navigator.clipboard?.writeText(shareUrl).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? p.share.copied : p.share.copy}</Button>
+                </div>
+                <button type="button" onClick={() => toggleShare(false)} className="text-xs font-semibold text-red-700 hover:underline">{p.share.revoke}</button>
+              </div>
+            ) : (
+              <Button size="sm" onClick={() => toggleShare(true)} data-testid="plan-share-create"><ShareIcon className="size-4" />{p.share.create}</Button>
+            )
+          )}
+          {plan.id && !readOnly && <p className="text-xs text-slate-500">{p.share.note}</p>}
         </Card>
       </div>
 
@@ -294,7 +392,7 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
       ))}
 
       {/* Approve */}
-      {editable && (
+      {editable && !readOnly && (
         <Card className="space-y-3 border-2 border-brand-600 p-5 print:hidden">
           <h2 className="text-lg font-bold">{p.approve.title}</h2>
           <p className="text-sm text-slate-600">{p.approve.desc}</p>
