@@ -103,3 +103,22 @@ describe("trip reminders", () => {
     expect(visa.href).toBe("/account/wallet");
   });
 });
+
+describe("sample reminders (sandbox)", () => {
+  it("shows one of each kind once to a traveller without notifications, and not after deleting them", async () => {
+    const { seedDemoNotifications } = await import("@/lib/reminders/demo");
+    const now = at("2026-09-26T09:00:00");
+    await seedDemoNotifications("demo-user", now);
+    const list = await listNotifications("demo-user", now);
+    expect(list.map((n) => n.kind)).toEqual(["arrival", "departure", "visa7", "visa1"]);
+    expect(list.every((n) => n.demo && !n.email)).toBe(true);
+    expect(list[0].titleAr).toBe("رحلتك إلى السعودية بعد 3 أيام — TA-DEMO2026");
+    expect(list[0].linesAr.join("\n")).toContain("السعودية SV306");
+    expect(list[0].linesAr.join("\n")).toContain("أول يوم في برنامجك");
+    expect(list[1].titleAr).toContain("موعد مغادرتك غدًا");
+    expect(list[2].titleEn).toContain("Your visa expires in 7 days");
+    for (const n of list) await deleteNotification("demo-user", n.id, now);
+    await seedDemoNotifications("demo-user", now);
+    expect(await listNotifications("demo-user", now)).toEqual([]);
+  });
+});

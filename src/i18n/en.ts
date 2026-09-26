@@ -1183,6 +1183,8 @@ const en: Dictionary = {
       delete: "Delete",
       deleted: "Notification deleted.",
       unread: "New",
+      demo: "Sample",
+      demoHint: "These are samples for a demo trip to show how reminders look; you can delete them. Reminders for your real trips appear here automatically.",
       bell: "Notifications ({n} unread)",
       kinds: { arrival: "Before arrival", departure: "Before departure", visa7: "Visa expiry", visa1: "Visa expiry" },
     },

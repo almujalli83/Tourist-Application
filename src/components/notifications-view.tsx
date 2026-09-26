@@ -51,6 +51,7 @@ export function NotificationsView() {
       </div>
       {error && <Alert tone="error">{t.review.errors.generic}</Alert>}
       {deleted && <Alert tone="success">{m.deleted}</Alert>}
+      {items?.some((n) => n.demo) && <Alert tone="info">{m.demoHint}</Alert>}
       {!items && !error ? (
         <div className="grid min-h-[30vh] place-items-center text-brand-700"><Spinner className="size-8" /></div>
       ) : items?.length === 0 ? (
@@ -70,6 +71,7 @@ export function NotificationsView() {
                         <span className="font-semibold text-brand-700">{m.kinds[n.kind]}</span>
                         <span>{fmtKsa(n.createdAt, locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                         {!n.readAt && <Badge tone="gold">{m.unread}</Badge>}
+                        {n.demo && <Badge tone="slate">{m.demo}</Badge>}
                       </div>
                       <h2 className="mt-1 font-bold text-ink">{locale === "ar" ? n.titleAr : n.titleEn}</h2>
                       <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-700">
