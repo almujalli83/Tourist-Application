@@ -6,6 +6,7 @@ import { Stepper } from "@/components/booking/wizard-shell";
 import { useApp } from "@/components/app-provider";
 import { BackLink } from "@/components/back-link";
 import { Spinner } from "@/components/ui";
+import { PlanHandoff, PlannerBanner } from "@/components/planner/plan-handoff";
 
 export default function PackageVisaSearchPage() {
   const { t, locale } = useApp();
@@ -21,7 +22,9 @@ export default function PackageVisaSearchPage() {
         </div>
       </div>
       <div className="mx-auto -mt-16 max-w-7xl px-4 sm:px-6">
+        <PlanHandoff />
         {hydrated ? <SearchForm /> : <div className="grid h-64 place-items-center rounded-2xl bg-white"><Spinner className="size-8 text-brand-700" /></div>}
+        {hydrated && <PlannerBanner />}
       </div>
     </>
   );

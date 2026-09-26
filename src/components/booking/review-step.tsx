@@ -94,6 +94,7 @@ export function ReviewStep() {
           disclaimerAccepted: booking.disclaimerAccepted,
           expectedTotalSAR: price.totalSAR,
           esim: booking.esim ? { planId: booking.esim.planId, travellers: booking.esim.travellers, expectedSAR: booking.esimSAR } : undefined,
+          tripPlanId: booking.tripPlanId ?? undefined,
           displayCurrency: currency,
           clientReference: clientReference || undefined,
           card: { holder: card.holder, number: card.number, expMonth, expYear, cvc: card.cvc },

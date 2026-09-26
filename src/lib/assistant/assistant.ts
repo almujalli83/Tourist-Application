@@ -31,6 +31,7 @@ export interface ChatMessage { role: "user" | "assistant"; content: string; at: 
 
 const PAGES = [
   ["Tourism package + visa booking", "/{locale}/package-visa"],
+  ["Smart trip planner (suggests destinations, length, budget and a day-by-day plan, then books the package)", "/{locale}/planner"],
   ["My bookings (packages, change package)", "/{locale}/account"],
   ["Digital wallet (documents, tickets, eSIMs)", "/{locale}/account/wallet"],
   ["Saved travellers", "/{locale}/account/travellers"],
@@ -175,6 +176,7 @@ export function sandboxReply(message: string, locale: "ar" | "en", context: stri
     if (pkg) return (ar ? `هذه أحدث باقة في حسابك:\n${pkg}\n\n` : `Here is the latest package in your account:\n${pkg}\n\n`) + link(ar ? "حجوزاتي" : "My bookings", "/account") + note;
     return (ar ? "لا أرى حجوزات في حسابك. " : "I can't see bookings in your account. ") + link(ar ? "احجز باقة" : "Book a package", "/package-visa") + note;
   }
+  if (has("خطة", "خطط", "برنامج", "plan", "itinerary", "وين أروح", "أين أذهب")) return (ar ? "دع مخطط الرحلة الذكي يقترح لك الوجهات والمدة والميزانية وبرنامجًا يوميًا: " : "Let the smart trip planner suggest destinations, length, budget and a daily programme: ") + link(ar ? "مخطط الرحلة" : "Trip planner", "/planner") + note;
   if (has("مطعم", "عشاء", "restaurant", "dinner", "food", "أكل")) return (ar ? "يمكنك تصفح المطاعم وحجز طاولة من هنا: " : "You can browse restaurants and book a table here: ") + link(ar ? "المطاعم" : "Restaurants", "/restaurants") + note;
   if (has("فعالي", "حفل", "موسم", "event", "concert", "season")) return (ar ? "تجد الفعاليات والمواسم هنا: " : "Events and seasons are here: ") + link(ar ? "الفعاليات" : "Events", "/events") + note;
   if (has("قطار", "train")) return (ar ? "احجز تذاكر القطار من هنا: " : "Book train tickets here: ") + link(ar ? "تذاكر القطار" : "Train tickets", "/trains") + note;

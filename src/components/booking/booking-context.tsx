@@ -30,7 +30,7 @@ function restore(raw: string | null, now = Date.now()): State | null {
   const s: State = { ...INITIAL, ...saved.state };
   const fresh = saved.build === BUILD_ID && typeof saved.savedAt === "number" && now - saved.savedAt < RESULTS_MAX_AGE_MS;
   if (fresh) return s;
-  return { ...INITIAL, criteria: s.criteria, travellers: s.travellers, disclaimerAccepted: s.disclaimerAccepted };
+  return { ...INITIAL, criteria: s.criteria, travellers: s.travellers, disclaimerAccepted: s.disclaimerAccepted, tripPlanId: s.tripPlanId };
 }
 
 export interface FlightLegResult { leg: FlightLeg; offers: FlightOffer[]; failedAgents: string[] }
@@ -50,18 +50,22 @@ interface State {
   disclaimerAccepted: boolean;
   /** Optional eSIMs (Tygo) for some travellers — paid with the package, not part of its price. */
   esim: EsimChoice | null;
+  /** Trip plan (smart planner) this package is built from; attached to the booking when it matches. */
+  tripPlanId: string | null;
 }
 
 export interface EsimChoice { planId: string; priceSAR: number; travellers: number[] }
 
 const INITIAL: State = {
   criteria: null, flightResults: null, hotelResults: null, activityResults: null,
-  flights: {}, hotels: {}, activities: [], travellers: [], disclaimerAccepted: false, esim: null,
+  flights: {}, hotels: {}, activities: [], travellers: [], disclaimerAccepted: false, esim: null, tripPlanId: null,
 };
 
 interface BookingCtx extends State {
   hydrated: boolean;
   setCriteria: (c: SearchCriteria) => void;
+  /** Starts a booking from an approved trip plan (its dates, cities and travellers). */
+  startFromPlan: (c: SearchCriteria, planId: string) => void;
   setFlightResults: (r: FlightLegResult[]) => void;
   setHotelResults: (r: HotelStayResult[]) => void;
   setActivityResults: (r: ActivityStayResult[]) => void;
@@ -136,7 +140,13 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
       ...INITIAL,
       criteria: c,
       travellers: travellersFor(c, s.travellers),
+      // The plan stays linked; the server attaches it only if the booking still matches it.
+      tripPlanId: s.tripPlanId,
     }));
+  }, []);
+
+  const startFromPlan = useCallback((c: SearchCriteria, planId: string) => {
+    setState((s) => ({ ...INITIAL, criteria: c, travellers: travellersFor(c, s.travellers), tripPlanId: planId }));
   }, []);
 
   const api = useMemo(() => ({
@@ -174,7 +184,7 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
     return { selectedFlights, selectedHotels, selectedActivities, price, esimSAR, amountToPaySAR };
   }, [state, visaFeeSAR]);
 
-  const value = useMemo(() => ({ ...state, ...api, ...derived, hydrated, setCriteria }), [state, api, derived, hydrated, setCriteria]);
+  const value = useMemo(() => ({ ...state, ...api, ...derived, hydrated, setCriteria, startFromPlan }), [state, api, derived, hydrated, setCriteria, startFromPlan]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

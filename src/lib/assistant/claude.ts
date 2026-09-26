@@ -18,17 +18,20 @@ export interface AskInput {
   system: Anthropic.Beta.BetaTextBlockParam[];
   messages: Anthropic.Beta.BetaMessageParam[];
   maxTokens?: number;
+  /** Structured output: the reply is JSON matching this schema. */
+  schema?: Record<string, unknown>;
+  effort?: "low" | "medium" | "high";
 }
 
 /** One request; returns the reply text, or null when the request was declined. */
-export async function askClaude({ system, messages, maxTokens = 4000 }: AskInput): Promise<string | null> {
+export async function askClaude({ system, messages, maxTokens = 4000, schema, effort = "low" }: AskInput): Promise<string | null> {
   try {
     const response = await getClient().beta.messages.create({
       model: aiModel(),
       max_tokens: maxTokens,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      output_config: { effort: "low" },
+      output_config: { effort, ...(schema ? { format: { type: "json_schema" as const, schema } } : {}) },
       system,
       messages,
     });

@@ -22,8 +22,12 @@ function normalize(s: string): string {
  * order (the itinerary, domestic flights and nights follow this order). Chips can be removed
  * or moved earlier/later.
  */
-export function CityMultiSelect({ value, onChange, invalid, id }: {
+export function CityMultiSelect({ value, onChange, invalid, id, allowed, max }: {
   value: string[];
+  /** Only these cities can be chosen (all Saudi destinations when omitted). */
+  allowed?: string[];
+  /** Most cities that can be chosen. */
+  max?: number;
   onChange: (cities: string[]) => void;
   invalid?: boolean;
   id?: string;
@@ -41,9 +45,9 @@ export function CityMultiSelect({ value, onChange, invalid, id }: {
   const options = useMemo(
     () =>
       SAUDI_CITIES.filter(
-        (c) => !q || normalize(c.ar).includes(q) || normalize(c.en).includes(q) || c.code.toLowerCase().includes(q),
+        (c) => (!allowed || allowed.includes(c.code)) && (!q || normalize(c.ar).includes(q) || normalize(c.en).includes(q) || c.code.toLowerCase().includes(q)),
       ),
-    [q],
+    [q, allowed],
   );
 
   useEffect(() => setActive(0), [q]);
@@ -58,7 +62,7 @@ export function CityMultiSelect({ value, onChange, invalid, id }: {
   }, [open]);
 
   const toggle = (code: string) =>
-    onChange(value.includes(code) ? value.filter((c) => c !== code) : [...value, code]);
+    onChange(value.includes(code) ? value.filter((c) => c !== code) : max && value.length >= max ? value : [...value, code]);
 
   const move = (i: number, delta: -1 | 1) => {
     const j = i + delta;

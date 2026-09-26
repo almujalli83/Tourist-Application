@@ -96,6 +96,15 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
           {booking.esim?.orderId ? t.wallet.view : t.esim.order.buy}
         </Link>
       </Card>
+      {booking.tripPlanId && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5" data-testid="booking-plan">
+          <div className="text-sm">
+            <p className="font-bold text-ink">{t.planner.bookingCard.title}</p>
+            <p className="text-slate-600">{fmt(t.planner.bookingCard.desc, { days: booking.criteria.stays.reduce((a, s) => a + s.nights, 0) + 1 })}</p>
+          </div>
+          <Link href={`/${locale}/planner/${booking.tripPlanId}`} className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">{t.planner.bookingCard.open}</Link>
+        </Card>
+      )}
       {eligibility?.allowed && (
         <Card className="flex flex-wrap items-center justify-between gap-3 border-gold-500/30 bg-gold-50 p-4 sm:p-5">
           <div className="text-sm">

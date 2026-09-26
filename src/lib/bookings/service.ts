@@ -17,6 +17,7 @@ import { computePackagePrice } from "../pricing";
 import type { ActivityOffer, BookingSelection, FlightOffer, HotelOffer, Traveller } from "../types";
 import { validatePackageComposition, validateTraveller } from "../visa-validation";
 import type { StoredApplicant, StoredBooking } from "./types";
+import { linkPlanToBooking } from "../planner/plans";
 
 export class BookingError extends Error {
   constructor(public code: string, public details?: unknown) {
@@ -34,6 +35,8 @@ export interface CreateBookingInput {
   card: CardInput;
   /** Optional eSIMs (Tygo) for some travellers, paid with the package but not part of its price. */
   esim?: { planId: string; travellers: number[]; expectedSAR: number };
+  /** Trip plan the package was built from (attached to the booking when it still matches). */
+  tripPlanId?: string;
 }
 
 /** Numeric application number (STP015: numbers only). */
@@ -238,6 +241,15 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
       await refundPayment(payment.transactionId, esimSAR);
       booking.esim = { orderId: null, amountSAR: 0, failed: true };
     }
+  }
+
+  // The trip plan (smart planner) the package was built from, when it still matches the booking.
+  if (input.tripPlanId) {
+    const linked = await linkPlanToBooking(user.id, input.tripPlanId, booking).catch((err) => {
+      console.error("plan link failed", err);
+      return false;
+    });
+    if (linked) booking.tripPlanId = input.tripPlanId;
   }
 
   // Passport images and photos are sent to MT only and are not retained.

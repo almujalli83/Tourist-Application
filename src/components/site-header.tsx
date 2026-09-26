@@ -21,6 +21,7 @@ export function SiteHeader() {
   const links = [
     { href: `/${locale}`, label: t.nav.home },
     { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
+    { href: `/${locale}/planner`, label: t.planner.nav },
     { href: `/${locale}/events`, label: t.events.nav },
     { href: `/${locale}/restaurants`, label: t.restaurants.nav },
     { href: `/${locale}/guide`, label: t.guide.nav },
@@ -93,13 +94,13 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 xl:flex">
+        <nav className="hidden items-center gap-0.5 xl:flex 2xl:gap-1">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               className={cx(
-                "whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-white/10",
+                "whitespace-nowrap rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-white/10 2xl:px-2.5",
                 l.href === activeHref && "bg-white/10 text-gold-100",
               )}
             >
@@ -110,9 +111,10 @@ export function SiteHeader() {
 
         <div className="hidden items-center gap-2 xl:flex">
           {currencySelect}
-          <Link href={switchHref} className="flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium hover:bg-white/10" hrefLang={otherLocale}>
+          <Link href={switchHref} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-medium hover:bg-white/10 2xl:px-3" hrefLang={otherLocale} aria-label={t.nav.language}>
             <GlobeIcon className="size-4" />
-            {t.nav.language}
+            <span className="hidden 2xl:inline">{t.nav.language}</span>
+            <span className="2xl:hidden">{otherLocale === "en" ? "EN" : "ع"}</span>
           </Link>
           {user ? (
             <div className="relative" ref={accountRef}>
@@ -142,7 +144,7 @@ export function SiteHeader() {
               )}
             </div>
           ) : (
-            <Link href={`/${locale}/login`} className="flex h-9 items-center gap-1.5 rounded-md bg-gold-500 px-4 text-sm font-semibold hover:bg-gold-600">
+            <Link href={`/${locale}/login`} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-gold-500 px-3 text-sm font-semibold hover:bg-gold-600 2xl:px-4">
               <UserIcon className="size-4" />
               {t.nav.login}
             </Link>

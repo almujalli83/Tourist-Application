@@ -39,7 +39,15 @@ export function RestaurantDetail({ id }: { id: string }) {
   useEffect(() => {
     fetch(`/api/restaurants/${encodeURIComponent(id)}`)
       .then((x) => (x.ok ? x.json() : Promise.reject()))
-      .then((x) => setR(x.restaurant))
+      .then((x) => {
+        setR(x.restaurant);
+        // Day and party size can come from a link (e.g. a trip plan): ?date=YYYY-MM-DD&party=N.
+        const qs = new URLSearchParams(window.location.search);
+        const wantDay = qs.get("date");
+        const wantParty = Number(qs.get("party"));
+        if (wantDay && /^\d{4}-\d{2}-\d{2}$/.test(wantDay) && wantDay >= ksaDay(new Date())) setDay(wantDay);
+        if (Number.isInteger(wantParty) && wantParty >= 1) setParty(Math.min(wantParty, x.restaurant.maxParty));
+      })
       .catch(() => setMissing(true));
   }, [id]);
   useEffect(() => {

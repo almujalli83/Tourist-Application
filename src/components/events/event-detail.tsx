@@ -43,7 +43,9 @@ export function EventDetail({ id }: { id: string }) {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((x: { event: EventSummary }) => {
         setEvent(x.event);
-        const first = x.event.sessions[0];
+        // A session can be preselected from a link (e.g. a trip plan): ?session=<id>.
+        const wanted = new URLSearchParams(window.location.search).get("session");
+        const first = x.event.sessions.find((s) => s.id === wanted) ?? x.event.sessions[0];
         if (first) {
           setDay(ksaDay(first.start));
           setSessionId(first.id);
