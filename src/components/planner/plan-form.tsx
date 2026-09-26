@@ -32,11 +32,15 @@ export function PlanForm({ cities, onGenerated }: { cities: string[] | null; onG
   const [errors, setErrors] = useState<string[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(FORM_KEY) ?? "null");
-      if (saved?.rooms) setForm({ ...initial(), ...saved });
+      if (saved?.rooms) {
+        setForm({ ...initial(), ...saved });
+        if (saved.prayer) setMoreOpen(true);
+      }
     } catch {
       /* ignore */
     }
@@ -189,13 +193,19 @@ export function PlanForm({ cities, onGenerated }: { cities: string[] | null; onG
             <Input id="plan-maxBudgetSAR" type="number" inputMode="numeric" min={1000} step={500} value={form.maxBudgetSAR} onChange={(x) => set("maxBudgetSAR", x.target.value)} invalid={!!e("maxBudgetSAR")} />
           </Field>
           <div className="grid gap-2">
-            {toggleRow("plan-prayer", form.prayer, (v) => set("prayer", v), f.prayer, f.prayerHint)}
             {toggleRow("plan-accessible", form.accessible, (v) => set("accessible", v), f.accessible, f.accessibleHint)}
           </div>
         </div>
         <Field label={f.notes} htmlFor="plan-notes">
           <Textarea id="plan-notes" rows={3} maxLength={PLANNER_LIMITS.maxNotesChars} value={form.notes} onChange={(x) => set("notes", x.target.value)} placeholder={f.notesPlaceholder} />
         </Field>
+        {/* Optional preferences most travellers don't need: folded away (open when one is already chosen). */}
+        <details className="group rounded-xl border border-slate-200 px-4 py-3" open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)} data-testid="plan-more-options">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-700">{f.moreOptions}</summary>
+          <div className="mt-3 grid gap-2 sm:max-w-xl">
+            {toggleRow("plan-prayer", form.prayer, (v) => set("prayer", v), f.prayer, f.prayerHint)}
+          </div>
+        </details>
       </Card>
 
       {err && <Alert tone="error">{err}</Alert>}
