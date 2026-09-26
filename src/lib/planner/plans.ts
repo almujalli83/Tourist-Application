@@ -3,7 +3,7 @@
  * booked; it is then attached to the booking and can no longer be changed. Visitors keep their
  * plan in the browser and can save it to their account after signing in.
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { PublicUser } from "../auth/types";
 import type { StoredBooking } from "../bookings/types";
 import { VISA_INSURANCE_FEE_SAR } from "../config";
@@ -149,4 +149,34 @@ export async function shiftPlanDates(user: PublicUser, id: string, departureDate
   }));
   if (!saved) throw new PlanError("notFound");
   return { plan: saved, dropped };
+}
+
+/* ------------------------------------------------------------ sharing */
+
+/** Creates (or returns) the plan's read-only share link token. */
+export async function sharePlan(userId: string, id: string): Promise<string> {
+  const plan = await getPlan(userId, id);
+  if (!plan) throw new PlanError("notFound");
+  if (plan.shareToken) return plan.shareToken;
+  const token = randomBytes(18).toString("base64url");
+  await store().update<TripPlan>(COL, id, (p) => ({ ...p, shareToken: p.shareToken ?? token }));
+  return (await getPlan(userId, id))!.shareToken!;
+}
+
+export async function unsharePlan(userId: string, id: string): Promise<void> {
+  const plan = await getPlan(userId, id);
+  if (!plan) throw new PlanError("notFound");
+  await store().update<TripPlan>(COL, id, (p) => ({ ...p, shareToken: null }));
+}
+
+/** A shared plan as others see it: the programme only, without the owner's account or booking. */
+export async function getSharedPlan(token: string): Promise<TripPlan | null> {
+  if (!/^[\w-]{20,40}$/.test(token)) return null;
+  const [plan] = await store().findBy<TripPlan>(COL, "shareToken", token);
+  if (!plan) return null;
+  return {
+    ...plan,
+    id: "", userId: null, bookingId: null, bookingReference: null, shareToken: null,
+    request: { ...plan.request, nationality: "", notes: "", maxBudgetSAR: null },
+  };
 }

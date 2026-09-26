@@ -485,3 +485,112 @@ export async function regenerateDay(plan: Pick<TripPlan, "request" | "days" | "l
   filled.items = filled.items.filter((i) => !used.has(i.ref.split("@")[0]) || i.kind === "restaurant");
   return { day: filled, source };
 }
+
+/* ------------------------------------------------------------ editing by conversation */
+
+export const MAX_CHAT_CHARS = 500;
+
+const CHAT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply", "days"],
+  properties: {
+    reply: { type: "string" },
+    days: SCHEMA.properties.days,
+  },
+} as const;
+
+const dayNumber = (m: string, count: number): number | null => {
+  const words: [RegExp, number][] = [[/الأول|first/i, 1], [/الثاني|second/i, 2], [/الثالث|third/i, 3], [/الرابع|fourth/i, 4], [/الخامس|fifth/i, 5], [/السادس|sixth/i, 6], [/السابع|seventh/i, 7]];
+  const digit = /(?:يوم|day)\s*(\d{1,2})/i.exec(m);
+  const n = digit ? Number(digit[1]) : words.find(([re]) => re.test(m))?.[1] ?? null;
+  return n && n >= 1 && n <= count ? n : null;
+};
+
+/** Without Claude: a few simple requests ("make day 3 lighter", "add a seafood dinner on day 2"). */
+function rulesChat(plan: Pick<TripPlan, "days" | "locale">, message: string, pools: Pools): { reply: string; changed: Map<string, RawItem[]> } | null {
+  const ar = plan.locale === "ar";
+  const n = dayNumber(message, plan.days.length);
+  const changed = new Map<string, RawItem[]>();
+  if (!n) return null;
+  const day = plan.days[n - 1];
+  const items = day.items.map((i) => ({ id: i.id, ref: i.ref, note: i.note, meal: i.meal }));
+  if (/أهدأ|أخف|خفف|أقل|lighter|relax|less/i.test(message)) {
+    const lastVisit = [...day.items].reverse().find((i) => i.kind === "place" && !i.meal);
+    if (!lastVisit) return { reply: ar ? `اليوم ${n} خفيف بالفعل.` : `Day ${n} is already light.`, changed };
+    changed.set(day.date, items.filter((i) => i.id !== lastVisit.id));
+    return { reply: ar ? `خففت اليوم ${n}: أزلت «${lastVisit.titleAr}».` : `Day ${n} is lighter: removed “${lastVisit.titleEn}”.`, changed };
+  }
+  if (/مطعم|عشاء|غداء|restaurant|dinner|lunch/i.test(message)) {
+    const meal = /غداء|lunch/i.test(message) ? "lunch" : "dinner";
+    const seafood = /بحري|سمك|seafood|fish/i.test(message);
+    const pool = pools.get(day.city);
+    const r = pool?.restaurants.find((x) => (!seafood || x.cuisine === "seafood" || x.tags.includes("seafood")) && !day.items.some((i) => i.ref === `restaurant:${x.id}`));
+    if (!r) return { reply: ar ? "لم أجد مطعمًا مناسبًا في مدينة ذلك اليوم." : "I couldn't find a matching restaurant in that day's city.", changed };
+    changed.set(day.date, [...items.filter((i) => i.meal !== meal), { ref: `restaurant:${r.id}`, note: "", meal }]);
+    return { reply: ar ? `أضفت ${meal === "lunch" ? "غداء" : "عشاء"} في «${r.nameAr}» يوم ${n}.` : `Added ${meal} at “${r.nameEn}” on day ${n}.`, changed };
+  }
+  return null;
+}
+
+/**
+ * Changes a plan as the traveller asks in their own words ("make day 3 calmer", "add a seafood
+ * dinner on Friday"). Returns the assistant's reply and the new version of the days that changed;
+ * every activity is still picked from the app's data and checked like a new plan.
+ */
+export async function chatEditPlan(plan: Pick<TripPlan, "request" | "days" | "locale" | "stays" | "returnDate">, message: string, today: string): Promise<{ reply: string; days: PlanDay[]; changed: string[]; source: TripPlan["source"] }> {
+  const text = message.trim();
+  if (!text || text.length > MAX_CHAT_CHARS) throw new PlanError("invalidMessage");
+  if (!isValidISODate(String(plan.request?.departureDate))) throw new PlanError("invalidRequest", ["departureDate"]);
+  const req = sanitizeRequest(plan.request, addDays(String(plan.request.departureDate), -PACKAGE_LIMITS.minLeadDays));
+  if (!Array.isArray(plan.days) || plan.days.some((d) => !getSaudiCity(d.city) || !["arrival", "full", "transfer", "departure"].includes(d.type))) throw new PlanError("invalidPlan");
+  const cities = [...new Set(plan.days.map((d) => d.city))];
+  const pools = await loadPools(cities, plan.days[0].date, plan.days[plan.days.length - 1].date);
+  const ar = plan.locale === "ar";
+
+  let reply = "";
+  let changedRaw = new Map<string, RawItem[]>();
+  let titles = new Map<string, string>();
+  let source: TripPlan["source"] = "rules";
+  if (aiConfigured()) {
+    const current = plan.days.map((d, i) => `Day ${i + 1} ${d.date} ${d.city} (${d.type}) "${d.title}": ${d.items.map((it) => `${it.ref}${it.meal ? ` [${it.meal}]` : ""}`).join(", ") || "empty"}`).join("\n");
+    const content = `${requestText(req, cities, today)}\n\nThe current plan:\n${current}\n\nCandidate activities per city:\n\n${[...pools.values()].map(poolText).join("\n\n")}\n\nThe traveller asks: <request>${text}</request>\n\nChange the plan as asked (only if it is about this trip; otherwise change nothing and say so). Return a short reply to the traveller and, for every day you change, the day's full new list of items in visiting order. Don't return days that stay the same.`;
+    const system: Anthropic.Beta.BetaTextBlockParam[] = [{ type: "text", text: SYSTEM.replace("{LANGUAGE}", ar ? "Arabic" : "English"), cache_control: { type: "ephemeral" } }];
+    try {
+      const out = await askClaude({ system, messages: [{ role: "user", content }], maxTokens: 8000, schema: CHAT_SCHEMA, effort: "low" });
+      if (out) {
+        const parsed = JSON.parse(out) as { reply?: unknown; days?: unknown };
+        reply = typeof parsed.reply === "string" ? parsed.reply.slice(0, 600) : "";
+        for (const d of clean(parsed.days) as RawDay[]) {
+          if (typeof d.date !== "string" || !plan.days.some((x) => x.date === d.date)) continue;
+          changedRaw.set(d.date, clean(d.items).map((i: RawItem) => ({ ...i, meal: mealOf(i.meal) })));
+          if (typeof d.title === "string" && d.title.trim()) titles.set(d.date, d.title.trim().slice(0, 80));
+        }
+        source = "claude";
+      } else reply = ar ? "عذرًا، لا أستطيع تنفيذ هذا الطلب." : "Sorry, I can't do that.";
+    } catch (e) {
+      if (!(e instanceof AiUnavailableError) && !(e instanceof SyntaxError)) throw e;
+    }
+  }
+  if (source === "rules") {
+    const r = rulesChat(plan, text, pools);
+    reply = r?.reply ?? (ar
+      ? "في الوضع التجريبي أفهم طلبات بسيطة فقط، مثل: «اجعل اليوم 3 أخف» أو «أضف مطعمًا بحريًا لليوم 2»."
+      : "In sandbox mode I understand simple requests only, such as “make day 3 lighter” or “add a seafood restaurant on day 2”.");
+    changedRaw = r?.changed ?? new Map();
+    titles = new Map();
+  }
+
+  // Rebuild the whole trip so no place is repeated across days; unchanged days keep their items.
+  const skeleton = plan.days.map(({ date, city, type, fromCity }) => ({ date, city, type, fromCity }));
+  const raw = plan.days.map((d) => ({
+    date: d.date,
+    title: titles.get(d.date) ?? d.title,
+    items: changedRaw.get(d.date) ?? d.items.map((i) => ({ id: i.id, ref: i.ref, note: i.note, meal: i.meal })),
+  }));
+  // Unchanged days go first so their places keep priority over the new picks.
+  const order = [...skeleton.keys()].sort((a, b) => Number(changedRaw.has(skeleton[a].date)) - Number(changedRaw.has(skeleton[b].date)));
+  const filled = fillDays(order.map((i) => skeleton[i]), order.map((i) => raw[i]), pools, req, plan.locale);
+  const byDate = new Map(filled.map((d) => [d.date, d]));
+  return { reply, days: skeleton.map((s) => byDate.get(s.date)!), changed: [...changedRaw.keys()], source };
+}

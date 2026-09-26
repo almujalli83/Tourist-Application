@@ -167,3 +167,19 @@ export function SavedPlanView({ id }: { id: string }) {
   if (!plan) return <div className="grid place-items-center py-20"><Spinner className="size-8 text-brand-700" /></div>;
   return <PlanEditor initial={plan} />;
 }
+
+/** A plan shared by its owner (/planner/shared/[token]): read-only, open to everyone. */
+export function SharedPlanView({ token }: { token: string }) {
+  const { t } = useApp();
+  const [plan, setPlan] = useState<TripPlan | null>(null);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    fetch(`/api/planner/shared/${encodeURIComponent(token)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => setPlan(d.plan))
+      .catch(() => setMissing(true));
+  }, [token]);
+  if (missing) return <Alert tone="error">{t.planner.plan.share.notFound}</Alert>;
+  if (!plan) return <div className="grid place-items-center py-20"><Spinner className="size-8 text-brand-700" /></div>;
+  return <PlanEditor initial={plan} readOnly />;
+}
