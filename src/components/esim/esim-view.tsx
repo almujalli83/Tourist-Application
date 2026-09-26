@@ -8,6 +8,7 @@ import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import type { EsimKind, EsimPlan } from "@/lib/esim/tygo";
 import { useApp } from "../app-provider";
 import { LockIcon } from "../icons";
+import { PointsRedeemer } from "../loyalty/points-redeemer";
 import { Alert, Button, Card, cx, Field, Input, Spinner } from "../ui";
 import { EsimPlanPicker } from "./plan-picker";
 
@@ -125,6 +126,7 @@ export function EsimView() {
               </div>
             ) : (
               <form onSubmit={pay} className="mt-4 space-y-3">
+                {total > 0 && <PointsRedeemer service="esim" totalSAR={total} value={0} onChange={() => undefined} />}
                 <Field label={t.review.cardHolder} required><Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(x) => setCard({ ...card, holder: x.target.value })} required /></Field>
                 <Field label={t.review.cardNumber} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number} onChange={(x) => setCard({ ...card, number: x.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required /></Field>
                 <div className="grid grid-cols-2 gap-3">

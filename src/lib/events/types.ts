@@ -1,3 +1,4 @@
+import type { OrderLoyalty } from "../loyalty/types";
 /** Experiences & events tickets (Saudi seasons), bought separately from packages. */
 export const EVENT_CATEGORIES = ["concert", "theatre", "sports", "family", "culture", "dining", "adventure"] as const;
 export type EventCategory = (typeof EVENT_CATEGORIES)[number];
@@ -111,4 +112,6 @@ export interface EventOrder {
   holderName: string;
   holderEmail: string;
   cancellation: { at: string; refundSAR: number; refundId: string } | null;
+  /** Reward points used and earned (service 10); the card paid `payment.amountSAR`. */
+  loyalty?: OrderLoyalty;
 }

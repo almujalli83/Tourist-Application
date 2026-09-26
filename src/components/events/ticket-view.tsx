@@ -12,6 +12,7 @@ import { CalendarIcon, MapPinIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
 import { EVENT_COLORS } from "./events-view";
+import { OrderPoints } from "../loyalty/points-redeemer";
 
 interface OrderView { order: EventOrder; qr: Record<string, string>; canCancel: boolean; deadline: string | null }
 
@@ -83,9 +84,10 @@ export function TicketView({ id }: { id: string }) {
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-4">
           <div><dt className="text-xs text-slate-500">{tk.reference}</dt><dd className="ltr-nums font-bold">{o.reference}</dd></div>
           <div><dt className="text-xs text-slate-500">{tk.holder}</dt><dd className="font-semibold">{o.holderName}</dd></div>
-          <div><dt className="text-xs text-slate-500">{tk.paid}</dt><dd className="font-semibold">{money(o.totalSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</dd></div>
+          <div><dt className="text-xs text-slate-500">{tk.paid}</dt><dd className="font-semibold">{money(o.payment.amountSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</dd></div>
           <div><dt className="text-xs text-slate-500">{tk.providerRef}</dt><dd className="ltr-nums font-semibold">{t.events.providers[o.provider]} · {o.providerRef}</dd></div>
         </dl>
+        <OrderPoints loyalty={o.loyalty} totalSAR={o.totalSAR} className="mt-4" />
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 print:hidden">
           {!cancelled && <PrintButton label={tk.print} />}
           {data.canCancel ? (

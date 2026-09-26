@@ -10,6 +10,7 @@ import { countryName } from "@/lib/data/countries";
 import type { PrivacyPolicyResponse } from "@/lib/mt-evisa/types";
 import { useApp } from "../app-provider";
 import { AuthForm } from "../auth-form";
+import { PointsRedeemer } from "../loyalty/points-redeemer";
 import { CardIcon, HotelIcon, LockIcon, PlaneIcon, ShieldIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Button, Card, Field, Input, SectionTitle, Stars } from "../ui";
 import { useBooking } from "./booking-context";
@@ -277,6 +278,18 @@ export function ReviewStep() {
                     onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required />
                 </Field>
               </div>
+              {price && (
+                <PointsRedeemer
+                  className="mt-4"
+                  service="package"
+                  totalSAR={price.totalSAR}
+                  earnBase={price.totalSAR - price.visaInsuranceSAR}
+                  extraEarn={booking.esimSAR ? [{ service: "esim", sar: booking.esimSAR }] : []}
+                  cities={booking.criteria?.stays.map((st) => st.city)}
+                  value={0}
+                  onChange={() => undefined}
+                />
+              )}
               <Alert tone="info" className="mt-4"><Badge tone="gold" className="me-2">{t.common.sandbox}</Badge>{t.review.testCards}</Alert>
               {errorText && <Alert tone="error" className="mt-4">{errorText}</Alert>}
               <Button type="submit" size="lg" variant="gold" className="mt-5 w-full" loading={submitting} disabled={!valid || !price || !packageOk}>

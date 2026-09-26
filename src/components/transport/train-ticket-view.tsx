@@ -10,6 +10,7 @@ import { BackLink } from "../back-link";
 import { TrainIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
+import { OrderPoints } from "../loyalty/points-redeemer";
 
 interface StationLite { code: string; nameAr: string; nameEn: string }
 interface LineLite { id: string; nameAr: string; nameEn: string; color: string }
@@ -85,8 +86,9 @@ export function TrainTicketView({ id }: { id: string }) {
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
           <div><dt className="text-xs text-slate-500">{tk.reference}</dt><dd className="ltr-nums font-bold">{o.reference}</dd></div>
           <div><dt className="text-xs text-slate-500">{tk.pnr}</dt><dd className="ltr-nums font-bold">{o.pnr}</dd></div>
-          <div><dt className="text-xs text-slate-500">{tk.paid}</dt><dd className="font-semibold">{money(o.totalSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</dd></div>
+          <div><dt className="text-xs text-slate-500">{tk.paid}</dt><dd className="font-semibold">{money(o.payment.amountSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</dd></div>
         </dl>
+        <OrderPoints loyalty={o.loyalty} totalSAR={o.totalSAR} className="mt-4" />
         <ul className="mt-4 space-y-2">
           {o.legs.map((l, i) => {
             const line = net.lines.find((x) => x.id === l.trip.lineId);

@@ -11,6 +11,7 @@ import { useApp } from "./app-provider";
 import { BackLink } from "./back-link";
 import { CheckIcon, RefreshIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "./ui";
+import { OrderPoints } from "./loyalty/points-redeemer";
 
 const FINAL = ["COMPLETED", "REJECTED", "CANCELLED", "VALIDATION_FAILED", "PAYMENT_FAILED"];
 
@@ -161,6 +162,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
           <p className="ltr-nums text-lg font-bold">{money(booking.payment.amountSAR)}</p>
           <p className="ltr-nums text-xs text-slate-500">{booking.payment.method.toUpperCase()} •••• {booking.payment.last4}</p>
         </div>
+        {booking.loyalty && <OrderPoints loyalty={booking.loyalty} totalSAR={booking.price.totalSAR} className="sm:col-span-full" />}
       </Card>
 
       <Card className="overflow-hidden">

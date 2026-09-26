@@ -20,6 +20,7 @@ import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildUpdateRequests } from "../mt-evisa/mapper";
 import { adultsOf, legacyRooms } from "../occupancy";
 import { minimumPackagePrice } from "../package-rules";
+import { awardPurchase, packageAvailableAt, quietly, reversePurchase } from "../loyalty/loyalty";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { computePackagePrice, type PriceBreakdown } from "../pricing";
 import { notifyTravellers } from "../notify";
@@ -494,6 +495,12 @@ export async function executeModification(
       notified: null,
     };
     modification.notified = await notifyIfUpdated(updated, modification);
+
+    // Reward points: earned on an extra payment, taken back in proportion to a refund.
+    if (q.chargeSAR > 0)
+      await quietly("change points", () => awardPurchase(user, { service: "package", source: { kind: "modification", id: modification.id, reference: b.reference }, eligibleSAR: q.chargeSAR, availableAt: packageAvailableAt(q.newReturnDate), cities: q.next.criteria.stays.map((st) => st.city) }), 0);
+    if (q.refundSAR > 0 && q.previousTotalSAR > 0)
+      await quietly("change points reversal", () => reversePurchase(user.id, [b.id, ...(b.modifications ?? []).map((m) => m.id)], q.refundSAR / q.previousTotalSAR), 0);
 
     const saved = await updateBooking(b.id, (cur) => ({
       ...cur,

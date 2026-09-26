@@ -10,6 +10,7 @@ import { BackLink } from "../back-link";
 import { PhoneIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
+import { OrderPoints } from "../loyalty/points-redeemer";
 
 interface View { order: EsimOrder; qr: Record<string, string>; canCancel: boolean }
 
@@ -76,6 +77,7 @@ export function EsimOrderView({ id }: { id: string }) {
           <div><dt className="text-xs text-slate-500">{t.common.total}</dt><dd className="font-semibold">{money(o.totalSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</dd></div>
           <div><dt className="text-xs text-slate-500">{fmtKsa(o.createdAt, locale, { day: "numeric", month: "long", year: "numeric" })}</dt><dd className="font-semibold">{o.booking ? fmt(o_.withPackage, { ref: o.booking.reference }) : "—"}</dd></div>
         </dl>
+        <OrderPoints loyalty={o.loyalty} totalSAR={o.totalSAR} className="mt-4" />
         {!cancelled && (
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 print:hidden">
             <PrintButton label={o_.print} />

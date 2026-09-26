@@ -8,8 +8,10 @@ import { CountrySelect } from "./booking/country-select";
 import { BuildingIcon, UserIcon } from "./icons";
 import { Alert, Button, cx, Field, Input } from "./ui";
 
-export function AuthForm({ initialMode = "login", onSuccess, compact }: {
+export function AuthForm({ initialMode = "login", onSuccess, compact, referralCode = "" }: {
   initialMode?: "login" | "register"; onSuccess: (u: PublicUser) => void; compact?: boolean;
+  /** From an invitation link (`?ref=`): the loyalty programme's referral code. */
+  referralCode?: string;
 }) {
   const { t, locale, setUser } = useApp();
   const a = t.auth;
@@ -17,7 +19,7 @@ export function AuthForm({ initialMode = "login", onSuccess, compact }: {
   const [accountType, setAccountType] = useState<"individual" | "company">("individual");
   const [f, setF] = useState({
     email: "", password: "", fullName: "", phone: "", nationality: "",
-    companyName: "", commercialRegNo: "", tourismLicenseNo: "", vatNo: "", contactPerson: "", city: "",
+    companyName: "", commercialRegNo: "", tourismLicenseNo: "", vatNo: "", contactPerson: "", city: "", referralCode,
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +32,7 @@ export function AuthForm({ initialMode = "login", onSuccess, compact }: {
     const payload = mode === "login"
       ? { email: f.email, password: f.password }
       : {
-          email: f.email, password: f.password, accountType, locale,
+          email: f.email, password: f.password, accountType, locale, ...(accountType === "individual" && f.referralCode.trim() ? { referralCode: f.referralCode.trim() } : {}),
           individual: { fullName: f.fullName, phone: f.phone, nationality: f.nationality },
           company: { companyName: f.companyName, commercialRegNo: f.commercialRegNo, tourismLicenseNo: f.tourismLicenseNo, vatNo: f.vatNo, contactPerson: f.contactPerson, phone: f.phone, city: f.city },
         };
@@ -88,6 +90,7 @@ export function AuthForm({ initialMode = "login", onSuccess, compact }: {
               <PhoneInput value={f.phone} defaultCountry={f.nationality || "SA"} onChange={(v) => setF({ ...f, phone: v })} />
             </Field>
             <Field label={a.nationality}><CountrySelect value={f.nationality} onChange={(v) => setF({ ...f, nationality: v })} /></Field>
+            <Field label={a.referralCode} hint={a.referralHint}><Input dir="ltr" value={f.referralCode} onChange={set("referralCode")} maxLength={12} /></Field>
           </>
         )}
         {mode === "register" && accountType === "company" && (

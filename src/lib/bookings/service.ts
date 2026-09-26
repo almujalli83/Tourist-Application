@@ -11,6 +11,7 @@ import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildSubmitRequests } from "../mt-evisa/mapper";
 import { checkPackageRequirements } from "../package-rules";
 import { esimTotal, issueEsimsForBooking, validateBookingEsim } from "../esim/orders";
+import { awardPurchase, getAccount, packageAvailableAt, quietly, reversePurchase } from "../loyalty/loyalty";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { syncIssuedDocuments } from "../wallet";
 import { computePackagePrice } from "../pricing";
@@ -159,6 +160,9 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
     if (Math.abs(extras.totalSAR - Number(input.planExtras.expectedSAR)) > 0.009) throw new BookingError("planExtrasChanged", extras);
   }
 
+  // Reward points are not used on packages: the traveller pays the price sent to MT.
+  const bookingId = randomUUID();
+  const reference = bookingReference();
   const payment = await chargeCard(input.card, Math.round((price.totalSAR + esimSAR) * 100) / 100);
   if (!payment.ok) throw new BookingError(`payment_${payment.code}`);
 
@@ -224,8 +228,8 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
 
   const allOk = applicants.every((a) => a.submission?.ok);
   const booking: StoredBooking = {
-    id: randomUUID(),
-    reference: bookingReference(),
+    id: bookingId,
+    reference,
     userId: user.id,
     accountType: user.accountType,
     clientReference: input.clientReference?.trim() || null,
@@ -273,6 +277,16 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
     } else if (linked && extras) booking.planExtras = { events: [], tables: [], issues: extras.issues };
   }
 
+  // Points on the package without the visa & insurance fees (and on the eSIMs), usable the day after the return.
+  const availableAt = packageAvailableAt(selection.criteria.returnDate);
+  const cities = selection.criteria.stays.map((st) => st.city);
+  const earned =
+    (await quietly("package points", () => awardPurchase(user, { service: "package", source: { kind: "package", id: booking.id, reference }, eligibleSAR: Math.max(0, price.totalSAR - price.visaInsuranceSAR), availableAt, cities }), 0)) +
+    (booking.esim?.orderId && booking.esim.amountSAR
+      ? await quietly("eSIM points", () => awardPurchase(user, { service: "esim", source: { kind: "esim", id: booking.esim!.orderId!, reference }, eligibleSAR: booking.esim!.amountSAR, availableAt }), 0)
+      : 0);
+  if (earned) booking.loyalty = { redeemedPoints: 0, discountSAR: 0, earnedPoints: earned };
+
   // Passport images and photos are sent to MT only and are not retained.
   await saveBooking(booking);
   return booking;
@@ -311,6 +325,10 @@ export async function refreshBookingStatus(userId: string, id: string): Promise<
     if (b.mt.packageStatus === "CANCELLED") b.status = "CANCELLED";
     return b;
   });
+  // A cancelled package takes back the points it earned.
+  if (updated?.status === "CANCELLED" && booking.status !== "CANCELLED" && (await getAccount(updated.userId))) {
+    await quietly("package points reversal", () => reversePurchase(updated.userId, [updated.id, ...(updated.modifications ?? []).map((m) => m.id)], 1), 0);
+  }
   // Issued visas and insurance policies go straight into the buyer's digital wallet.
   if (updated?.applicants.some((a) => a.visaNumber))
     await syncIssuedDocuments(updated.userId, [updated]).catch((err) => console.error("wallet sync failed", err));

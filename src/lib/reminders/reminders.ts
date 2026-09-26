@@ -12,6 +12,7 @@ import type { StoredBooking } from "../bookings/types";
 import { cityName } from "../data/cities";
 import { addDays } from "../dates";
 import { fmtDay } from "../events/format";
+import { expiryReminders, runLoyalty } from "../loyalty/loyalty";
 import { notifyTravellers } from "../notify";
 import { planForBooking } from "../planner/plans";
 import { getUserById, listBookingsByUser } from "../repo";
@@ -20,8 +21,8 @@ import { store } from "../store";
 
 export type ReminderKind = "arrival" | "departure" | "visa7" | "visa1";
 
-/** Notification kinds: trip reminders, and requests to rate experiences (service 9). */
-export type NotificationKind = ReminderKind | "review";
+/** Notification kinds: trip reminders, requests to rate experiences (service 9) and points about to expire (service 10). */
+export type NotificationKind = ReminderKind | "review" | "points";
 
 export interface AppNotification {
   /** `${bookingId}:${kind}` (for visa reminders also the expiry date). */
@@ -222,19 +223,21 @@ async function remind(bookings: StoredBooking[], now: Date): Promise<number> {
   return created;
 }
 
-/** Daily job: reminders for every booking. */
-export async function runReminders(now = new Date()): Promise<{ bookings: number; created: number; reviewRequests: number }> {
+/** Daily job: reminders for every booking, review requests, and expiring reward points. */
+export async function runReminders(now = new Date()): Promise<{ bookings: number; created: number; reviewRequests: number; pointsReminders: number }> {
   const bookings = (await store().list<StoredBooking>("bookings", 100_000)).filter(active);
   const created = await remind(bookings, now);
   let reviewRequests = 0;
   for (const u of await store().list<{ id: string }>("users", 100_000)) if (await requestReviews(u.id, now)) reviewRequests++;
-  return { bookings: bookings.length, created, reviewRequests };
+  const loyalty = await runLoyalty(now);
+  return { bookings: bookings.length, created, reviewRequests, pointsReminders: loyalty.reminders };
 }
 
 /** The account's notifications, newest first (its due reminders are created first). */
 export async function listNotifications(userId: string, now = new Date()): Promise<AppNotification[]> {
   await remind(await listBookingsByUser(userId), now);
   await requestReviews(userId, now);
+  await expiryReminders(userId, now);
   const rows = await store().findBy<AppNotification>(COL, "userId", userId);
   return rows.filter((n) => !n.deletedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

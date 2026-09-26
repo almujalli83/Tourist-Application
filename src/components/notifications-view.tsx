@@ -6,11 +6,11 @@ import { fmtKsa } from "@/lib/events/format";
 import type { AppNotification, NotificationKind } from "@/lib/reminders/reminders";
 import { useApp } from "./app-provider";
 import { BackLink } from "./back-link";
-import { CalendarIcon, PassportIcon, PlaneIcon, StarIcon, TrashIcon } from "./icons";
+import { CalendarIcon, GiftIcon, PassportIcon, PlaneIcon, StarIcon, TrashIcon } from "./icons";
 import { NOTIFICATIONS_CHANGED } from "./notification-bell";
 import { Alert, Badge, Card, cx, Spinner } from "./ui";
 
-const ICON: Record<NotificationKind, typeof PlaneIcon> = { arrival: PlaneIcon, departure: CalendarIcon, visa7: PassportIcon, visa1: PassportIcon, review: StarIcon };
+const ICON: Record<NotificationKind, typeof PlaneIcon> = { arrival: PlaneIcon, departure: CalendarIcon, visa7: PassportIcon, visa1: PassportIcon, review: StarIcon, points: GiftIcon };
 
 /** Service 8 — trip reminders (before arrival, before departure, before the visa expires). */
 export function NotificationsView() {

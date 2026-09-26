@@ -8,6 +8,8 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { displayName, type PublicUser } from "../auth/types";
 import { todayISO } from "../dates";
 import { notifyTravellers } from "../notify";
+import { awardPurchase, holdRedeem, LoyaltyError, quietly, releaseRedeem, returnRedeemed, reversePurchase } from "../loyalty/loyalty";
+import { pointsEmailLine } from "../loyalty/rules";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { store } from "../store";
 import { isKnownSeat, listCatalog, sessionDay, type DateRange, providerCancel, providerPurchase, providerSoldCount, providerSoldSeat } from "./catalog";
@@ -176,6 +178,8 @@ export interface OrderInput {
   idempotencyKey: string;
   displayCurrency?: string;
   card: CardInput;
+  /** Reward points used on the order (service 10). */
+  redeemPoints?: number;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -220,15 +224,25 @@ export async function placeOrder(user: PublicUser, input: OrderInput, now = new 
   if (Math.abs(totalSAR - Number(input.expectedTotalSAR)) > 0.01) throw new EventOrderError("priceChanged", 409);
 
   if (!(await reserve(e, session.id, lines, id))) throw new EventOrderError(e.seating === "seated" ? "seatUnavailable" : "soldOut", 409);
-  const pay = await chargeCard(input.card, totalSAR, now);
+  const reference = `EV-${randomBytes(4).toString("hex").toUpperCase()}`;
+  let hold: Awaited<ReturnType<typeof holdRedeem>> = null;
+  try {
+    hold = await holdRedeem(user, { points: input.redeemPoints, totalSAR, source: { kind: "event", id, reference } }, now);
+  } catch (err) {
+    await release(session.id, lines, id);
+    throw err instanceof LoyaltyError ? new EventOrderError(err.code) : err;
+  }
+  const cardSAR = round2(totalSAR - (hold?.discountSAR ?? 0));
+  const pay = await chargeCard(input.card, cardSAR, now);
   if (!pay.ok) {
     await release(session.id, lines, id);
+    await releaseRedeem(user.id, hold, now);
     throw new EventOrderError(`payment_${pay.code}`, 402);
   }
   const issued = await providerPurchase(e, lines.length);
   const order: EventOrder = {
     id,
-    reference: `EV-${randomBytes(4).toString("hex").toUpperCase()}`,
+    reference,
     userId: user.id,
     idempotencyKey: input.idempotencyKey,
     createdAt: now.toISOString(),
@@ -240,15 +254,24 @@ export async function placeOrder(user: PublicUser, input: OrderInput, now = new 
     tickets: lines.map((line, i) => ({ id: randomUUID(), code: issued.codes[i], line })),
     totalSAR,
     displayCurrency: input.displayCurrency ?? "SAR",
-    payment: { transactionId: pay.transactionId, method: pay.method, last4: pay.last4, amountSAR: totalSAR, paidAt: now.toISOString() },
+    payment: { transactionId: pay.transactionId, method: pay.method, last4: pay.last4, amountSAR: cardSAR, paidAt: now.toISOString() },
     holderName: displayName(user),
     holderEmail: user.email,
     cancellation: null,
+    ...(hold ? { loyalty: { redeemedPoints: hold.points, discountSAR: hold.discountSAR, earnedPoints: 0 } } : {}),
   };
   if (!(await store().insert("eventOrders", id, order))) {
     // Same request submitted twice at once: keep the first order, undo this one.
-    await refundPayment(pay.transactionId, totalSAR);
+    await refundPayment(pay.transactionId, cardSAR);
+    await releaseRedeem(user.id, hold, now);
     return (await store().get<EventOrder>("eventOrders", id))!;
+  }
+  // Points on the card amount, usable once the event is over.
+  const ends = new Date(Date.parse(session.start) + e.durationMins * 60_000).toISOString();
+  const earned = await quietly("event points", () => awardPurchase(user, { service: "event", source: { kind: "event", id, reference }, eligibleSAR: cardSAR, availableAt: ends, cities: [e.city] }, now), 0);
+  if (earned) {
+    order.loyalty = { redeemedPoints: hold?.points ?? 0, discountSAR: hold?.discountSAR ?? 0, earnedPoints: earned };
+    await store().update<EventOrder>("eventOrders", id, (cur) => ({ ...cur, loyalty: order.loyalty }));
   }
   await notifyTravellers([user.email], orderEmail(order, "confirmed", user.preferredLocale));
   return order;
@@ -288,12 +311,15 @@ export async function cancelOrder(user: PublicUser, id: string, now = new Date()
     return { ...cur, status: "CANCELLED", cancellation: { at: now.toISOString(), refundSAR: 0, refundId: "" } };
   });
   if (!claimed) throw new EventOrderError("notCancellable");
-  const refund = await refundPayment(o.payment.transactionId, o.totalSAR);
+  // The card is refunded what it paid; points used come back and points earned are taken back.
+  const refund = await refundPayment(o.payment.transactionId, o.payment.amountSAR);
   await providerCancel(o.providerRef);
   await release(o.session.id, o.tickets.map((t) => t.line), o.id);
+  await quietly("event points return", () => returnRedeemed(user.id, o.id, now), 0);
+  await quietly("event points reversal", () => reversePurchase(user.id, [o.id], 1, now), 0);
   const done = await store().update<EventOrder>("eventOrders", id, (cur) => ({
     ...cur,
-    cancellation: { at: now.toISOString(), refundSAR: refund.ok ? o.totalSAR : 0, refundId: refund.ok ? refund.refundId : "" },
+    cancellation: { at: now.toISOString(), refundSAR: refund.ok ? o.payment.amountSAR : 0, refundId: refund.ok ? refund.refundId : "" },
   }));
   await notifyTravellers([o.holderEmail], orderEmail(done!, "cancelled", user.preferredLocale));
   return done!;
@@ -311,8 +337,8 @@ function orderEmail(o: EventOrder, kind: "confirmed" | "cancelled", locale: "ar"
   const lines = o.tickets.map((t) => `- ${ar ? t.line.typeNameAr : t.line.typeNameEn}${t.line.seat ? ` · ${t.line.seat}` : ""} · ${t.code}`).join("\n");
   if (kind === "confirmed") {
     return ar
-      ? { subject: `تذاكرك: ${title} — ${o.reference}`, text: `تم تأكيد طلبك ${o.reference}.\n\n${title}\n${ar ? o.event.venueAr : o.event.venueEn}\n${when}\n\nالتذاكر:\n${lines}\n\nالمبلغ: ${o.totalSAR} ريال\nتجد تذاكرك في «حجوزاتي» في سعودي تريب.` }
-      : { subject: `Your tickets: ${title} — ${o.reference}`, text: `Your order ${o.reference} is confirmed.\n\n${title}\n${o.event.venueEn}\n${when}\n\nTickets:\n${lines}\n\nAmount: SAR ${o.totalSAR}\nYour tickets are in “My bookings” on Saudi Trip.` };
+      ? { subject: `تذاكرك: ${title} — ${o.reference}`, text: `تم تأكيد طلبك ${o.reference}.\n\n${title}\n${ar ? o.event.venueAr : o.event.venueEn}\n${when}\n\nالتذاكر:\n${lines}\n\nالمبلغ: ${o.payment.amountSAR} ريال${pointsEmailLine(o.loyalty, true)}\nتجد تذاكرك في «حجوزاتي» في سعودي تريب.` }
+      : { subject: `Your tickets: ${title} — ${o.reference}`, text: `Your order ${o.reference} is confirmed.\n\n${title}\n${o.event.venueEn}\n${when}\n\nTickets:\n${lines}\n\nAmount: SAR ${o.payment.amountSAR}${pointsEmailLine(o.loyalty, false)}\nYour tickets are in “My bookings” on Saudi Trip.` };
   }
   const refund = o.cancellation?.refundSAR ?? 0;
   return ar

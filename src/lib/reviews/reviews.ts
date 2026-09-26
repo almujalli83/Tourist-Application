@@ -17,6 +17,7 @@ import { addDays } from "../dates";
 import { listEsimOrders } from "../esim/orders";
 import { listOrders as listEventOrders } from "../events/orders";
 import { readFile, saveFile } from "../files";
+import { awardReviewBonus, quietly } from "../loyalty/loyalty";
 import { notifyTravellers } from "../notify";
 import { listPlans, planForBooking } from "../planner/plans";
 import { listBookingsByUser, getUserById } from "../repo";
@@ -269,6 +270,8 @@ export async function submitReview(user: PublicUser, input: ReviewInput, now = n
     publishedAt: m.status === "published" ? at : null, ...(item.demo ? { demo: true } : {}),
   };
   if (!(await store().insert(COL, id, doc))) throw new ReviewError("alreadyReviewed", 409);
+  // Reward points for a published verified review (service 10).
+  if (doc.status === "published" && !doc.demo) await quietly("review points", () => awardReviewBonus(user.id, id, now), 0);
   return { review: { ...toPublic(doc), status: doc.status, moderationReason: doc.moderation.reason }, complaint: rating <= COMPLAINT_MAX_RATING };
 }
 
@@ -338,6 +341,12 @@ export async function adminReviewStats() {
 
 export async function adminModerate(id: string, action: "approve" | "reject", note: string | null, now = new Date()) {
   const at = now.toISOString();
+  const r = await moderate(id, action, note, at);
+  if (r && action === "approve" && !r.demo) await quietly("review points", () => awardReviewBonus(r.userId, r.id, now), 0);
+  return r;
+}
+
+function moderate(id: string, action: "approve" | "reject", note: string | null, at: string) {
   return store().update<StoredReview>(COL, id, (r) => ({
     ...r,
     status: action === "approve" ? "published" : "rejected",

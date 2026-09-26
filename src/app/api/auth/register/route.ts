@@ -3,6 +3,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { setSessionCookie } from "@/lib/auth/session";
 import { toPublicUser, type CompanyProfile, type IndividualProfile } from "@/lib/auth/types";
 import { cleanCompany, cleanIndividual, EMAIL_RE } from "@/lib/auth/validation";
+import { ensureAccount, isEligible, joinWithReferral } from "@/lib/loyalty/loyalty";
 import { createUser } from "@/lib/repo";
 import { body, error, json } from "@/lib/http";
 import { validatePhone } from "@/lib/phone";
@@ -14,6 +15,8 @@ interface RegisterBody {
   individual?: Partial<IndividualProfile>;
   company?: Partial<CompanyProfile>;
   locale?: "ar" | "en";
+  /** Referral code of the member who invited them (loyalty programme). */
+  referralCode?: string;
 }
 
 export async function POST(req: Request) {
@@ -42,6 +45,11 @@ export async function POST(req: Request) {
     createdAt: new Date().toISOString(),
   });
   if (!user) return error("exists", 409);
+  // Individual accounts join the loyalty programme automatically.
+  if (isEligible(user)) {
+    await ensureAccount(user.id);
+    if (typeof b.referralCode === "string") await joinWithReferral(user, b.referralCode);
+  }
   await setSessionCookie(user.id);
   return json({ user: toPublicUser(user) }, 201);
 }
