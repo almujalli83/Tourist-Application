@@ -1,7 +1,7 @@
 /**
  * Event ticket orders: bought separately from packages by any signed-in account. Seats and
  * general-admission tickets are reserved atomically per session before the card is charged;
- * tickets are issued in the buyer's name, saved in the wallet and emailed. Cancellation follows
+ * tickets are issued in the buyer's name, listed in «My bookings» and emailed. Cancellation follows
  * the event's refund policy.
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -311,8 +311,8 @@ function orderEmail(o: EventOrder, kind: "confirmed" | "cancelled", locale: "ar"
   const lines = o.tickets.map((t) => `- ${ar ? t.line.typeNameAr : t.line.typeNameEn}${t.line.seat ? ` · ${t.line.seat}` : ""} · ${t.code}`).join("\n");
   if (kind === "confirmed") {
     return ar
-      ? { subject: `تذاكرك: ${title} — ${o.reference}`, text: `تم تأكيد طلبك ${o.reference}.\n\n${title}\n${ar ? o.event.venueAr : o.event.venueEn}\n${when}\n\nالتذاكر:\n${lines}\n\nالمبلغ: ${o.totalSAR} ريال\nالتذاكر محفوظة في محفظتك الرقمية في سعودي تريب.` }
-      : { subject: `Your tickets: ${title} — ${o.reference}`, text: `Your order ${o.reference} is confirmed.\n\n${title}\n${o.event.venueEn}\n${when}\n\nTickets:\n${lines}\n\nAmount: SAR ${o.totalSAR}\nYour tickets are saved in your Saudi Trip digital wallet.` };
+      ? { subject: `تذاكرك: ${title} — ${o.reference}`, text: `تم تأكيد طلبك ${o.reference}.\n\n${title}\n${ar ? o.event.venueAr : o.event.venueEn}\n${when}\n\nالتذاكر:\n${lines}\n\nالمبلغ: ${o.totalSAR} ريال\nتجد تذاكرك في «حجوزاتي» في سعودي تريب.` }
+      : { subject: `Your tickets: ${title} — ${o.reference}`, text: `Your order ${o.reference} is confirmed.\n\n${title}\n${o.event.venueEn}\n${when}\n\nTickets:\n${lines}\n\nAmount: SAR ${o.totalSAR}\nYour tickets are in “My bookings” on Saudi Trip.` };
   }
   const refund = o.cancellation?.refundSAR ?? 0;
   return ar

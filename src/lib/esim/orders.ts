@@ -2,7 +2,7 @@
  * eSIM orders (Tygo): one eSIM per chosen traveller, bought with a package (optional step after
  * activities, not part of the package price) or on its own later. Each traveller receives the
  * installation details at their own email (already known from their saved or visa details); the
- * buyer's wallet keeps the QR codes. Refund per the plan's terms: before activation only.
+ * buyer's «My bookings» keeps the QR codes. Refund per the plan's terms: before activation only.
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { displayName, type PublicUser } from "../auth/types";
@@ -215,10 +215,10 @@ function installEmail(o: EsimOrder, l: EsimLine, locale: "ar" | "en") {
   return ar
     ? {
         subject: `شريحتك الإلكترونية (eSIM) للسعودية — ${o.reference}`,
-        text: `مرحبًا ${l.name}،\n\nهذه شريحتك الإلكترونية: ${size} لمدة ${o.plan.days} يومًا${o.plan.minutes ? ` و${o.plan.minutes} دقيقة محلية` : ""}.${number}\n\nالتثبيت (قبل السفر، مع اتصال بالإنترنت):\n1. الإعدادات ← الشبكة الخلوية / الاتصالات ← إضافة eSIM.\n2. امسح رمز QR من محفظة سعودي تريب، أو أدخل البيانات يدويًا:\n   عنوان SM-DP+: ${l.smdpAddress}\n   رمز التفعيل: ${l.matchingId}\n3. فعّل تجوال البيانات للشريحة الجديدة عند الوصول.\n\nيجب أن يدعم جهازك eSIM وأن يكون غير مقفل على شبكة معينة.\nرقم الشريحة (ICCID): ${l.iccid}`,
+        text: `مرحبًا ${l.name}،\n\nهذه شريحتك الإلكترونية: ${size} لمدة ${o.plan.days} يومًا${o.plan.minutes ? ` و${o.plan.minutes} دقيقة محلية` : ""}.${number}\n\nالتثبيت (قبل السفر، مع اتصال بالإنترنت):\n1. الإعدادات ← الشبكة الخلوية / الاتصالات ← إضافة eSIM.\n2. امسح رمز QR من «حجوزاتي» في سعودي تريب، أو أدخل البيانات يدويًا:\n   عنوان SM-DP+: ${l.smdpAddress}\n   رمز التفعيل: ${l.matchingId}\n3. فعّل تجوال البيانات للشريحة الجديدة عند الوصول.\n\nيجب أن يدعم جهازك eSIM وأن يكون غير مقفل على شبكة معينة.\nرقم الشريحة (ICCID): ${l.iccid}`,
       }
     : {
         subject: `Your Saudi eSIM — ${o.reference}`,
-        text: `Hello ${l.name},\n\nHere is your eSIM: ${size} for ${o.plan.days} days${o.plan.minutes ? ` with ${o.plan.minutes} local minutes` : ""}.${number}\n\nInstallation (before you travel, while online):\n1. Settings → Mobile / Cellular → Add eSIM.\n2. Scan the QR code from the Saudi Trip wallet, or enter the details manually:\n   SM-DP+ address: ${l.smdpAddress}\n   Activation code: ${l.matchingId}\n3. Turn on data roaming for the new line when you arrive.\n\nYour phone must support eSIM and be carrier-unlocked.\nICCID: ${l.iccid}`,
+        text: `Hello ${l.name},\n\nHere is your eSIM: ${size} for ${o.plan.days} days${o.plan.minutes ? ` with ${o.plan.minutes} local minutes` : ""}.${number}\n\nInstallation (before you travel, while online):\n1. Settings → Mobile / Cellular → Add eSIM.\n2. Scan the QR code from “My bookings” on Saudi Trip, or enter the details manually:\n   SM-DP+ address: ${l.smdpAddress}\n   Activation code: ${l.matchingId}\n3. Turn on data roaming for the new line when you arrive.\n\nYour phone must support eSIM and be carrier-unlocked.\nICCID: ${l.iccid}`,
       };
 }

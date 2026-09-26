@@ -12,7 +12,6 @@ import { BackLink } from "../back-link";
 import { CalendarIcon, MapPinIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Field, Input, Spinner } from "../ui";
-import { WalletTicketsPane } from "../wallet-tickets-pane";
 import { SlotPicker } from "./shared";
 
 interface View { booking: RestaurantBooking; qr: string; canCancel: boolean; canChange: boolean; cancelDeadline: string; changeDeadline: string }
@@ -65,7 +64,7 @@ export function TableBookingView({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="print:hidden"><BackLink href={`/${locale}/account/wallet`} label={t.wallet.title} /></div>
+      <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
       {notice && !cancelled && <Alert tone="success" className="print:hidden">{notice}</Alert>}
       {cancelled && <Alert tone="warning">{bk.cancelled}{b.cancellation?.refundSAR ? ` ${fmt(bk.refunded, { amount: money(b.cancellation.refundSAR) })}` : ""}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}
@@ -201,33 +200,5 @@ function ChangePanel({ booking: b, onDone, onClose }: { booking: RestaurantBooki
         <Button type="button" variant="ghost" onClick={onClose}>{bk.closeChange}</Button>
       </div>
     </form>
-  );
-}
-
-/** Wallet pane: the account's restaurant bookings. */
-export function TableBookingsPane({ bookings }: { bookings: RestaurantBooking[] | null }) {
-  const { t, locale } = useApp();
-  const rs = t.restaurants;
-  const bk = rs.booking;
-  const ar = locale === "ar";
-  const now = Date.now();
-  const items = bookings?.map((b) => ({
-    id: b.id,
-    href: `/${locale}/account/table-bookings/${b.id}`,
-    title: ar ? b.restaurant.nameAr : b.restaurant.nameEn,
-    subtitle: `${fmtKsa(b.start, locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · ${bk.party}: ${b.party}`,
-    status: { label: bk.status[b.status], tone: b.status === "CANCELLED" ? ("red" as const) : ("brand" as const) },
-    upcoming: b.status === "CONFIRMED" && Date.parse(b.start) > now,
-  })) ?? null;
-  return (
-    <WalletTicketsPane
-      testid="wallet-table-bookings"
-      title={bk.myBookings}
-      subtitle={t.wallet.restaurantsSubtitle}
-      icon={<CalendarIcon className="size-5" />}
-      action={{ href: `/${locale}/restaurants`, label: bk.browse }}
-      items={items}
-      emptyText={bk.empty}
-    />
   );
 }

@@ -321,6 +321,6 @@ function bookingEmail(b: RestaurantBooking, kind: "confirmed" | "changed" | "can
   }
   const head = kind === "changed" ? (ar ? "تم تعديل حجزك" : "Your booking has been changed") : ar ? "تم تأكيد حجزك" : "Your booking is confirmed";
   return ar
-    ? { subject: `${head}: ${name} — ${b.reference}`, text: `${head} ${b.reference}.\n\n${name}\n${b.restaurant.addressAr}\n${when}\nعدد الأشخاص: ${b.party}\nرمز الحجز: ${b.code}${fee}\n\nاعرض رمز QR من محفظتك عند الوصول.` }
-    : { subject: `${head}: ${name} — ${b.reference}`, text: `${head} — ${b.reference}.\n\n${name}\n${b.restaurant.addressEn}\n${when}\nGuests: ${b.party}\nBooking code: ${b.code}${fee}\n\nShow the QR code from your wallet on arrival.` };
+    ? { subject: `${head}: ${name} — ${b.reference}`, text: `${head} ${b.reference}.\n\n${name}\n${b.restaurant.addressAr}\n${when}\nعدد الأشخاص: ${b.party}\nرمز الحجز: ${b.code}${fee}\n\nاعرض رمز QR من «حجوزاتي» عند الوصول.` }
+    : { subject: `${head}: ${name} — ${b.reference}`, text: `${head} — ${b.reference}.\n\n${name}\n${b.restaurant.addressEn}\n${when}\nGuests: ${b.party}\nBooking code: ${b.code}${fee}\n\nShow the QR code from “My bookings” on arrival.` };
 }

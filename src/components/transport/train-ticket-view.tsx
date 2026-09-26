@@ -9,14 +9,13 @@ import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
 import { TrainIcon } from "../icons";
 import { PrintButton } from "../print-button";
-import { WalletTicketsPane } from "../wallet-tickets-pane";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
 
 interface StationLite { code: string; nameAr: string; nameEn: string }
 interface LineLite { id: string; nameAr: string; nameEn: string; color: string }
 interface OrderView { order: TrainOrder; qr: Record<string, string>; canCancel: boolean; deadline: string; refund: { refundSAR: number; feeSAR: number } | null }
 
-function useNetwork() {
+export function useNetwork() {
   const [net, setNet] = useState<{ stations: StationLite[]; lines: LineLite[] } | null>(null);
   useEffect(() => {
     fetch("/api/trains/stations").then((r) => r.json()).then(setNet).catch(() => setNet({ stations: [], lines: [] }));
@@ -73,7 +72,7 @@ export function TrainTicketView({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="print:hidden"><BackLink href={`/${locale}/account/wallet`} label={t.wallet.title} /></div>
+      <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
       {fresh && !cancelled && <Alert tone="success" className="print:hidden">{tk.purchased}</Alert>}
       {cancelled && o.cancellation && <Alert tone="warning">{fmt(tk.cancelled, { refund: money(o.cancellation.refundSAR), fee: money(o.cancellation.feeSAR) })}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}
@@ -151,37 +150,5 @@ export function TrainTicketView({ id }: { id: string }) {
       )}
       <p className="text-center print:hidden"><Link href={`/${locale}/trains`} className="text-sm font-semibold text-brand-700 hover:underline">{tk.book}</Link></p>
     </div>
-  );
-}
-
-/** Wallet pane: the account's train bookings. */
-export function TrainTicketsPane({ orders }: { orders: TrainOrder[] | null }) {
-  const { t, locale, money } = useApp();
-  const tk = t.trains.ticket;
-  const ar = locale === "ar";
-  const net = useNetwork();
-  const st = (code: string) => {
-    const s = net?.stations.find((x) => x.code === code);
-    return s ? (ar ? s.nameAr : s.nameEn) : code;
-  };
-  const now = Date.now();
-  const items = orders?.map((o) => ({
-    id: o.id,
-    href: `/${locale}/account/train-tickets/${o.id}`,
-    title: `${st(o.legs[0].trip.from)} ${o.legs.length > 1 ? "⇄" : "→"} ${st(o.legs[0].trip.to)}`,
-    subtitle: `${fmtKsa(o.legs[0].trip.depart, locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · ${fmt(tk.tickets, { n: o.tickets.length })} · ${money(o.totalSAR)}`,
-    status: { label: tk.status[o.status], tone: o.status === "CANCELLED" ? ("red" as const) : ("brand" as const) },
-    upcoming: o.status === "CONFIRMED" && Date.parse(o.legs[o.legs.length - 1].trip.depart) > now,
-  })) ?? null;
-  return (
-    <WalletTicketsPane
-      testid="wallet-train-tickets"
-      title={tk.myTickets}
-      subtitle={t.wallet.trainsSubtitle}
-      icon={<TrainIcon className="size-5" />}
-      action={{ href: `/${locale}/trains`, label: tk.book }}
-      items={items}
-      emptyText={tk.empty}
-    />
   );
 }
