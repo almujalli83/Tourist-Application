@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, HotelIcon, PassportIcon, PlaneIcon, ShieldIcon, TicketIcon, UserIcon } from "@/components/icons";
+import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, ShieldIcon, TicketIcon, UserIcon } from "@/components/icons";
 import { PrayerHomeCard } from "@/components/prayer/prayer-home-card";
 import { getDictionary } from "@/i18n";
 import type { Locale } from "@/i18n/config";
@@ -77,6 +77,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
             <div className="flex-1">
               <p className="font-semibold text-ink">{t.prayer.title}</p>
               <p className="mt-0.5 text-sm text-slate-600">{t.prayer.serviceCard}</p>
+            </div>
+          </Link>
+          <Link href={`/${locale}/emergency`} className="group flex items-center gap-4 rounded-2xl border border-red-200 bg-red-50/60 p-5 transition hover:shadow-md" data-testid="emergency-service">
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-red-600 text-white"><PhoneIcon className="size-5" /></div>
+            <div className="flex-1">
+              <p className="font-semibold text-ink">{t.emergency.title}</p>
+              <p className="mt-0.5 text-sm text-slate-600">{t.emergency.serviceCard}</p>
             </div>
           </Link>
           {t.home.comingServices.map((s, i) => {
