@@ -25,8 +25,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
               <Link href={`/${locale}/package-visa`} className="inline-flex h-12 items-center gap-2 rounded-lg bg-gold-500 px-7 text-base font-semibold shadow-lg shadow-black/10 hover:bg-gold-600">
                 {t.home.startNow}
               </Link>
-              <Link href={`/${locale}/register`} className="inline-flex h-12 items-center gap-2 rounded-lg bg-white/10 px-6 text-base font-semibold ring-1 ring-white/20 hover:bg-white/15">
-                {t.nav.register}
+              <Link href={`/${locale}/planner`} className="inline-flex h-12 items-center gap-2 rounded-lg bg-white/10 px-6 text-base font-semibold ring-1 ring-white/20 hover:bg-white/15">
+                <CalendarIcon className="size-5" />
+                {t.planner.banner.cta}
               </Link>
             </div>
           </div>
@@ -60,6 +61,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
               <span className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1"><BuildingIcon className="size-3.5" />B2B · {t.nav.business}</span>
             </div>
             <span className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-brand-700 text-sm font-semibold text-white group-hover:bg-brand-800">{t.home.startNow}</span>
+          </Link>
+          <Link href={`/${locale}/planner`} className="group flex items-center gap-4 rounded-2xl border border-gold-500/40 bg-gold-50 p-5 transition hover:shadow-md">
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-gold-500 text-ink"><CalendarIcon className="size-5" /></div>
+            <div className="flex-1">
+              <p className="font-semibold text-ink">{t.planner.title}</p>
+              <p className="mt-0.5 text-sm text-slate-600">{t.planner.banner.desc}</p>
+            </div>
           </Link>
           {t.home.comingServices.map((s, i) => {
             const Icon = [PassportIcon, TicketIcon, PlaneIcon, UserIcon][i] ?? TicketIcon;

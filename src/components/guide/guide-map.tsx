@@ -30,21 +30,27 @@ export interface MapPoint {
   lng: number;
   category: GuideCategory;
   label: string;
+  /** Short text shown on the pin (e.g. the order of a visit in a day plan). */
+  badge?: string;
 }
 
 const TILE_URL = process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const TILE_ATTRIBUTION = process.env.NEXT_PUBLIC_MAP_ATTRIBUTION || '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
 
-const pin = (color: string, selected: boolean) =>
-  `<span style="display:block;width:${selected ? 30 : 22}px;height:${selected ? 30 : 22}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)"></span>`;
+const pin = (color: string, selected: boolean, badge?: string) =>
+  `<span style="position:relative;display:block;width:${selected ? 30 : 22}px;height:${selected ? 30 : 22}px"><span style="position:absolute;inset:0;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)"></span>${
+    badge ? `<span style="position:absolute;inset:0;display:grid;place-items:center;color:#fff;font:700 11px/1 system-ui,sans-serif">${badge.replace(/[^\w]/g, "").slice(0, 3)}</span>` : ""
+  }</span>`;
 
 /**
  * Interactive map (Leaflet, online tiles). Loads Leaflet in the browser only.
  * `fitKey` changes when the set of points should be refitted (new city, new filter).
  * `className` must position the map box (e.g. "absolute inset-0" or "relative h-64").
  */
-export function GuideMap({ points, selectedId, onSelect, center, fitKey, userLocation, onMapClick, className, unavailableText }: {
+export function GuideMap({ points, selectedId, onSelect, center, fitKey, userLocation, onMapClick, className, unavailableText, route }: {
   points: MapPoint[];
+  /** Dashed line through these points, in order (a day's route). */
+  route?: { lat: number; lng: number }[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   center: { lat: number; lng: number; zoom: number };
@@ -97,17 +103,19 @@ export function GuideMap({ points, selectedId, onSelect, center, fitKey, userLoc
     if (!ready || !Lf || !layer.current) return;
     layer.current.clearLayers();
     markers.current.clear();
+    if (route && route.length > 1)
+      Lf.polyline(route.map((p) => [p.lat, p.lng] as [number, number]), { color: "#0f766e", weight: 3, opacity: 0.8, dashArray: "6 8" }).addTo(layer.current);
     for (const p of points) {
       const selected = p.id === selectedId;
       const size = selected ? 30 : 22;
-      const icon = Lf.divIcon({ className: "guide-pin", html: pin(CATEGORY_COLORS[p.category], selected), iconSize: [size, size], iconAnchor: [size / 2, size] });
+      const icon = Lf.divIcon({ className: "guide-pin", html: pin(CATEGORY_COLORS[p.category], selected, p.badge), iconSize: [size, size], iconAnchor: [size / 2, size] });
       const mk = Lf.marker([p.lat, p.lng], { icon, title: p.label, alt: p.label, keyboard: true, zIndexOffset: selected ? 1000 : 0 });
       mk.bindTooltip(p.label, { direction: "top", offset: [0, -size] });
       mk.on("click", () => handlers.current.onSelect?.(p.id));
       mk.addTo(layer.current);
       markers.current.set(p.id, mk);
     }
-  }, [ready, points, selectedId]);
+  }, [ready, points, selectedId, route]);
 
   // Fit to the points (or the city centre) when the result set changes.
   useEffect(() => {

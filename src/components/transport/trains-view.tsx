@@ -64,9 +64,15 @@ export function TrainsView() {
       .then((r) => r.json())
       .then((d) => {
         setNet(d);
-        const f = new URLSearchParams(window.location.search).get("from")?.toUpperCase();
+        const qs = new URLSearchParams(window.location.search);
+        const f = qs.get("from")?.toUpperCase();
         if (f && d.stations.some((s: Station) => s.code === f)) setFrom(f);
+        const to = qs.get("to")?.toUpperCase();
+        if (f && to && to !== f && d.stations.some((s: Station) => s.code === to)) setTo(to);
+        const day = qs.get("date");
+        if (day && /^\d{4}-\d{2}-\d{2}$/.test(day) && day > today) setDate(day);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read once on load
   }, []);
 
   useEffect(() => {

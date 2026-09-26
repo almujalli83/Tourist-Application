@@ -34,7 +34,11 @@ export function SlotPicker({ restaurant: r, day, party, time, onDay, onParty, on
   const { t, locale } = useApp();
   const d = t.restaurants.details;
   const today = ksaDay(new Date());
-  const dayList = useMemo(() => Array.from({ length: days }, (_, i) => addDaysISO(today, i)), [today, days]);
+  const dayList = useMemo(() => {
+    const list = Array.from({ length: days }, (_, i) => addDaysISO(today, i));
+    // A later day chosen from a link (e.g. a trip plan) is shown at the end of the list.
+    return day > list[list.length - 1] ? [...list, day] : list;
+  }, [today, days, day]);
   const [slots, setSlots] = useState<SlotView[] | null>(null);
   const advanced = useRef(!autoAdvance);
 
@@ -51,7 +55,7 @@ export function SlotPicker({ restaurant: r, day, party, time, onDay, onParty, on
     if (slots.some((x) => x.bookable && x.left >= party)) advanced.current = true;
     else {
       const next = dayList[dayList.indexOf(day) + 1];
-      if (next && dayList.indexOf(day) < 3) onDay(next);
+      if (next && dayList.indexOf(day) >= 0 && dayList.indexOf(day) < 3) onDay(next);
       else advanced.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
