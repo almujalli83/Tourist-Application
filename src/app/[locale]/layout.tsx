@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AppProvider } from "@/components/app-provider";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { PrayerAlerts } from "@/components/prayer/prayer-alerts";
+import { SosButton } from "@/components/emergency/sos-button";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getDictionary } from "@/i18n";
@@ -56,6 +57,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
           <SiteFooter />
           <AssistantWidget />
           <PrayerAlerts />
+          <SosButton />
         </AppProvider>
       </body>
     </html>
