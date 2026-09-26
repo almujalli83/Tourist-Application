@@ -318,8 +318,8 @@ function trainEmail(o: TrainOrder, kind: "confirmed" | "cancelled", locale: "ar"
   }).join("\n\n");
   if (kind === "confirmed") {
     return ar
-      ? { subject: `تذاكر القطار ${o.reference}`, text: `تم تأكيد حجز القطار ${o.reference} (PNR ${o.pnr}).\n\n${legs}\n\nالمبلغ: ${o.totalSAR} ريال\nالتذاكر محفوظة في محفظتك الرقمية. أحضر جواز سفر كل راكب عند السفر.` }
-      : { subject: `Train tickets ${o.reference}`, text: `Your train booking ${o.reference} (PNR ${o.pnr}) is confirmed.\n\n${legs}\n\nAmount: SAR ${o.totalSAR}\nTickets are saved in your digital wallet. Each passenger must carry their passport.` };
+      ? { subject: `تذاكر القطار ${o.reference}`, text: `تم تأكيد حجز القطار ${o.reference} (PNR ${o.pnr}).\n\n${legs}\n\nالمبلغ: ${o.totalSAR} ريال\nتجد التذاكر في «حجوزاتي». أحضر جواز سفر كل راكب عند السفر.` }
+      : { subject: `Train tickets ${o.reference}`, text: `Your train booking ${o.reference} (PNR ${o.pnr}) is confirmed.\n\n${legs}\n\nAmount: SAR ${o.totalSAR}\nYour tickets are in “My bookings”. Each passenger must carry their passport.` };
   }
   const c = o.cancellation!;
   return ar

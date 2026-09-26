@@ -32,8 +32,8 @@ export interface ChatMessage { role: "user" | "assistant"; content: string; at: 
 const PAGES = [
   ["Tourism package + visa booking", "/{locale}/package-visa"],
   ["Smart trip planner (suggests destinations, length, budget and a day-by-day plan, then books the package)", "/{locale}/planner"],
-  ["My bookings (packages, change package)", "/{locale}/account"],
-  ["Digital wallet (documents, tickets, eSIMs)", "/{locale}/account/wallet"],
+  ["My bookings: packages (and package changes), event tickets, train tickets, restaurant tables, eSIMs", "/{locale}/account"],
+  ["Digital wallet: travellers' documents (passports, visas, insurance policies)", "/{locale}/account/wallet"],
   ["Saved travellers", "/{locale}/account/travellers"],
   ["Events & Saudi seasons tickets", "/{locale}/events"],
   ["Event page", "/{locale}/events/{eventId}"],

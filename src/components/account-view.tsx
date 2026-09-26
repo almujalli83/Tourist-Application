@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { fmt } from "@/i18n";
-import { cityName } from "@/lib/data/cities";
 import { useApp } from "./app-provider";
 import { PhoneInput, phoneHint } from "./phone-input";
 import { BackLink } from "./back-link";
-import { StatusBadge } from "./booking-details";
+import { MyBookings } from "./my-bookings";
 import { CountrySelect } from "./booking/country-select";
 import { BuildingIcon, PassportIcon, UserIcon, UsersIcon } from "./icons";
 import { Alert, Badge, Button, Card, Field, Input } from "./ui";
@@ -93,8 +92,7 @@ function ProfileForm() {
 }
 
 export function AccountView({ bookings, savedTravellers }: { bookings: BookingRow[]; savedTravellers: number }) {
-  const { t, locale, money, user } = useApp();
-  const isCo = user?.accountType === "company";
+  const { t, locale } = useApp();
   const stats = [
     { label: t.account.stats.total, v: bookings.length },
     { label: t.account.stats.travellers, v: bookings.reduce((a, b) => a + b.travellers, 0) },
@@ -116,33 +114,7 @@ export function AccountView({ bookings, savedTravellers }: { bookings: BookingRo
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <Card className="overflow-hidden">
-          <div className="border-b border-slate-100 px-5 py-4 font-bold">{isCo ? t.account.clientBookings : t.account.bookings}</div>
-          {bookings.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500">{t.account.noBookings}</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {bookings.map((b) => (
-                <li key={b.id}>
-                  <Link href={`/${locale}/account/bookings/${b.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50">
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2">
-                        <span className="ltr-nums font-bold text-brand-800">{b.reference}</span>
-                        {b.clientReference && <Badge>{b.clientReference}</Badge>}
-                      </p>
-                      <p className="mt-0.5 text-sm">{cityName(b.origin, locale)} {locale === "ar" ? "←" : "→"} {b.cities.map((c) => cityName(c, locale)).join(locale === "ar" ? "، " : ", ")}</p>
-                      <p className="ltr-nums text-xs text-slate-500">{b.departureDate} → {b.returnDate} · {b.leadName} · {b.travellers} {t.common.travellers}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={b.status} />
-                      <span className="ltr-nums font-semibold">{money(b.totalSAR)}</span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        <MyBookings packages={bookings} />
         <div className="space-y-6">
           <Card className="p-5 sm:p-6">
             <h2 className="flex items-center gap-2 font-bold"><PassportIcon className="size-5 text-brand-700" />{t.wallet.title}</h2>

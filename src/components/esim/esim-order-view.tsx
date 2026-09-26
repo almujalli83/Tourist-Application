@@ -10,7 +10,6 @@ import { BackLink } from "../back-link";
 import { PhoneIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
-import { WalletTicketsPane } from "../wallet-tickets-pane";
 
 interface View { order: EsimOrder; qr: Record<string, string>; canCancel: boolean }
 
@@ -58,7 +57,7 @@ export function EsimOrderView({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="print:hidden"><BackLink href={`/${locale}/account/wallet`} label={t.wallet.title} /></div>
+      <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
       {fresh && !cancelled && <Alert tone="success" className="print:hidden">{o_.purchased}</Alert>}
       {cancelled && o.cancellation && <Alert tone="warning">{fmt(o_.cancelled, { amount: money(o.cancellation.refundSAR) })}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}
@@ -115,33 +114,5 @@ export function EsimOrderView({ id }: { id: string }) {
       )}
       <p className="text-center print:hidden"><Link href={`/${locale}/esim`} className="text-sm font-semibold text-brand-700 hover:underline">{o_.buy}</Link></p>
     </div>
-  );
-}
-
-/** Wallet pane: the account's eSIM orders. */
-export function EsimPane({ orders }: { orders: EsimOrder[] | null }) {
-  const { t, locale, money } = useApp();
-  const e = t.esim;
-  const items = orders?.map((o) => {
-    const end = Date.parse(o.createdAt) + (o.plan.days + 120) * 86_400_000;
-    return {
-      id: o.id,
-      href: `/${locale}/account/esim/${o.id}`,
-      title: `${o.plan.dataGB === null ? e.unlimited : fmt(e.dataGB, { n: o.plan.dataGB })} · ${fmt(e.days, { n: o.plan.days })} — ${e.kinds[o.plan.kind]}`,
-      subtitle: `${o.lines.map((l) => l.name).join("، ")} · ${money(o.totalSAR)}${o.booking ? ` · ${fmt(e.order.withPackage, { ref: o.booking.reference })}` : ""}`,
-      status: { label: e.order.status[o.status], tone: o.status === "CANCELLED" ? ("red" as const) : ("brand" as const) },
-      upcoming: o.status === "CONFIRMED" && Date.now() < end,
-    };
-  }) ?? null;
-  return (
-    <WalletTicketsPane
-      testid="wallet-esim"
-      title={e.order.myOrders}
-      subtitle={t.wallet.esimSubtitle}
-      icon={<PhoneIcon className="size-5" />}
-      action={{ href: `/${locale}/esim`, label: e.order.buy }}
-      items={items}
-      emptyText={e.order.empty}
-    />
   );
 }

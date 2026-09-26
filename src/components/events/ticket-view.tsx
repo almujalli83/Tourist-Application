@@ -8,10 +8,9 @@ import { fmtKsa } from "@/lib/events/format";
 import type { EventOrder } from "@/lib/events/types";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
-import { CalendarIcon, MapPinIcon, TicketIcon } from "../icons";
+import { CalendarIcon, MapPinIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
-import { WalletTicketsPane } from "../wallet-tickets-pane";
 import { EVENT_COLORS } from "./events-view";
 
 interface OrderView { order: EventOrder; qr: Record<string, string>; canCancel: boolean; deadline: string | null }
@@ -66,7 +65,7 @@ export function TicketView({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="print:hidden"><BackLink href={`/${locale}/account/wallet`} label={t.wallet.title} /></div>
+      <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
       {fresh && !cancelled && <Alert tone="success" className="print:hidden">{tk.purchased}</Alert>}
       {cancelled && o.cancellation && <Alert tone="warning">{fmt(tk.cancelled, { amount: money(o.cancellation.refundSAR) })}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}
@@ -128,32 +127,5 @@ export function TicketView({ id }: { id: string }) {
       )}
       <p className="text-center print:hidden"><Link href={`/${locale}/events`} className="text-sm font-semibold text-brand-700 hover:underline">{tk.browse}</Link></p>
     </div>
-  );
-}
-
-/** Wallet pane: the account's event orders. */
-export function EventTicketsPane({ orders }: { orders: EventOrder[] | null }) {
-  const { t, locale, money } = useApp();
-  const tk = t.events.ticket;
-  const ar = locale === "ar";
-  const now = Date.now();
-  const items = orders?.map((o) => ({
-    id: o.id,
-    href: `/${locale}/account/tickets/${o.id}`,
-    title: ar ? o.event.titleAr : o.event.titleEn,
-    subtitle: `${fmtKsa(o.session.start, locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · ${fmt(tk.tickets, { n: o.tickets.length })} · ${money(o.totalSAR)}`,
-    status: { label: tk.status[o.status], tone: o.status === "CANCELLED" ? ("red" as const) : ("brand" as const) },
-    upcoming: o.status === "CONFIRMED" && Date.parse(o.session.start) > now,
-  })) ?? null;
-  return (
-    <WalletTicketsPane
-      testid="wallet-event-tickets"
-      title={tk.myTickets}
-      subtitle={t.wallet.ticketsSubtitle}
-      icon={<TicketIcon className="size-5" />}
-      action={{ href: `/${locale}/events`, label: tk.browse }}
-      items={items}
-      emptyText={tk.empty}
-    />
   );
 }
