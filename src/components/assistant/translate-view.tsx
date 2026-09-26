@@ -7,6 +7,8 @@ import { Alert, Button, Card, cx, Spinner } from "../ui";
 
 const LANGS = ["ar", "en", "zh", "fr", "de", "es", "tr", "ur", "id"] as const;
 type Lang = (typeof LANGS)[number];
+const ARABIC = /[\u0600-\u06FF]/;
+
 /** Speech recognition / synthesis locale per language. */
 const SPEECH: Record<Lang, string> = { ar: "ar-SA", en: "en-US", zh: "zh-CN", fr: "fr-FR", de: "de-DE", es: "es-ES", tr: "tr-TR", ur: "ur-PK", id: "id-ID" };
 const RTL = new Set<Lang>(["ar", "ur"]);
@@ -57,6 +59,8 @@ export function TranslateView() {
   const [tab, setTab] = useState<"text" | "voice" | "image">("text");
   const [from, setFrom] = useState<Lang | "auto">("auto");
   const [to, setTo] = useState<Lang>(locale === "ar" ? "en" : "ar");
+  // Until the traveller picks the target language, it follows the text: Arabic → English, anything else → Arabic.
+  const [toManual, setToManual] = useState(false);
   const [input, setInput] = useState("");
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,6 +80,15 @@ export function TranslateView() {
   }, []);
 
   const errText = (code: string) => (tr.errors as Record<string, string>)[code] ?? tr.errors.generic;
+
+  /** The target language for a source (or the text itself when the source is detected automatically). */
+  function target(source: Lang | "auto", text = ""): Lang {
+    if (toManual) return to;
+    const src = source !== "auto" ? source : ARABIC.test(text) ? "ar" : "other";
+    const t = src === "ar" ? "en" : "ar";
+    setTo(t);
+    return t;
+  }
 
   async function call(payload: Record<string, unknown>): Promise<string | null> {
     setBusy(true);
@@ -129,8 +142,9 @@ export function TranslateView() {
     rec.onend = async () => {
       setListening(false);
       if (!finalText.trim()) return;
-      const out = await call({ mode: "text", text: finalText, from: voiceFrom, to });
-      if (out) speak(out, to);
+      const dest = target(voiceFrom);
+      const out = await call({ mode: "text", text: finalText, from: voiceFrom, to: dest });
+      if (out) speak(out, dest);
     };
     recRef.current = rec;
     setListening(true);
@@ -143,7 +157,10 @@ export function TranslateView() {
     try {
       const data = await shrinkImage(file);
       setPreview(data);
-      await call({ mode: "image", image: data, to });
+      // Photos (menus, signs) are read into the interface language unless another is chosen.
+      const dest = toManual ? to : locale;
+      setTo(dest);
+      await call({ mode: "image", image: data, to: dest });
     } catch {
       setErr(tr.errors.invalidImage);
     }
@@ -180,14 +197,14 @@ export function TranslateView() {
         <div className="flex flex-wrap items-end gap-3">
           {tab !== "image" && langSelect(tab === "voice" ? voiceFrom : from, (v) => setFrom(v as Lang | "auto"), tr.from, tab === "text")}
           {tab !== "image" && (
-            <button type="button" aria-label={tr.swap} title={tr.swap} onClick={() => { if (from !== "auto") { setFrom(to); setTo(from); } else { setFrom(to); setTo(locale === "ar" ? "ar" : "en"); } }}
+            <button type="button" aria-label={tr.swap} title={tr.swap} onClick={() => { setToManual(true); if (from !== "auto") { setFrom(to); setTo(from); } else { setFrom(to); setTo(to === "ar" ? "en" : "ar"); } }}
               className="grid h-11 w-11 place-items-center rounded-lg border border-slate-300 text-lg font-bold text-brand-800 hover:bg-brand-50">⇄</button>
           )}
-          {langSelect(to, (v) => setTo(v as Lang), tr.to, false)}
+          {langSelect(to, (v) => { setTo(v as Lang); setToManual(true); }, tr.to, false)}
         </div>
 
         {tab === "text" && (
-          <form onSubmit={(e) => { e.preventDefault(); if (!input.trim()) { setErr(tr.errors.empty); return; } void call({ mode: "text", text: input, from, to }); }} className="space-y-3">
+          <form onSubmit={(e) => { e.preventDefault(); if (!input.trim()) { setErr(tr.errors.empty); return; } void call({ mode: "text", text: input, from, to: target(from, input) }); }} className="space-y-3">
             <textarea value={input} onChange={(e) => setInput(e.target.value.slice(0, 3000))} placeholder={tr.inputPlaceholder} aria-label={tr.inputPlaceholder} rows={5}
               dir={from !== "auto" && RTL.has(from) ? "rtl" : "auto"}
               className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
@@ -226,6 +243,7 @@ export function TranslateView() {
           <div className="rounded-xl border border-brand-100 bg-brand-50/60 p-4" data-testid="translation">
             <p className="text-xs font-semibold text-brand-700">{tr.result} · {tr.languages[to]}</p>
             <p className="mt-2 whitespace-pre-wrap text-base" dir={RTL.has(to) ? "rtl" : "ltr"}>{result}</p>
+            {mode === "sandbox" && <p className="mt-2 text-xs text-amber-700" data-testid="sandbox-result">{tr.sandboxResult}</p>}
             <div className="mt-3 flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => speak(result, to)}>{tr.speak}</Button>
               <Button size="sm" variant="ghost" onClick={async () => { await navigator.clipboard?.writeText(result).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? tr.copied : tr.copy}</Button>
