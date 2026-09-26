@@ -1316,7 +1316,7 @@ const en: Dictionary = {
       departure: "Head to the airport",
       trainAlt: "Alternative: the train",
       prayer: "{name} prayer",
-      prayerNames: { dhuhr: "Dhuhr", asr: "Asr", maghrib: "Maghrib", isha: "Isha" },
+      prayerNames: { jumuah: "Jumu'ah", dhuhr: "Dhuhr", asr: "Asr", maghrib: "Maghrib", isha: "Isha" },
       prayerApprox: "Prayer times are approximate (Umm al-Qura calendar).",
       travel: "~{n} min drive",
       warnings: { closed: "May be closed at this time", conflict: "Overlaps another activity", late: "Ends late" },

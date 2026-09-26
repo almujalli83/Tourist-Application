@@ -3,6 +3,7 @@
  * and then managed by the operations team from the back office. Coordinates are approximate and
  * should be reviewed before launch.
  */
+import { EXTRA_SEED } from "./seed-extra";
 import type { OpeningSlot, Place } from "./types";
 
 export { CITY_CENTERS } from "./centers";
@@ -58,5 +59,5 @@ const SEED: Seed[] = [
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 export function seedPlaces(now = new Date().toISOString()): Place[] {
-  return SEED.map((s) => ({ tags: [], ...s, id: `cur-${s.city.toLowerCase()}-${slug(s.nameEn)}`, source: "curated" as const, status: "published" as const, updatedAt: now }));
+  return [...SEED, ...EXTRA_SEED].map((s) => ({ tags: [], ...s, id: `cur-${s.city.toLowerCase()}-${slug(s.nameEn)}`, source: "curated" as const, status: "published" as const, updatedAt: now }));
 }

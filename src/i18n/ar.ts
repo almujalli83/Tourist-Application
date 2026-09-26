@@ -1314,7 +1314,7 @@ const ar = {
       departure: "التوجه إلى المطار للمغادرة",
       trainAlt: "بديل: القطار",
       prayer: "صلاة {name}",
-      prayerNames: { dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" },
+      prayerNames: { jumuah: "الجمعة", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" },
       prayerApprox: "أوقات الصلاة تقريبية حسب تقويم أم القرى.",
       travel: "~{n} د بالسيارة",
       warnings: { closed: "قد يكون مغلقًا في هذا الوقت", conflict: "يتعارض مع نشاط آخر", late: "ينتهي متأخرًا" },

@@ -108,7 +108,7 @@ export interface TripPlan {
 
 /** Most activities a day can hold (meals and events included). */
 export const maxItems = (type: DayType, pace: Pace) =>
-  type === "full" ? { relaxed: 4, moderate: 6, intense: 8 }[pace] : type === "departure" ? 2 : 4;
+  type === "full" ? { relaxed: 4, moderate: 6, intense: 8 }[pace] : type === "arrival" ? 1 : type === "departure" ? 2 : 4;
 
 /** Items the traveller can reorder (events and meals keep their time). */
 export const isFlexible = (i: Pick<PlanItem, "fixedStart" | "meal">) => !i.fixedStart && !i.meal;

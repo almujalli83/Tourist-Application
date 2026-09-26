@@ -11,7 +11,7 @@ import type { DayType, Pace, PlanDay, PlanItem } from "./types";
 export interface ScheduledEntry {
   kind: "item" | "prayer" | "travel" | "arrival" | "departure";
   item?: PlanItem;
-  prayer?: PrayerName;
+  prayer?: PrayerName | "jumuah";
   start: number; // minutes since midnight
   end: number;
   /** Driving minutes from the previous place (items only). */
@@ -75,20 +75,31 @@ export function scheduleDay(day: PlanDay, ctx: DayContext, cityCenter: { lat: nu
   const fixed: ScheduledEntry[] = [];
   if (ctx.prayer) {
     const p = prayerTimes(day.date, cityCenter.lat, cityCenter.lng);
+    const friday = weekday(day.date) === 5;
     for (const name of ["dhuhr", "asr", "maghrib", "isha"] as const) {
       const t = toMin(p[name]);
-      if (t >= win.start - 30 && t < win.end) fixed.push({ kind: "prayer", prayer: name, start: t, end: t + PRAYER_MINS, warnings: [] });
+      if (!(t >= win.start - 30 && t < win.end)) continue;
+      // Friday prayer: the sermon starts before the Dhuhr time and takes about an hour in all.
+      if (friday && name === "dhuhr") fixed.push({ kind: "prayer", prayer: "jumuah", start: t - 20, end: t + 40, warnings: [] });
+      else fixed.push({ kind: "prayer", prayer: name, start: t, end: t + PRAYER_MINS, warnings: [] });
     }
   }
   const flexible: PlanItem[] = [];
+  const meals: PlanItem[] = [];
   for (const item of day.items) {
     if (item.fixedStart) fixed.push({ kind: "item", item, start: toMin(item.fixedStart), end: toMin(item.fixedStart) + item.durationMins, warnings: [] });
-    else if (item.meal) {
-      let start = Math.max(mealTime(item.meal, ctx), win.start);
-      // Don't sit down to eat during a prayer.
-      for (const f of fixed) if (f.kind === "prayer" && start < f.end && start + 15 > f.start) start = f.end;
-      fixed.push({ kind: "item", item, start, end: start + item.durationMins, warnings: [] });
-    } else flexible.push(item);
+    else if (item.meal) meals.push(item);
+    else flexible.push(item);
+  }
+  // Meals go at lunch / dinner time, moved before or after an event that takes that time.
+  for (const item of meals) {
+    let start = Math.max(mealTime(item.meal!, ctx), win.start);
+    const earliest = item.meal === "lunch" ? 12 * 60 : 18 * 60;
+    const event = fixed.find((f) => f.kind === "item" && start < f.end && start + item.durationMins > f.start);
+    if (event) start = event.start - item.durationMins - 15 >= Math.max(earliest, win.start) ? event.start - item.durationMins - 15 : event.end + 15;
+    // Don't sit down to eat during a prayer.
+    for (const f of fixed) if (f.kind === "prayer" && start < f.end && start + 15 > f.start) start = f.end;
+    fixed.push({ kind: "item", item, start, end: start + item.durationMins, warnings: [] });
   }
   fixed.sort((a, b) => a.start - b.start);
 
@@ -107,8 +118,8 @@ export function scheduleDay(day: PlanDay, ctx: DayContext, cityCenter: { lat: nu
         break;
       }
       start = open;
-      // Visits don't overlap events or meals; a prayer only pauses a visit, so it is not moved for one.
-      const clash = placed.find((f) => f.kind === "item" && start < f.end && start + item.durationMins > f.start);
+      // Visits don't overlap events, meals or the Friday prayer; other prayers only pause a visit.
+      const clash = placed.find((f) => (f.kind === "item" || f.prayer === "jumuah") && start < f.end && start + item.durationMins > f.start);
       if (!clash) break;
       start = clash.end + (clash.item ? travelMinutes(clash.item, item) : 5);
     }

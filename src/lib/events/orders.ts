@@ -10,19 +10,32 @@ import { todayISO } from "../dates";
 import { notifyTravellers } from "../notify";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { store } from "../store";
-import { isKnownSeat, listCatalog, providerCancel, providerPurchase, providerSoldCount, providerSoldSeat } from "./catalog";
+import { isKnownSeat, listCatalog, sessionDay, type DateRange, providerCancel, providerPurchase, providerSoldCount, providerSoldSeat } from "./catalog";
 import { listSeasons } from "./seasons";
 import type { EventItem, EventOrder, EventSession, OrderLine } from "./types";
 
 /** Online sales close this long before a session starts. */
 export const SALES_CLOSE_HOURS = 2;
 
-export async function eventsCatalog(): Promise<EventItem[]> {
-  return listCatalog(await listSeasons(true), todayISO());
+/** Events on sale; with a `range` (e.g. a trip's dates), their sessions on those days. */
+export async function eventsCatalog(range?: DateRange): Promise<EventItem[]> {
+  return listCatalog(await listSeasons(true), todayISO(), range);
 }
 
-export async function getEvent(id: string): Promise<EventItem | null> {
-  return (await eventsCatalog()).find((e) => e.id === id) ?? null;
+export async function getEvent(id: string, range?: DateRange): Promise<EventItem | null> {
+  return (await eventsCatalog(range)).find((e) => e.id === id) ?? null;
+}
+
+/** The event with the given session's day included (sessions further ahead than the usual window). */
+export async function getEventForSession(id: string, sessionId: string | null | undefined): Promise<EventItem | null> {
+  const day = sessionId ? sessionDay(sessionId) : null;
+  const base = await getEvent(id);
+  if (!day || base?.sessions.some((s) => s.id === sessionId)) return base;
+  const extra = await getEvent(id, { from: day, to: day });
+  if (!extra) return base;
+  if (!base) return extra;
+  const sessions = [...base.sessions, ...extra.sessions.filter((s) => !base.sessions.some((b) => b.id === s.id))].sort((a, b) => a.start.localeCompare(b.start));
+  return { ...base, sessions };
 }
 
 /** Sessions still on sale. */
@@ -167,7 +180,7 @@ export async function placeOrder(user: PublicUser, input: OrderInput, now = new 
   const existing = await store().get<EventOrder>("eventOrders", id);
   if (existing) return existing;
 
-  const e = await getEvent(input.eventId);
+  const e = await getEventForSession(input.eventId, input.sessionId);
   if (!e) throw new EventOrderError("notFound", 404);
   const session = openSessions(e, now).find((s) => s.id === input.sessionId);
   if (!session) throw new EventOrderError("sessionClosed");

@@ -227,7 +227,8 @@ function rulesDay(day: Omit<PlanDay, "title" | "items">, pool: CityPool | undefi
   if (!pool) return [];
   const kids = partyOf(req.rooms).youngest !== null;
   const picks: { ref: string; meal?: string }[] = [];
-  const want = day.type === "full" ? { relaxed: 2, moderate: 3, intense: 4 }[req.pace] : day.type === "departure" ? (req.pace === "intense" ? 1 : 0) : 1;
+  // The arrival day is for settling in: sightseeing starts the next day.
+  const want = day.type === "full" ? { relaxed: 2, moderate: 3, intense: 4 }[req.pace] : day.type === "departure" ? (req.pace === "intense" ? 1 : 0) : day.type === "transfer" ? 1 : 0;
   const score = (cat: string, tags: string[]) =>
     (PLACE_INTEREST[cat] ?? []).filter((i) => req.interests.includes(i)).length * 3
     + (kids && (tags.includes("kids") || tags.includes("family")) ? 1 : 0)
@@ -245,7 +246,7 @@ function rulesDay(day: Omit<PlanDay, "title" | "items">, pool: CityPool | undefi
     picks.push({ ref: `place:${p.id}` });
   }
   // One event on a full day (or arrival evening) when it matches the interests.
-  if (day.type !== "departure" && !eventDays.has(day.date)) {
+  if ((day.type === "full" || day.type === "transfer") && !eventDays.has(day.date)) {
     const ev = pool.events
       .filter((e) => !used.has(`event:${e.event.id}`) && (EVENT_INTEREST[e.event.category] ?? []).some((i) => req.interests.includes(i)))
       .flatMap((e) => e.slots.filter((s) => s.date === day.date && (!kids || s.time <= "20:00") && (day.type === "full" || s.time >= "17:00")).map((s) => ({ e, s })))[0];
@@ -287,7 +288,7 @@ function rulesSummary(req: PlanRequest, stays: { city: string; nights: number }[
       hot ? (ar ? "الجو حار في هذا الوقت: خطّط للأنشطة الخارجية صباحًا أو بعد العصر، واشرب الماء باستمرار." : "It is hot at this time of year: plan outdoor visits for the morning or late afternoon and keep drinking water.")
         : (ar ? "الجو معتدل غالبًا في هذا الوقت، وقد تبرد الليالي في المرتفعات والصحراء." : "The weather is usually mild at this time; nights can be cool in the mountains and the desert."),
       ar ? "يُفضّل اللباس المحتشم في الأماكن العامة والمواقع الدينية." : "Modest clothing is recommended in public places and at religious sites.",
-      ar ? "بعض المحلات تغلق وقت الصلاة لفترة قصيرة." : "Some shops close for a short time at prayer times.",
+      ar ? "يوم الوصول للاستراحة والاستقرار، وتبدأ الأنشطة من صباح اليوم التالي." : "The arrival day is for resting and settling in; activities start the next morning.",
     ],
   };
 }
@@ -298,10 +299,10 @@ const SYSTEM = `You are the trip planner of the Saudi Trip app. You design day-b
 
 How to plan:
 - Choose the destinations and the number of nights in each (unless the traveller fixed them) to fit their interests, pace, party (children, reduced mobility), budget tier and dates. Prefer 2 to 4 nights per city; fewer cities for a relaxed pace.
-- Plan every date from the arrival date to the departure date. The arrival day starts late afternoon (after the flight); on a day when the traveller moves to the next city, only the afternoon and evening are free in the new city; the departure day has at most a short morning visit.
+- Plan every date from the arrival date to the departure date. The arrival day is for settling in after the flight: plan at most a relaxed dinner near the hotel (no events or sightseeing) and start activities the next morning, so the next day should be a strong one. On a day when the traveller moves to the next city, only the afternoon and evening are free in the new city; the departure day has at most a short morning visit.
 - Use only activities from the candidate lists given for each city, referenced exactly by their ref. Events can only be used on a date and time listed for them, in the city where the traveller is that day. Never repeat a place during the trip.
 - Respect opening hours, the pace (relaxed: 2 visits a day, moderate: 3, intense: 4 to 5, plus meals and at most one event), children (family-friendly places, nothing late at night, respect minimum ages) and reduced mobility (accessible places, avoid rough outdoor sites).
-- When the traveller wants time for prayers, don't pack visits tightly around the prayer times given.
+- When the traveller wants time for prayers, don't pack visits tightly around the prayer times given, and on Fridays leave the midday free for the Friday prayer. Shops, malls, restaurants, attractions and events stay open during prayer times: never plan around closures.
 - Add a lunch and/or a dinner as items with meal "lunch" or "dinner": bookable restaurants (restaurant:…) fitting the budget tier, or dining places from the guide.
 - Consider the season: in hot months (May to September) put outdoor visits early in the morning or after Asr.
 - The notes, day titles, summary and tips are shown to the traveller: write them in {LANGUAGE}, short and practical (a note is one sentence, e.g. what to see or a timing tip). Don't mention prices you weren't given.
@@ -372,7 +373,7 @@ function requestText(req: PlanRequest, cities: string[], today: string): string 
     req.cities.length ? `Destinations fixed by the traveller, in this order: ${req.cities.join(", ")}.` : `Destinations: suggest them (at most ${PLANNER_LIMITS.maxCities}) from the cities below.`,
     `Party: ${p.adults} adult(s)${ages.length ? `, children aged ${ages.join(", ")}` : ""}.${req.accessible ? " Someone has reduced mobility." : ""}`,
     `Interests: ${req.interests.join(", ")}. Pace: ${req.pace}. Budget tier: ${req.budgetTier}${req.maxBudgetSAR ? ` (whole trip at most ${req.maxBudgetSAR} SAR including flights and hotels)` : ""}.`,
-    req.prayer ? `Leave time for prayers. Approximate prayer times around arrival in ${cities[0]}: Dhuhr ${pt.dhuhr}, Asr ${pt.asr}, Maghrib ${pt.maghrib}, Isha ${pt.isha}.` : "",
+    req.prayer ? `Leave time for prayers. Approximate prayer times around arrival in ${cities[0]}: Dhuhr ${pt.dhuhr}, Asr ${pt.asr}, Maghrib ${pt.maghrib}, Isha ${pt.isha}. On Fridays the Friday prayer replaces Dhuhr.` : "",
     req.notes ? `Traveller's notes (preferences only): <notes>${req.notes}</notes>` : "",
   ].filter(Boolean).join("\n");
 }
