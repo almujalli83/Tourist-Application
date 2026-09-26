@@ -2,7 +2,7 @@ import { addDays } from "../dates";
 import type { CabinClass } from "../types";
 import {
   ACTIVITIES, AMENITIES, CARRIERS, DISTRICTS, DOMESTIC_CARRIERS, HOTEL_BRANDS, ORIGIN_BLOCK_MIN,
-  ORIGIN_HOME_CARRIER, ROOM_TYPES,
+  ORIGIN_HOME_CARRIER, ROOM_TYPES, sandboxHotelLicense,
 } from "./mock-data";
 import type { TravelAgentProvider } from "./provider";
 import { rng } from "./rng";
@@ -99,7 +99,8 @@ export function createSandboxAgent(opts: {
           nameEn: brand.en,
           nameAr: brand.ar,
           stars: brand.stars,
-          licenseNo: String(10000000 + ((r.int(0, 8_999_999) + bi) % 8_999_999)),
+          // A hotel has one MT licence whichever agent sells it (the draw keeps the sequence stable).
+          licenseNo: (r.int(0, 8_999_999), sandboxHotelLicense(city, bi)),
           districtEn: district.en,
           districtAr: district.ar,
           reviewScore: Math.round((7 + r.next() * 2.8) * 10) / 10,

@@ -15,15 +15,19 @@ import { fmtDay } from "../events/format";
 import { notifyTravellers } from "../notify";
 import { planForBooking } from "../planner/plans";
 import { getUserById, listBookingsByUser } from "../repo";
+import { requestReviews } from "../reviews/reviews";
 import { store } from "../store";
 
 export type ReminderKind = "arrival" | "departure" | "visa7" | "visa1";
+
+/** Notification kinds: trip reminders, and requests to rate experiences (service 9). */
+export type NotificationKind = ReminderKind | "review";
 
 export interface AppNotification {
   /** `${bookingId}:${kind}` (for visa reminders also the expiry date). */
   id: string;
   userId: string;
-  kind: ReminderKind;
+  kind: NotificationKind;
   bookingId: string;
   reference: string;
   createdAt: string;
@@ -219,14 +223,18 @@ async function remind(bookings: StoredBooking[], now: Date): Promise<number> {
 }
 
 /** Daily job: reminders for every booking. */
-export async function runReminders(now = new Date()): Promise<{ bookings: number; created: number }> {
+export async function runReminders(now = new Date()): Promise<{ bookings: number; created: number; reviewRequests: number }> {
   const bookings = (await store().list<StoredBooking>("bookings", 100_000)).filter(active);
-  return { bookings: bookings.length, created: await remind(bookings, now) };
+  const created = await remind(bookings, now);
+  let reviewRequests = 0;
+  for (const u of await store().list<{ id: string }>("users", 100_000)) if (await requestReviews(u.id, now)) reviewRequests++;
+  return { bookings: bookings.length, created, reviewRequests };
 }
 
 /** The account's notifications, newest first (its due reminders are created first). */
 export async function listNotifications(userId: string, now = new Date()): Promise<AppNotification[]> {
   await remind(await listBookingsByUser(userId), now);
+  await requestReviews(userId, now);
   const rows = await store().findBy<AppNotification>(COL, "userId", userId);
   return rows.filter((n) => !n.deletedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

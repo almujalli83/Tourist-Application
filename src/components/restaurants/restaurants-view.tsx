@@ -9,6 +9,7 @@ import { isOpenNow } from "@/lib/guide/hours";
 import { normalizeSearch } from "@/lib/guide/search";
 import type { Cuisine, Restaurant } from "@/lib/restaurants/catalog";
 import { useApp } from "../app-provider";
+import { RatingBadge, useSummaries } from "../reviews/shared";
 import { ClockIcon, LocateIcon, MapPinIcon, SearchIcon } from "../icons";
 import { Alert, Badge, Card, cx, Spinner } from "../ui";
 import { priceSigns, Stars } from "./shared";
@@ -58,6 +59,7 @@ export function RestaurantsView() {
   }
 
   const cities = useMemo(() => [...new Set((list ?? []).map((r) => r.city))], [list]);
+  const verified = useSummaries("restaurant", (list ?? []).map((r) => r.id));
   const results = useMemo(() => {
     if (!list) return null;
     const needle = normalizeSearch(q);
@@ -146,6 +148,7 @@ export function RestaurantsView() {
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       <Stars rating={r.rating} /><span>({fmt(rs.reviews, { n: r.reviews })})</span>
                       {km !== null && <span className="font-semibold text-brand-700">· {fmt(g.distance, { d: km.toFixed(1) })}</span>}
+                      <RatingBadge summary={verified[r.id]} className="basis-full" />
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm text-slate-600">{ar ? r.descriptionAr : r.descriptionEn}</p>
                     <div className="mt-3">

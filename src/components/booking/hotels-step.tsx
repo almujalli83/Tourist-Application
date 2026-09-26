@@ -11,10 +11,12 @@ import { Alert, Badge, Button, Card, cx, Select, Spinner, Stars } from "../ui";
 import { useBooking, type HotelStayResult } from "./booking-context";
 import { useFetchStep } from "./use-fetch-step";
 import { WizardShell } from "./wizard-shell";
+import { RatingBadge, useSummaries } from "../reviews/shared";
+import type { ReviewSummary } from "@/lib/reviews/types";
 
 const GRADIENTS = ["from-brand-700 to-brand-500", "from-gold-600 to-gold-500", "from-slate-700 to-slate-500", "from-brand-900 to-brand-600"];
 
-function HotelCard({ offer, selected, onSelect, idx }: { offer: HotelOffer; selected: boolean; onSelect: () => void; idx: number }) {
+function HotelCard({ offer, selected, onSelect, idx, verified }: { offer: HotelOffer; selected: boolean; onSelect: () => void; idx: number; verified?: ReviewSummary }) {
   const { t, locale, money } = useApp();
   return (
     <Card className={cx("flex flex-col overflow-hidden sm:flex-row", selected && "border-brand-600 ring-2 ring-brand-600/60")}>
@@ -30,6 +32,7 @@ function HotelCard({ offer, selected, onSelect, idx }: { offer: HotelOffer; sele
               <Stars n={offer.stars} />
               <span className="inline-flex items-center gap-1"><MapPinIcon className="size-3.5" />{locale === "ar" ? offer.districtAr : offer.districtEn}</span>
             </div>
+            <RatingBadge summary={verified} className="mt-1" />
           </div>
           <Badge tone="gold">{t.common.agent}: {locale === "ar" ? offer.agentNameAr : offer.agentNameEn}</Badge>
         </div>
@@ -66,6 +69,7 @@ function StaySection({ result, onRetry }: { result: HotelStayResult; onRetry?: (
     return [...list].sort((a, b) => (sort === "price" ? a.totalSAR - b.totalSAR : b.reviewScore - a.reviewScore));
   }, [result.offers, sort, agent]);
   const { stay } = result;
+  const verified = useSummaries("hotel", result.offers.map((o) => o.licenseNo));
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brand-900 px-4 py-3 text-white">
@@ -96,7 +100,7 @@ function StaySection({ result, onRetry }: { result: HotelStayResult; onRetry?: (
       )}
       {offers.length === 0 && <p className="text-sm text-slate-500">{t.common.noResults}</p>}
       <div className="grid gap-3">
-        {offers.map((o, i) => <HotelCard key={o.id} idx={i} offer={o} selected={hotels[stay.city] === o.id} onSelect={() => selectHotel(stay.city, o.id)} />)}
+        {offers.map((o, i) => <HotelCard key={o.id} idx={i} offer={o} verified={verified[o.licenseNo]} selected={hotels[stay.city] === o.id} onSelect={() => selectHotel(stay.city, o.id)} />)}
       </div>
     </section>
   );

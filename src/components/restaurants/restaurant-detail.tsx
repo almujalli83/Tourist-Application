@@ -15,6 +15,7 @@ import { BackLink } from "../back-link";
 import { ClockIcon, DirectionsIcon, LockIcon, MapPinIcon } from "../icons";
 import { Alert, Badge, Button, Card, Field, Input, Spinner } from "../ui";
 import { priceSigns, SlotPicker, Stars } from "./shared";
+import { RatingBadge, ReviewsSection, useSummaries } from "../reviews/shared";
 
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
@@ -35,6 +36,7 @@ export function RestaurantDetail({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const key = useRef(newKey());
+  const verified = useSummaries("restaurant", [id])[id];
 
   useEffect(() => {
     fetch(`/api/restaurants/${encodeURIComponent(id)}`)
@@ -106,6 +108,7 @@ export function RestaurantDetail({ id }: { id: string }) {
               <Stars rating={r.rating} /><span>({fmt(rs.reviews, { n: r.reviews })})</span>
               <span>· {fmt(rs.via, { provider: rs.providers[r.provider] })}</span>
             </div>
+            <RatingBadge summary={verified} className="mt-1" />
           </div>
           {open !== null && <Badge tone={open ? "brand" : "red"}>{open ? g.open : g.closed}</Badge>}
         </div>
@@ -148,6 +151,7 @@ export function RestaurantDetail({ id }: { id: string }) {
             <h2 className="mb-4 font-bold">{d.book}</h2>
             <SlotPicker restaurant={r} day={day} party={party} time={time} onDay={setDay} onParty={setParty} onTime={setTime} autoAdvance />
           </Card>
+          <ReviewsSection type="restaurant" id={r.id} />
         </div>
 
         <div className="lg:sticky lg:top-24 lg:self-start">

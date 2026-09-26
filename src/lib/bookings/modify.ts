@@ -12,7 +12,7 @@ import {
 } from "../agents/aggregator";
 import { verifyOffer } from "../agents/offer-signing";
 import type { PublicUser } from "../auth/types";
-import { PACKAGE_LIMITS } from "../config";
+import { hotelClassAllowed, PACKAGE_LIMITS } from "../config";
 import { addDays, diffDays, isValidISODate } from "../dates";
 import { cityName, getSaudiCity } from "../data/cities";
 import { stayDates } from "../itinerary";
@@ -230,7 +230,7 @@ export function quoteModification(booking: StoredBooking, plan: ModificationPlan
     const h = plan.offers.hotel;
     if (!h || !verifyOffer(h) || h.city !== t.city || h.checkIn !== c.returnDate || h.checkOut !== newReturnDate || h.forPax !== hotelPaxKey(c.pax, c.rooms))
       throw new BookingError("offerExpired");
-    if (h.stars < PACKAGE_LIMITS.minHotelStars || !h.licenseNo) throw new BookingError("hotelNotAllowed");
+    if (!hotelClassAllowed(h)) throw new BookingError("hotelNotAllowed");
     const last = hotels.find((x) => x.city === t.lastCity && x.checkOut === c.returnDate);
     if (h.id.startsWith("HX:")) {
       // Same hotel: extended with the agent that booked it.

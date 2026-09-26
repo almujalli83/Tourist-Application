@@ -35,6 +35,7 @@ export function SiteHeader() {
         { href: `/${locale}/account`, label: t.nav.myBookings },
         { href: `/${locale}/account/wallet`, label: t.wallet.nav },
         { href: `/${locale}/account/notifications`, label: t.account.notifications.nav },
+        { href: `/${locale}/account/reviews`, label: t.reviews.nav },
         ...(user.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
       ]
     : [];

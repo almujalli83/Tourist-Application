@@ -1,4 +1,4 @@
-import { PACKAGE_LIMITS } from "../config";
+import { hotelClassAllowed } from "../config";
 import { signOffer } from "./offer-signing";
 import { priceFlightOffer } from "../pricing";
 import { occupancyKey } from "../occupancy";
@@ -72,8 +72,8 @@ export async function searchHotels(req: HotelSearchRequest, agentIds?: string[])
     ),
     agentIds,
   );
-  // Packages require MT-licensed hotels of the minimum star rating (Key Package Requirements).
-  res.offers = res.offers.filter((h) => h.stars >= PACKAGE_LIMITS.minHotelStars && !!h.licenseNo);
+  // Packages include only MT-licensed hotels classified 3 to 5 stars (Key Package Requirements).
+  res.offers = res.offers.filter(hotelClassAllowed);
   res.offers.sort((x, y) => x.totalSAR - y.totalSAR);
   return res;
 }

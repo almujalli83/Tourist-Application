@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import type { operationsOverview } from "@/lib/admin";
 import { useApp } from "./app-provider";
-import { MapPinIcon, RefreshIcon, TicketIcon } from "./icons";
+import { MapPinIcon, RefreshIcon, StarIcon, TicketIcon } from "./icons";
 import { StatusBadge } from "./booking-details";
 import { Alert, Badge, Button, Card, Spinner } from "./ui";
 
@@ -70,6 +70,9 @@ export function AdminOperations() {
           </Link>
           <Link href={`/${locale}/admin/seasons`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
             <TicketIcon className="size-4" />{t.events.admin.nav}
+          </Link>
+          <Link href={`/${locale}/admin/reviews`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
+            <StarIcon className="size-4" />{t.reviews.admin.nav}
           </Link>
           <Button variant="secondary" onClick={() => void load()}><RefreshIcon className="size-4" />{a.refresh}</Button>
         </div>

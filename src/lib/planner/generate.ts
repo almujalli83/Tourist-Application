@@ -233,9 +233,14 @@ function rulesDay(day: Omit<PlanDay, "title" | "items">, pool: CityPool | undefi
     (PLACE_INTEREST[cat] ?? []).filter((i) => req.interests.includes(i)).length * 3
     + (kids && (tags.includes("kids") || tags.includes("family")) ? 1 : 0)
     + (req.accessible ? (tags.includes("wheelchair") ? 2 : cat === "nature" ? -3 : 0) : 0);
+  // Verified traveller ratings nudge the choice (±1.5 around an average of 3.5, with 3+ reviews).
+  const rated = (ref: string) => {
+    const r = pool.ratings?.[ref];
+    return r && r.count >= 3 ? r.avg - 3.5 : 0;
+  };
   const places = pool.places
     .filter((p) => p.category !== "restaurant" && p.category !== "cafe" && !used.has(`place:${p.id}`))
-    .map((p) => ({ p, s: score(p.category, p.tags) }))
+    .map((p) => ({ p, s: score(p.category, p.tags) + rated(`place:${p.id}`) }))
     .filter((x) => x.s > (req.accessible ? -1 : -10))
     .sort((a, b) => b.s - a.s)
     .slice(0, want)
@@ -261,7 +266,7 @@ function rulesDay(day: Omit<PlanDay, "title" | "items">, pool: CityPool | undefi
     const maxPrice = { economy: 2, comfort: 3, luxury: 4 }[req.budgetTier];
     const r = pool.restaurants
       .filter((x) => x.priceLevel <= maxPrice && !used.has(`restaurant:${x.id}`))
-      .sort((a, b) => (req.budgetTier === "luxury" ? b.priceLevel - a.priceLevel : 0) || b.rating - a.rating)[0];
+      .sort((a, b) => (req.budgetTier === "luxury" ? b.priceLevel - a.priceLevel : 0) || rated(`restaurant:${b.id}`) - rated(`restaurant:${a.id}`) || b.rating - a.rating)[0];
     if (r) {
       used.add(`restaurant:${r.id}`);
       picks.push({ ref: `restaurant:${r.id}`, meal: "dinner" });
@@ -303,6 +308,7 @@ How to plan:
 - Use only activities from the candidate lists given for each city, referenced exactly by their ref. Events can only be used on a date and time listed for them, in the city where the traveller is that day. Never repeat a place during the trip.
 - Respect opening hours, the pace (relaxed: 2 visits a day, moderate: 3, intense: 4 to 5, plus meals and at most one event), children (family-friendly places, nothing late at night, respect minimum ages) and reduced mobility (accessible places, avoid rough outdoor sites).
 - When the traveller wants time for prayers, don't pack visits tightly around the prayer times given, and on Fridays leave the midday free for the Friday prayer. Shops, malls, restaurants, attractions and events stay open during prayer times: never plan around closures.
+- Candidates may show verified traveller ratings ("rated 4.6/5 (23)"): between otherwise suitable options, prefer the better-rated ones.
 - Add a lunch and/or a dinner as items with meal "lunch" or "dinner": bookable restaurants (restaurant:…) fitting the budget tier, or dining places from the guide.
 - Consider the season: in hot months (May to September) put outdoor visits early in the morning or after Asr.
 - The notes, day titles, summary and tips are shown to the traveller: write them in {LANGUAGE}, short and practical (a note is one sentence, e.g. what to see or a timing tip). Don't mention prices you weren't given.
@@ -355,10 +361,14 @@ const hoursText = (h?: { days: number[]; open: string; close: string }[], open24
 /** Candidate activities of a city, one per line (the only things the model may use). */
 export function poolText(pool: CityPool): string {
   const lines = [`## ${pool.city} (${SAUDI_CITIES.find((c) => c.code === pool.city)?.en})`];
-  for (const p of pool.places) lines.push(`place:${p.id} | ${p.nameEn} | ${p.category} | ${p.tags.join(",") || "-"} | ${hoursText(p.hours, p.open24h)} | ~${p.durationMins ?? 90} min`);
-  for (const r of pool.restaurants) lines.push(`restaurant:${r.id} | ${r.nameEn} | ${r.cuisine} | price ${"$".repeat(r.priceLevel)} | ${r.tags.join(",") || "-"} | ${hoursText(r.hours)}`);
+  const rated = (ref: string) => {
+    const r = pool.ratings?.[ref];
+    return r ? ` | rated ${r.avg.toFixed(1)}/5 (${r.count})` : "";
+  };
+  for (const p of pool.places) lines.push(`place:${p.id} | ${p.nameEn} | ${p.category} | ${p.tags.join(",") || "-"} | ${hoursText(p.hours, p.open24h)} | ~${p.durationMins ?? 90} min${rated(`place:${p.id}`)}`);
+  for (const r of pool.restaurants) lines.push(`restaurant:${r.id} | ${r.nameEn} | ${r.cuisine} | price ${"$".repeat(r.priceLevel)} | ${r.tags.join(",") || "-"} | ${hoursText(r.hours)}${rated(`restaurant:${r.id}`)}`);
   for (const { event: e, slots } of pool.events)
-    lines.push(`event:${e.id} | ${e.titleEn} | ${e.category}${e.minAge ? ` | min age ${e.minAge}` : ""} | ~${e.durationMins} min | sessions (ref event:${e.id}@DATE T TIME): ${slots.map((s) => `${s.date}T${s.time}`).join(", ")}`);
+    lines.push(`event:${e.id} | ${e.titleEn} | ${e.category}${e.minAge ? ` | min age ${e.minAge}` : ""} | ~${e.durationMins} min${rated(`event:${e.id}`)} | sessions (ref event:${e.id}@DATE T TIME): ${slots.map((s) => `${s.date}T${s.time}`).join(", ")}`);
   return lines.join("\n");
 }
 

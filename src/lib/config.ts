@@ -21,8 +21,9 @@ export const PACKAGE_LIMITS = {
   /** Purchase-to-travel window: at least 3 days (the 80-day maximum is from the eVisa integration guide, VTP010). */
   minLeadDays: 3,
   maxLeadDays: 80,
-  /** Accommodation: MT-licensed hotels of 3 stars or more. */
+  /** Accommodation: MT-licensed hotels classified 3 to 5 stars. */
   minHotelStars: 3,
+  maxHotelStars: 5,
   /** Package price starts from 2,000 SAR per adult (18+); covers flights, hotels, activities and visa & insurance. */
   minPricePerAdultSAR: 2000,
   passportValidityMonths: 6,
@@ -48,6 +49,11 @@ export function mtConfig() {
     /** Without credentials the integration runs in mock mode. */
     mock: !process.env.MT_CLIENT_ID,
   };
+}
+
+/** Hotels a package may include: MT-licensed and officially classified 3 to 5 stars. */
+export function hotelClassAllowed(h: { stars: number; licenseNo?: string | null }): boolean {
+  return Number.isInteger(h.stars) && h.stars >= PACKAGE_LIMITS.minHotelStars && h.stars <= PACKAGE_LIMITS.maxHotelStars && !!h.licenseNo;
 }
 
 /** Back-office (operations) access: comma-separated emails in ADMIN_EMAILS. */
