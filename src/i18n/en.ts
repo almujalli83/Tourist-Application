@@ -1111,6 +1111,7 @@ const en: Dictionary = {
     imageHint: "Take a photo of a menu or sign, or choose a picture (up to 4 MB).",
     chooseImage: "Take or choose a photo",
     sandbox: "Sandbox mode — real translation works once Claude is enabled.",
+    sandboxResult: "Sample result: the text wasn't actually translated because the Claude key (ANTHROPIC_API_KEY) isn't set on the site.",
     errors: { empty: "Enter text to translate.", invalidImage: "Unsupported image format (JPG, PNG or WebP).", imageTooLarge: "The image is larger than 4 MB.", declined: "This content couldn't be translated.", dailyLimit: "You've reached today's limit. Please try again tomorrow.", unavailable: "The service is busy, please try again shortly.", generic: "Translation failed, please try again." },
   },
   confirmation: {
