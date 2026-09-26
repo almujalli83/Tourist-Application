@@ -1174,6 +1174,7 @@ const ar = {
   account: {
     all: {
       tabs: { all: "الكل", package: "الباقات", event: "الفعاليات", train: "القطار", table: "المطاعم", esim: "eSIM" },
+      inTrip: "ضمن هذه الرحلة ({n})",
       today: "اليوم",
       todayHint: "افتح الحجز لعرض رمز الدخول (QR).",
       upcoming: "القادمة",
