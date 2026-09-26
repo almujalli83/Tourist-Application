@@ -16,7 +16,9 @@ import { computePackagePrice } from "../pricing";
 import { availability as tableAvailability, bookTable, feeFor, RestaurantBookingError } from "../restaurants/bookings";
 import { BOOKING_DAYS_AHEAD, getRestaurant } from "../restaurants/catalog";
 import type { ActivityOffer, FlightLeg, FlightOffer, HotelOffer, SearchCriteria } from "../types";
+import { CITY_CENTERS } from "../guide/centers";
 import { partyOf } from "./budget";
+import { scheduleDay } from "./schedule";
 import { planCriteria } from "./handoff";
 import type { BudgetTier, Interest, TripPlan } from "./types";
 
@@ -207,11 +209,13 @@ export async function planExtras(plan: TripPlan, now = new Date()): Promise<Plan
   const out: PlanExtras = { events: [], tables: [], issues: [], totalSAR: 0 };
   const lastBookable = addDays(todayISO(), BOOKING_DAYS_AHEAD);
   for (const day of plan.days) {
+    // The table is booked for the time the day's schedule gives the meal (moved around events and prayers).
+    const schedule = scheduleDay(day, { pace: plan.request.pace, prayer: plan.request.prayer, kids }, CITY_CENTERS[day.city] ?? CITY_CENTERS.RUH);
     for (const item of day.items) {
       const base = { itemId: item.id, titleAr: item.titleAr, titleEn: item.titleEn };
       if (item.kind === "event") {
         const [eventId, when = ""] = item.ref.slice("event:".length).split("@");
-        const e = await getEvent(eventId);
+        const e = await getEvent(eventId, { from: day.date, to: day.date });
         const session = e ? openSessions(e, now).find((s) => new Date(Date.parse(s.start) + 3 * 3_600_000).toISOString().slice(0, 16) === when) : undefined;
         if (!e || !session) {
           out.issues.push({ ...base, reason: "closed" });
@@ -250,7 +254,7 @@ export async function planExtras(plan: TripPlan, now = new Date()): Promise<Plan
           continue;
         }
         const size = Math.min(r.maxParty, party.adults + party.children + party.infants);
-        const target = item.meal === "lunch" ? 13 * 60 + 30 : kids ? 19 * 60 : 20 * 60 + 30;
+        const target = schedule.find((e) => e.item?.id === item.id)?.start ?? (item.meal === "lunch" ? 13 * 60 + 30 : kids ? 19 * 60 : 20 * 60 + 30);
         const slot = (await tableAvailability(r, day.date, now))
           .filter((s) => s.bookable && s.left >= size && (item.meal === "lunch" ? toMin(s.time) < 17 * 60 : toMin(s.time) >= 17 * 60))
           .sort((a, b) => Math.abs(toMin(a.time) - target) - Math.abs(toMin(b.time) - target))[0];

@@ -11,7 +11,8 @@ import { matchesQuery } from "./search";
 import { seedPlaces } from "./seed";
 import { PLACE_CATEGORIES, PLACE_TAGS, type OpeningSlot, type Place, type PlaceTag } from "./types";
 
-const SEED_FLAG = "guideSeed:v1";
+/** Raised when curated places are added; existing places (and the team's edits) are kept. */
+const SEED_FLAG = "guideSeed:v2";
 const CITY_CODES = new Set(SAUDI_CITIES.map((c) => c.code));
 
 /** Loads the curated starter content once (safe to call on every request). */

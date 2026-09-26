@@ -58,16 +58,25 @@ const DEFS: Def[] = [
 const DEFAULT_WINDOW_DAYS = 90;
 const MAX_WINDOW_DAYS = 300;
 const MAX_SESSIONS = 40;
+const MAX_RANGE_SESSIONS = 400;
 
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const weekday = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay();
 
-/** Sessions from the schedule, from tomorrow, inside the season (or the next 90 days). */
-function sessionsFor(def: Def, season: Season | undefined, today: string): EventSession[] {
-  const from = season && season.startDate > today ? season.startDate : addDays(today, 1);
-  const to = season ? [season.endDate, addDays(today, MAX_WINDOW_DAYS)].sort()[0] : addDays(today, DEFAULT_WINDOW_DAYS);
+export interface DateRange { from: string; to: string }
+
+/**
+ * Sessions from the schedule, from tomorrow, inside the season (or the next 90 days). A `range`
+ * (e.g. the dates of a trip) lists the sessions of those days instead, up to 300 days ahead.
+ */
+function sessionsFor(def: Def, season: Season | undefined, today: string, range?: DateRange): EventSession[] {
+  const tomorrow = addDays(today, 1);
+  const horizon = addDays(today, range ? MAX_WINDOW_DAYS : DEFAULT_WINDOW_DAYS);
+  const from = [tomorrow, season?.startDate ?? tomorrow, range?.from ?? tomorrow].sort().at(-1)!;
+  const to = [horizon, season?.endDate ?? horizon, range?.to ?? horizon, addDays(today, MAX_WINDOW_DAYS)].sort()[0];
+  const cap = range ? MAX_RANGE_SESSIONS : MAX_SESSIONS;
   const out: EventSession[] = [];
-  for (let d = from; d <= to && out.length < MAX_SESSIONS; d = addDays(d, 1)) {
+  for (let d = from; d <= to && out.length < cap; d = addDays(d, 1)) {
     if (!def.schedule.days.includes(weekday(d))) continue;
     for (const time of def.schedule.times) {
       out.push({ id: `${def.id}-${d.replace(/-/g, "")}${time.replace(":", "")}`, start: new Date(`${d}T${time}:00+03:00`).toISOString() });
@@ -76,17 +85,23 @@ function sessionsFor(def: Def, season: Season | undefined, today: string): Event
   return out;
 }
 
+/** Day (YYYY-MM-DD) of a session id ("<event>-YYYYMMDDHHMM"). */
+export function sessionDay(sessionId: string): string | null {
+  const m = /-(\d{4})(\d{2})(\d{2})\d{4}$/.exec(sessionId);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
 /**
- * The catalogue: events with upcoming sessions. Events of a hidden or removed season are not
- * offered (the season is the provider's grouping).
+ * The catalogue: events with upcoming sessions (or the sessions in `range`). Events of a hidden
+ * or removed season are not offered (the season is the provider's grouping).
  */
-export function listCatalog(seasons: Season[], today: string): EventItem[] {
+export function listCatalog(seasons: Season[], today: string, range?: DateRange): EventItem[] {
   const byId = new Map(seasons.map((s) => [s.id, s]));
   const out: EventItem[] = [];
   for (const def of DEFS) {
     const season = def.seasonId ? byId.get(def.seasonId) : undefined;
     if (def.seasonId && (!season || season.status !== "published")) continue;
-    const sessions = sessionsFor(def, season, today);
+    const sessions = sessionsFor(def, season, today, range);
     if (!sessions.length) continue;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { schedule, provider, maxPerOrder, ...rest } = def;

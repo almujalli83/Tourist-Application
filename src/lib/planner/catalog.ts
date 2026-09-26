@@ -29,7 +29,7 @@ export async function plannerCities(): Promise<string[]> {
 const ksaTime = (iso: string) => new Date(Date.parse(iso) + 3 * 3_600_000).toISOString().slice(11, 16);
 
 export async function loadPools(cities: string[], from: string, to: string, now = new Date()): Promise<Pools> {
-  const [catalog, restaurants] = await Promise.all([eventsCatalog(), Promise.resolve(listRestaurants())]);
+  const [catalog, restaurants] = await Promise.all([eventsCatalog({ from, to }), Promise.resolve(listRestaurants())]);
   const pools: Pools = new Map();
   for (const city of cities) {
     const events = catalog

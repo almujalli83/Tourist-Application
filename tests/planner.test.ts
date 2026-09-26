@@ -193,3 +193,59 @@ describe("saved plans", () => {
     expect(saved.stays).toEqual([{ city: "JED", nights: 2 }]);
   });
 });
+
+describe("plan quality", () => {
+  it("keeps the arrival day light and starts activities the next day", async () => {
+    const { plan } = await generatePlan({ ...baseReq, nights: 4, cities: ["RUH"], pace: "intense", interests: ["heritage", "culture", "entertainment", "shopping", "food"] }, "ar", today);
+    const arrival = plan.days[0];
+    expect(arrival.type).toBe("arrival");
+    expect(arrival.items.length).toBeLessThanOrEqual(1);
+    expect(arrival.items.every((i) => i.kind !== "event" && (i.kind === "restaurant" || i.meal))).toBe(true);
+    expect(plan.days[1].items.filter((i) => i.kind === "place").length).toBeGreaterThanOrEqual(3);
+    expect(plan.tips.join(" ")).not.toMatch(/تغلق وقت الصلاة/);
+  });
+
+  it("reserves the Friday prayer and keeps visits out of it", () => {
+    const friday = "2026-10-09";
+    const day = {
+      date: friday, city: "RUH", type: "full" as const, title: "",
+      items: [{ id: "m", ref: "place:m", kind: "place" as const, titleAr: "", titleEn: "Museum", note: "", lat: 24.6477, lng: 46.7101, durationMins: 180, category: "museum", open24h: true }],
+    };
+    const entries = scheduleDay(day, { pace: "moderate", prayer: true, kids: false }, { lat: 24.7136, lng: 46.6753 });
+    const jumuah = entries.find((e) => e.prayer === "jumuah")!;
+    expect(jumuah.end - jumuah.start).toBe(60);
+    expect(entries.some((e) => e.prayer === "dhuhr")).toBe(false);
+    const visit = entries.find((e) => e.item?.id === "m")!;
+    expect(visit.end <= jumuah.start || visit.start >= jumuah.end).toBe(true);
+  });
+
+  it("offers events for trips further ahead than the usual sales window", async () => {
+    const far = addDays(today, 75);
+    const { loadPools } = await import("@/lib/planner/catalog");
+    const pool = (await loadPools(["ULH"], far, addDays(far, 6))).get("ULH")!;
+    const slots = pool.events.flatMap((e) => e.slots);
+    expect(slots.length).toBeGreaterThan(0);
+    expect(slots.every((s) => s.date >= far)).toBe(true);
+    const { getEventForSession } = await import("@/lib/events/orders");
+    const e = pool.events[0];
+    const found = await getEventForSession(e.event.id, e.slots[0].id);
+    expect(found?.sessions.some((s) => s.id === e.slots[0].id)).toBe(true);
+  });
+});
+
+describe("meals around events", () => {
+  it("moves dinner before (or after) an evening event", () => {
+    const base = { lat: 24.7, lng: 46.6, titleAr: "", note: "", category: "restaurant" };
+    const day = {
+      date: "2026-10-11", city: "RUH", type: "full" as const, title: "",
+      items: [
+        { ...base, id: "e", ref: "event:x@y", kind: "event" as const, titleEn: "Match", durationMins: 120, category: "sports", fixedStart: "20:30" },
+        { ...base, id: "d", ref: "restaurant:r", kind: "restaurant" as const, titleEn: "Dinner", durationMins: 90, meal: "dinner" as const },
+      ],
+    };
+    const entries = scheduleDay(day, { pace: "moderate", prayer: false, kids: false }, { lat: 24.7, lng: 46.6 });
+    const dinner = entries.find((e) => e.item?.id === "d")!;
+    expect(fmtMin(dinner.start)).toBe("18:45");
+    expect(entries.every((e) => !e.warnings.includes("conflict"))).toBe(true);
+  });
+});

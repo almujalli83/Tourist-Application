@@ -39,13 +39,13 @@ export function EventDetail({ id }: { id: string }) {
   const key = useRef(newKey());
 
   useEffect(() => {
-    fetch(`/api/events/${encodeURIComponent(id)}`, { cache: "no-store" })
+    const wantedSession = new URLSearchParams(window.location.search).get("session");
+    fetch(`/api/events/${encodeURIComponent(id)}${wantedSession ? `?session=${encodeURIComponent(wantedSession)}` : ""}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((x: { event: EventSummary }) => {
         setEvent(x.event);
         // A session can be preselected from a link (e.g. a trip plan): ?session=<id>.
-        const wanted = new URLSearchParams(window.location.search).get("session");
-        const first = x.event.sessions.find((s) => s.id === wanted) ?? x.event.sessions[0];
+        const first = x.event.sessions.find((s) => s.id === wantedSession) ?? x.event.sessions[0];
         if (first) {
           setDay(ksaDay(first.start));
           setSessionId(first.id);
