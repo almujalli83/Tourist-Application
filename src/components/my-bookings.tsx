@@ -9,6 +9,7 @@ import { fmtDay, fmtKsa, ksaDay } from "@/lib/events/format";
 import type { EventOrder } from "@/lib/events/types";
 import type { RestaurantBooking } from "@/lib/restaurants/bookings";
 import type { TrainOrder } from "@/lib/trains/orders";
+import { groupByTrip } from "@/lib/account/trips";
 import type { BookingRow } from "./account-view";
 import { useApp } from "./app-provider";
 import { StatusBadge } from "./booking-details";
@@ -41,7 +42,12 @@ interface Item {
   today: boolean;
   status: ReactNode;
   amount?: string;
+  /** Packages: trip dates and whether it is cancelled; eSIMs: the package they were bought with. */
+  trip?: { from: string; to: string; cancelled: boolean };
+  packageId?: string;
 }
+
+type Entry = { item: Item; children: Item[] };
 
 /**
  * «My bookings»: every booking of the account in one place — packages with visas, event tickets,
@@ -87,6 +93,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(`${b.departureDate}T00:00:00+03:00`), day: b.departureDate,
         upcoming: !cancelled && b.returnDate >= today, today: !cancelled && b.departureDate <= today && b.returnDate >= today,
         status: <StatusBadge status={b.status} />, amount: money(b.totalSAR),
+        trip: { from: b.departureDate, to: b.returnDate, cancelled },
       });
     }
     for (const o of events ?? []) {
@@ -136,36 +143,51 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(o.createdAt), day: o.createdAt.slice(0, 10),
         upcoming: live && now < end, today: false,
         status: badge(e.order.status[o.status], !live), amount: money(o.totalSAR),
+        packageId: o.booking?.id,
       });
     }
     return out;
   }, [packages, events, trains, tables, esims, net, locale, ar, money, t]);
 
   const shown = items.filter((i) => tab === "all" || i.kind === tab);
-  const todays = shown.filter((i) => i.today).sort((a, b) => a.at - b.at);
-  const upcoming = shown.filter((i) => i.upcoming && !i.today).sort((a, b) => a.at - b.at);
-  const past = shown.filter((i) => !i.upcoming).sort((a, b) => b.at - a.at);
+  // "All" and "Packages" show each trip with the bookings made for it; the other tabs stay flat.
+  const entries: Entry[] = tab === "all" ? groupByTrip(items) : tab === "package" ? groupByTrip(items).filter((e) => e.item.kind === "package") : shown.map((item) => ({ item, children: [] }));
+  const todays = entries.filter((e) => e.item.today).sort((a, b) => a.item.at - b.item.at);
+  const upcoming = entries.filter((e) => e.item.upcoming && !e.item.today).sort((a, b) => a.item.at - b.item.at);
+  const past = entries.filter((e) => !e.item.upcoming).sort((a, b) => b.item.at - a.item.at);
   const count = (k: "all" | Kind) => items.filter((i) => k === "all" || i.kind === k).length;
   const isCo = user?.accountType === "company";
 
-  const list = (rows: Item[]) => (
+  const row = (i: Item, child = false) => (
+    <Link href={i.href} className={cx("flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50", child ? "rounded-lg px-3 py-2.5" : "px-5 py-4")} data-testid={`my-booking-${i.kind}`}>
+      <div className="flex min-w-0 items-start gap-3">
+        <span className={cx("mt-0.5 grid shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700", child ? "size-7 [&_svg]:size-4" : "size-9")}>{ICONS[i.kind]}</span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-slate-500">{m.kinds[i.kind]}</p>
+          <p className={cx("font-semibold", child && "text-sm")}>{i.title}</p>
+          <p className="text-xs text-slate-500">{i.subtitle}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        {i.status}
+        {i.amount && <span className="ltr-nums text-sm font-semibold">{i.amount}</span>}
+      </div>
+    </Link>
+  );
+
+  const list = (rows: Entry[]) => (
     <ul className="divide-y divide-slate-100">
-      {rows.map((i) => (
-        <li key={`${i.kind}-${i.id}`}>
-          <Link href={i.href} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50" data-testid={`my-booking-${i.kind}`}>
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700">{ICONS[i.kind]}</span>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500">{m.kinds[i.kind]}</p>
-                <p className="font-semibold">{i.title}</p>
-                <p className="text-xs text-slate-500">{i.subtitle}</p>
-              </div>
+      {rows.map(({ item, children }) => (
+        <li key={`${item.kind}-${item.id}`} data-testid={children.length ? "my-trip" : undefined}>
+          {row(item)}
+          {children.length > 0 && (
+            <div className="mx-5 mb-4 rounded-xl border border-brand-100 bg-brand-50/40 p-2" data-testid="my-trip-children">
+              <p className="px-3 pt-1 text-xs font-bold text-brand-800">{fmt(m.inTrip, { n: children.length })}</p>
+              <ul className="divide-y divide-brand-100/70 border-s-2 border-brand-200 ps-2">
+                {children.map((c) => <li key={`${c.kind}-${c.id}`}>{row(c, true)}</li>)}
+              </ul>
             </div>
-            <div className="flex items-center gap-3">
-              {i.status}
-              {i.amount && <span className="ltr-nums text-sm font-semibold">{i.amount}</span>}
-            </div>
-          </Link>
+          )}
         </li>
       ))}
     </ul>

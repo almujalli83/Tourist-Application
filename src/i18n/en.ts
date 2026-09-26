@@ -1176,6 +1176,7 @@ const en: Dictionary = {
   account: {
     all: {
       tabs: { all: "All", package: "Packages", event: "Events", train: "Trains", table: "Restaurants", esim: "eSIM" },
+      inTrip: "In this trip ({n})",
       today: "Today",
       todayHint: "Open the booking to show its entry QR code.",
       upcoming: "Upcoming",
