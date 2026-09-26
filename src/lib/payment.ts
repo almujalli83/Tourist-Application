@@ -51,6 +51,16 @@ export async function chargeCard(card: CardInput, amountSAR: number, now = new D
   return { ok: true, transactionId: `TXN-${randomUUID()}`, method: cardBrand(num), last4: num.slice(-4) };
 }
 
+/** Payment of an order fully paid with reward points: no card is charged. */
+export const POINTS_PAYMENT = { transactionId: "", method: "points", last4: "" } as const;
+
+/** Charges the card for what is left to pay, or nothing when reward points cover the whole price. */
+export async function chargeRest(card: CardInput | undefined, amountSAR: number, now = new Date()): Promise<PaymentResult> {
+  if (amountSAR <= 0) return { ok: true, ...POINTS_PAYMENT };
+  if (!card) return { ok: false, code: "invalid_card" };
+  return chargeCard(card, amountSAR, now);
+}
+
 export type RefundResult = { ok: true; refundId: string } | { ok: false; code: "invalid_amount" };
 
 /** Refunds part of a captured payment to the original card (sandbox: always approved). */

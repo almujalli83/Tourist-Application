@@ -25,8 +25,6 @@ export const LOYALTY = {
   /** 100 points = 5 SAR. */
   sarPerPoint: 0.05,
   minRedeemPoints: 500,
-  /** Points pay at most this share of a purchase. */
-  maxRedeemShare: 0.3,
   /** Points expire 24 months after they were earned; a reminder is sent 30 days before. */
   expiryMonths: 24,
   expiryReminderDays: 30,
@@ -70,10 +68,12 @@ export function pointsValueSAR(points: number): number {
 
 export const canRedeemOn = (service: string) => (LOYALTY.redeemableOn as string[]).includes(service);
 
-/** Most points usable on a purchase (30% of its price); 0 when less than the 500-point minimum could be used. */
+/**
+ * Most points usable on a purchase: the whole balance, up to the full price (then nothing is left
+ * to pay by card). 0 when less than the 500-point minimum could be used.
+ */
 export function maxRedeemable(input: { totalSAR: number; balance: number }): number {
-  const capSAR = input.totalSAR * LOYALTY.maxRedeemShare;
-  const max = Math.min(Math.floor(capSAR / LOYALTY.sarPerPoint + 1e-9), Math.floor(input.balance));
+  const max = Math.min(Math.floor(input.totalSAR / LOYALTY.sarPerPoint + 1e-9), Math.floor(input.balance));
   return max >= LOYALTY.minRedeemPoints ? max : 0;
 }
 

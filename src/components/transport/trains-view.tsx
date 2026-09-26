@@ -160,6 +160,7 @@ export function TrainsView() {
   const price = legs.reduce((a, l) => a + adults * l.fares[cls].adult + children * l.fares[cls].child, 0);
   const total = Math.round(price * 100) / 100;
   const [points, setPoints] = useState(0);
+  const restSAR = afterPoints(total, points);
   const seatsReady = legs.length > 0 && legs.every((_, i) => seats[i].length === count);
   const paxReady = pax.every((p) => p.ref || (p.nameEn.trim().includes(" ") && p.nationality && p.passportNo.trim().length >= 5));
   const ready = legs.length === (round ? 2 : 1) && seatsReady && paxReady;
@@ -195,7 +196,7 @@ export function TrainsView() {
           legs: legs.map((l, i) => ({ tripId: l.id, cls, seats: seats[i] })),
           passengers: pax.map((p) => (p.ref ? { type: p.type, ref: p.ref } : { type: p.type, nameEn: p.nameEn, nationality: p.nationality, passportNo: p.passportNo })),
           expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency, redeemPoints: points || undefined,
-          card: { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc },
+          card: restSAR > 0 ? { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } : undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -401,6 +402,8 @@ export function TrainsView() {
               ) : (
                 <form onSubmit={pay} className="mt-4 space-y-3">
                   {total > 0 && <PointsRedeemer service="train" totalSAR={total} value={points} onChange={setPoints} />}
+                  {restSAR > 0 && (
+                    <>
                   <Field label={t.review.cardHolder} required><Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required /></Field>
                   <Field label={t.review.cardNumber} required>
                     <Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required />
@@ -410,6 +413,8 @@ export function TrainsView() {
                     <Field label={t.review.cvc} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required /></Field>
                   </div>
                   <p className="text-xs text-slate-500">{t.review.testCards}</p>
+                    </>
+                  )}
                   {showMissing && missing.length > 0 && (
                     <Alert tone="warning" className="text-xs">
                       <p className="font-semibold">{tr.missing.title}</p>
@@ -419,7 +424,7 @@ export function TrainsView() {
                     </Alert>
                   )}
                   <Button type="submit" variant="gold" size="lg" className="w-full" loading={paying}>
-                    <LockIcon className="size-5" />{paying ? tr.paying : fmt(tr.pay, { amount: money(afterPoints(total, points)) })}
+                    <LockIcon className="size-5" />{paying ? tr.paying : (restSAR > 0 ? fmt(tr.pay, { amount: money(restSAR) }) : t.loyalty.checkout.payWithPoints)}
                   </Button>
                 </form>
               )}

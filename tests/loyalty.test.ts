@@ -45,16 +45,17 @@ describe("loyalty rules", () => {
     expect(tierFor(50_000).next).toBeNull();
   });
 
-  it("limits redemption to 30%, from 500 points, and keeps 2,000 SAR per adult paid on packages", () => {
+  it("allows the whole balance, from 500 points, up to the full price", () => {
     expect(pointsValueSAR(100)).toBe(5);
-    expect(maxRedeemable({ totalSAR: 1000, balance: 10_000 })).toBe(6000); // 300 SAR
+    expect(maxRedeemable({ totalSAR: 1000, balance: 10_000 })).toBe(10_000); // 500 SAR
+    expect(maxRedeemable({ totalSAR: 100, balance: 10_000 })).toBe(2000); // the full 100 SAR
     expect(maxRedeemable({ totalSAR: 1000, balance: 700 })).toBe(700);
     expect(maxRedeemable({ totalSAR: 1000, balance: 400 })).toBe(0);
-    expect(maxRedeemable({ totalSAR: 50, balance: 10_000 })).toBe(0); // 30% is 15 SAR = 300 points < 500
+    expect(maxRedeemable({ totalSAR: 20, balance: 10_000 })).toBe(0); // 20 SAR = 400 points < 500
     expect(canRedeemOn("event") && canRedeemOn("train")).toBe(true);
     expect(canRedeemOn("package") || canRedeemOn("esim")).toBe(false);
     expect(redeemError(499, { totalSAR: 1000, balance: 5000 })).toBe("redeemBelowMinimum");
-    expect(redeemError(6001, { totalSAR: 1000, balance: 10_000 })).toBe("redeemAboveMaximum");
+    expect(redeemError(20_001, { totalSAR: 1000, balance: 30_000 })).toBe("redeemAboveMaximum");
     expect(redeemError(800, { totalSAR: 1000, balance: 700 })).toBe("redeemBalance");
     expect(redeemError(1.5, { totalSAR: 1000, balance: 700 })).toBe("redeemInvalid");
     expect(redeemError(0, { totalSAR: 1000, balance: 0 })).toBeNull();
@@ -91,7 +92,7 @@ describe("points ledger", () => {
     await releaseRedeem(u.id, hold, now);
     expect((await loyaltySummary(u, now)).summary.available).toBe(2000);
     await expect(holdRedeem(u, { points: 3000, totalSAR: 5000, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemBalance" });
-    await expect(holdRedeem(u, { points: 1000, totalSAR: 100, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemAboveMaximum" });
+    await expect(holdRedeem(u, { points: 1000, totalSAR: 40, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemAboveMaximum" });
     // Packages (price sent to MT) and eSIMs are never paid with points.
     await expect(holdRedeem(u, { points: 500, totalSAR: 5000, source: { kind: "package", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemNotAllowed" });
     await expect(holdRedeem(u, { points: 500, totalSAR: 5000, source: { kind: "esim", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemNotAllowed" });
@@ -230,6 +231,28 @@ describe("purchases", () => {
       s = (await loyaltySummary(u)).summary;
       expect([s.available, s.pending]).toEqual([1000, 0]);
     }
+  });
+});
+
+describe("paid in full with points", () => {
+  it("confirms an event order without a card when points cover the price, and gives them back on cancellation", async () => {
+    const u = await member("allpoints");
+    await adminAdjust({ ...(await member("boss3")), isAdmin: true }, u.email, 10_000, "test balance");
+    const e = (await eventsCatalog()).find((x) => x.id === "ruh-boulevard-entry")!;
+    const session = openSessions(e)[3];
+    const price = e.ticketTypes!.find((t) => t.id === "adult")!.priceSAR * 2;
+    const points = maxRedeemable({ totalSAR: price, balance: 10_000 });
+    expect(pointsValueSAR(points)).toBe(price);
+    // Without enough points, a card is still needed.
+    await expect(placeOrder(u, { eventId: e.id, sessionId: session.id, quantities: { adult: 2 }, expectedTotalSAR: price, idempotencyKey: `np-${run}`, redeemPoints: points - 100 })).rejects.toMatchObject({ code: "payment_invalid_card" });
+    expect((await loyaltySummary(u)).summary.available).toBe(10_000);
+    const order = await placeOrder(u, { eventId: e.id, sessionId: session.id, quantities: { adult: 2 }, expectedTotalSAR: price, idempotencyKey: `ap-${run}`, redeemPoints: points });
+    expect(order.payment).toMatchObject({ method: "points", amountSAR: 0 });
+    expect(order.loyalty).toMatchObject({ redeemedPoints: points, earnedPoints: 0 });
+    expect((await loyaltySummary(u)).summary.available).toBe(10_000 - points);
+    const cancelled = await cancelOrder(u, order.id);
+    expect(cancelled.cancellation?.refundSAR).toBe(0);
+    expect((await loyaltySummary(u)).summary.available).toBe(10_000);
   });
 });
 

@@ -11,7 +11,7 @@ import { notifyTravellers } from "../notify";
 import { awardPurchase, holdRedeem, LoyaltyError, quietly, releaseRedeem, returnRedeemed, reversePurchase } from "../loyalty/loyalty";
 import { pointsEmailLine } from "../loyalty/rules";
 import type { OrderLoyalty } from "../loyalty/types";
-import { chargeCard, refundPayment, type CardInput } from "../payment";
+import { chargeRest, refundPayment, type CardInput } from "../payment";
 import { listBookingsByUser } from "../repo";
 import { getSavedTraveller, listWithKeys, passportKey } from "../saved-travellers-repo";
 import { store } from "../store";
@@ -186,7 +186,8 @@ export interface TrainOrderInput {
   expectedTotalSAR: number;
   idempotencyKey: string;
   displayCurrency?: string;
-  card: CardInput;
+  /** Not needed when reward points pay the whole price. */
+  card?: CardInput;
   /** Reward points used on the order (service 10). */
   redeemPoints?: number;
 }
@@ -243,7 +244,7 @@ export async function placeTrainOrder(user: PublicUser, input: TrainOrderInput, 
     throw err instanceof LoyaltyError ? new TrainOrderError(err.code) : err;
   }
   const cardSAR = round2(totalSAR - (pointsHold?.discountSAR ?? 0));
-  const pay = await chargeCard(input.card, cardSAR, now);
+  const pay = await chargeRest(input.card, cardSAR, now);
   if (!pay.ok) {
     for (const j of held) await releaseSeats(legs[j].trip.runId, input.legs[j].seats, id);
     await releaseRedeem(user.id, pointsHold, now);
@@ -270,7 +271,7 @@ export async function placeTrainOrder(user: PublicUser, input: TrainOrderInput, 
     ...(pointsHold ? { loyalty: { redeemedPoints: pointsHold.points, discountSAR: pointsHold.discountSAR, earnedPoints: 0 } } : {}),
   };
   if (!(await store().insert("trainOrders", id, order))) {
-    await refundPayment(pay.transactionId, cardSAR);
+    if (cardSAR > 0) await refundPayment(pay.transactionId, cardSAR);
     await releaseRedeem(user.id, pointsHold, now);
     return (await store().get<TrainOrder>("trainOrders", id))!;
   }

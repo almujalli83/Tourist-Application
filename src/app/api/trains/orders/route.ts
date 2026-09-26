@@ -12,7 +12,7 @@ export const POST = handle(async (req: Request) => {
   const user = await currentUser();
   if (!user) return error("unauthorized", 401);
   const input = await body<TrainOrderInput>(req);
-  if (!input?.card || !Array.isArray(input.legs) || !Array.isArray(input.passengers)) return error("invalidRequest", 400);
+  if (!input || !Array.isArray(input.legs) || !Array.isArray(input.passengers)) return error("invalidRequest", 400);
   try {
     return json({ order: await placeTrainOrder(user, input) }, 201);
   } catch (e) {

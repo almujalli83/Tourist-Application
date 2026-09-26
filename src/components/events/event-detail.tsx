@@ -93,6 +93,7 @@ export function EventDetail({ id }: { id: string }) {
   const count = event?.seating === "seated" ? seats.length : Object.values(qty).reduce((a, n) => a + n, 0);
   const total = Math.round(lines.reduce((a, l) => a + l.price, 0) * 100) / 100;
   const [points, setPoints] = useState(0);
+  const restSAR = afterPoints(total, points);
 
   if (notFound) return <Alert tone="error">{ev.errors.generic}</Alert>;
   if (!event) return <div className="grid min-h-[40vh] place-items-center text-brand-700"><Spinner className="size-8" /></div>;
@@ -130,7 +131,7 @@ export function EventDetail({ id }: { id: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           eventId: event!.id, sessionId: session.id, seats, quantities: qty, expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency, redeemPoints: points || undefined,
-          card: { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc },
+          card: restSAR > 0 ? { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } : undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -277,6 +278,8 @@ export function EventDetail({ id }: { id: string }) {
             ) : (
               <form onSubmit={pay} className="mt-4 space-y-3">
                 {total > 0 && <PointsRedeemer service="event" totalSAR={total} cities={[event.city]} value={points} onChange={setPoints} />}
+                {restSAR > 0 && (
+                  <>
                 <Field label={t.review.cardHolder} required>
                   <Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required />
                 </Field>
@@ -293,8 +296,10 @@ export function EventDetail({ id }: { id: string }) {
                   </Field>
                 </div>
                 <p className="text-xs text-slate-500">{t.review.testCards}</p>
+                  </>
+                )}
                 <Button type="submit" variant="gold" size="lg" className="w-full" loading={paying} disabled={!count || !session}>
-                  <LockIcon className="size-5" />{paying ? d.paying : fmt(d.pay, { amount: money(afterPoints(total, points)) })}
+                  <LockIcon className="size-5" />{paying ? d.paying : (restSAR > 0 ? fmt(d.pay, { amount: money(restSAR) }) : t.loyalty.checkout.payWithPoints)}
                 </Button>
                 <p className="text-xs text-slate-500">{d.holderNote}</p>
               </form>
