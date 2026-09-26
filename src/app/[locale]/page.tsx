@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BuildingIcon, CalendarIcon, CheckIcon, HotelIcon, PassportIcon, PlaneIcon, ShieldIcon, TicketIcon, UserIcon } from "@/components/icons";
+import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, HotelIcon, PassportIcon, PlaneIcon, ShieldIcon, TicketIcon, UserIcon } from "@/components/icons";
+import { PrayerHomeCard } from "@/components/prayer/prayer-home-card";
 import { getDictionary } from "@/i18n";
 import type { Locale } from "@/i18n/config";
 
@@ -48,6 +49,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         </div>
       </section>
 
+      <PrayerHomeCard />
+
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
         <h2 className="text-2xl font-bold text-ink">{t.home.servicesTitle}</h2>
         <p className="mt-1 text-slate-500">{t.home.servicesSubtitle}</p>
@@ -67,6 +70,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
             <div className="flex-1">
               <p className="font-semibold text-ink">{t.planner.title}</p>
               <p className="mt-0.5 text-sm text-slate-600">{t.planner.banner.desc}</p>
+            </div>
+          </Link>
+          <Link href={`/${locale}/prayer`} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:shadow-md" data-testid="prayer-service">
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><ClockIcon className="size-5" /></div>
+            <div className="flex-1">
+              <p className="font-semibold text-ink">{t.prayer.title}</p>
+              <p className="mt-0.5 text-sm text-slate-600">{t.prayer.serviceCard}</p>
             </div>
           </Link>
           {t.home.comingServices.map((s, i) => {
