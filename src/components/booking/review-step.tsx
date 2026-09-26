@@ -202,6 +202,12 @@ export function ReviewStep() {
                 </li>
               ))}
             </ul>
+            {extras.issues.length > 0 && (
+              <Alert tone="warning" className="mt-3">
+                <p className="font-semibold">{t.planner.exec.issuesTitle}</p>
+                <ul className="list-inside list-disc">{extras.issues.map((i) => <li key={i.itemId}>{locale === "ar" ? i.titleAr : i.titleEn}: {(t.planner.exec.issues as Record<string, string>)[i.reason] ?? i.reason}</li>)}</ul>
+              </Alert>
+            )}
           </Card>
         )}
 

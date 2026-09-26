@@ -16,10 +16,33 @@ export interface ScheduledEntry {
   end: number;
   /** Driving minutes from the previous place (items only). */
   travelMins?: number;
-  warnings: ("closed" | "conflict" | "late")[];
+  warnings: ("closed" | "conflict" | "late" | "flight")[];
 }
 
-export interface DayContext { pace: Pace; prayer: boolean; kids: boolean }
+/** Booked flight times ("YYYY-MM-DDTHH:mm", local) the days are fitted to once known. */
+export interface FlightTimes {
+  /** Landing of the international arrival. */
+  arriveAt: string;
+  /** Take-off of the international return. */
+  departAt: string;
+  /** Domestic flights by date: take-off and landing. */
+  transfers: Record<string, { departAt: string; arriveAt: string }>;
+}
+
+export function flightTimesFrom(flights: { kind: string; departAt: string; arriveAt: string }[]): FlightTimes | null {
+  const out = flights.find((f) => f.kind === "outbound");
+  const ret = flights.find((f) => f.kind === "return");
+  if (!out || !ret) return null;
+  const transfers: FlightTimes["transfers"] = {};
+  for (const f of flights) if (f.kind === "domestic") transfers[f.departAt.slice(0, 10)] = { departAt: f.departAt, arriveAt: f.arriveAt };
+  return { arriveAt: out.arriveAt, departAt: ret.departAt, transfers };
+}
+
+export interface DayContext { pace: Pace; prayer: boolean; kids: boolean; flights?: FlightTimes | null }
+
+/** Time to reach the hotel after landing, and to be at the airport before take-off. */
+const AFTER_LANDING = 90;
+const BEFORE_TAKEOFF = 180;
 
 const PRAYER_MINS = 20;
 const toMin = (hhmm: string) => {
@@ -37,12 +60,19 @@ export const travelMinutes = (a: { lat: number; lng: number }, b: { lat: number;
   return km < 0.3 ? 5 : Math.round(10 + km * 2);
 };
 
-export function dayWindow(type: DayType, ctx: DayContext): { start: number; end: number } {
+/** Minutes into `date` of a local "YYYY-MM-DDTHH:mm" time (negative before, over 1440 after). */
+const minutesOn = (date: string, at: string) => Math.round((Date.parse(`${at.slice(0, 16)}:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 60_000);
+
+export function dayWindow(type: DayType, ctx: DayContext, date?: string): { start: number; end: number } {
   const base = { relaxed: 600, moderate: 540, intense: 480 }[ctx.pace];
   const end = ctx.kids ? 21 * 60 + 30 : { relaxed: 22 * 60, moderate: 23 * 60, intense: 23 * 60 + 45 }[ctx.pace];
-  if (type === "arrival") return { start: 16 * 60, end };
-  if (type === "transfer") return { start: 15 * 60, end };
-  if (type === "departure") return { start: base, end: 12 * 60 };
+  const f = ctx.flights;
+  if (type === "arrival") return { start: f && date ? Math.max(12 * 60, minutesOn(date, f.arriveAt) + AFTER_LANDING) : 16 * 60, end };
+  if (type === "transfer") {
+    const leg = f && date ? f.transfers[date] : undefined;
+    return { start: leg ? minutesOn(date!, leg.arriveAt) + AFTER_LANDING : 15 * 60, end };
+  }
+  if (type === "departure") return { start: base, end: f && date ? Math.min(end, minutesOn(date, f.departAt) - BEFORE_TAKEOFF) : 12 * 60 };
   return { start: base, end };
 }
 
@@ -71,7 +101,7 @@ export function nextOpen(item: Pick<PlanItem, "hours" | "open24h">, date: string
 const mealTime = (meal: "lunch" | "dinner", ctx: DayContext) => (meal === "lunch" ? 13 * 60 + 30 : ctx.kids ? 19 * 60 : 20 * 60 + 30);
 
 export function scheduleDay(day: PlanDay, ctx: DayContext, cityCenter: { lat: number; lng: number }): ScheduledEntry[] {
-  const win = dayWindow(day.type, ctx);
+  const win = dayWindow(day.type, ctx, day.date);
   const fixed: ScheduledEntry[] = [];
   if (ctx.prayer) {
     const p = prayerTimes(day.date, cityCenter.lat, cityCenter.lng);
@@ -137,15 +167,22 @@ export function scheduleDay(day: PlanDay, ctx: DayContext, cityCenter: { lat: nu
     if (e.kind !== "item") continue;
     if (prevItem && e.start < prevItem.end && !e.warnings.includes("conflict")) e.warnings.push("conflict");
     if (e.item?.fixedStart && e.end > win.end + 15 && !e.warnings.includes("late")) e.warnings.push("late");
+    // With the flights booked: nothing before landing (plus the way to the hotel) or after leaving for the airport.
+    if (ctx.flights && day.type !== "full" && (e.start < win.start || e.end > win.end + 15) && !e.warnings.includes("flight")) {
+      e.warnings = [...e.warnings.filter((w) => w !== "late"), "flight"];
+    }
     // Travel time from whatever comes before (recomputed in the final order).
     if (prevItem?.item && e.item) e.travelMins = travelMinutes(prevItem.item, e.item);
     else if (!prevItem) e.travelMins = undefined;
     prevItem = e;
   }
-  if (day.type === "arrival") out.push({ kind: "arrival", start: win.start - 30, end: win.start, warnings: [] });
-  if (day.type === "transfer") out.push({ kind: "travel", start: 11 * 60, end: win.start, warnings: [] });
+  if (day.type === "arrival") out.push({ kind: "arrival", start: ctx.flights ? win.start - AFTER_LANDING : win.start - 30, end: win.start, warnings: [] });
+  if (day.type === "transfer") {
+    const leg = ctx.flights?.transfers[day.date];
+    out.push({ kind: "travel", start: leg ? minutesOn(day.date, leg.departAt) - 120 : 11 * 60, end: win.start, warnings: [] });
+  }
   out.push(...placed);
-  if (day.type === "departure") out.push({ kind: "departure", start: win.end, end: win.end, warnings: [] });
+  if (day.type === "departure") out.push({ kind: "departure", start: win.end, end: ctx.flights ? win.end + BEFORE_TAKEOFF : win.end, warnings: [] });
   return out;
 }
 

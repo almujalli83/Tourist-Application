@@ -8,17 +8,17 @@ import type { CardInput } from "../payment";
 import type { PublicUser } from "../auth/types";
 import { PACKAGE_LIMITS, VISA_INSURANCE_FEE_SAR } from "../config";
 import { addDays, todayISO } from "../dates";
-import { availability as eventAvailability, EventOrderError, getEvent, openSessions, placeOrder } from "../events/orders";
+import { availability as eventAvailability, EventOrderError, getEvent, holdTickets, openSessions, orderIdFor, placeOrder } from "../events/orders";
 import type { EventItem } from "../events/types";
 import { buildLegs, stayDates, validateCriteria } from "../itinerary";
 import { checkPackageRequirements } from "../package-rules";
 import { computePackagePrice } from "../pricing";
-import { availability as tableAvailability, bookTable, feeFor, RestaurantBookingError } from "../restaurants/bookings";
+import { availability as tableAvailability, bookingIdFor, bookTable, feeFor, holdTable, RestaurantBookingError } from "../restaurants/bookings";
 import { BOOKING_DAYS_AHEAD, getRestaurant } from "../restaurants/catalog";
 import type { ActivityOffer, FlightLeg, FlightOffer, HotelOffer, SearchCriteria } from "../types";
 import { CITY_CENTERS } from "../guide/centers";
 import { partyOf } from "./budget";
-import { scheduleDay } from "./schedule";
+import { flightTimesFrom, scheduleDay, type FlightTimes } from "./schedule";
 import { planCriteria } from "./handoff";
 import type { BudgetTier, Interest, TripPlan } from "./types";
 
@@ -29,7 +29,8 @@ export type AutoNote =
   | { code: "budgetDowngrade"; stars: number }
   | { code: "addedActivities"; count: number }
   | { code: "overBudget"; totalSAR: number; maxSAR: number }
-  | { code: "noOffers"; what: "flights" | "hotels" };
+  | { code: "noOffers"; what: "flights" | "hotels" }
+  | { code: "arrivalAdjusted"; time: string };
 
 export interface AutoSelection {
   criteria: SearchCriteria;
@@ -41,9 +42,15 @@ export interface AutoSelection {
   activities: string[];
   packageTotalSAR: number;
   notes: AutoNote[];
+  /** Times of the chosen flights, which the plan's days are fitted to. */
+  flightTimes: FlightTimes | null;
 }
 
-export class ExecuteError extends Error {}
+export class ExecuteError extends Error {
+  constructor(code: string, public details?: unknown) {
+    super(code);
+  }
+}
 
 const TIER_STARS: Record<BudgetTier, number> = { economy: 3, comfort: 4, luxury: 5 };
 const hhmm = (iso: string) => iso.slice(11, 16);
@@ -91,7 +98,8 @@ export async function autoSelect(plan: TripPlan, extrasSAR = 0): Promise<AutoSel
   ]);
   const notes: AutoNote[] = [];
   const flights = legs.map((_, i) => pickFlight(fl[i].offers));
-  if (flights.some((f) => !f)) throw new ExecuteError("noFlights");
+  // No flight for a date of the plan: the traveller chooses nearby dates (the plan is not moved silently).
+  if (flights.some((f) => !f)) throw new ExecuteError("noFlights", { alternatives: await alternativeDates(plan) });
   const wanted = TIER_STARS[plan.request.budgetTier];
   let hotels = stays.map((_, i) => pickHotel(ho[i].offers, wanted));
   if (hotels.some((h) => !h)) throw new ExecuteError("noHotels");
@@ -134,6 +142,7 @@ export async function autoSelect(plan: TripPlan, extrasSAR = 0): Promise<AutoSel
   if (activities.length) notes.push({ code: "addedActivities", count: activities.length });
   if (max && total + extrasSAR > max) notes.push({ code: "overBudget", totalSAR: Math.round(total + extrasSAR), maxSAR: max });
 
+  const times = flightTimesFrom(flights as FlightOffer[]);
   const rules = checkPackageRequirements({ criteria, flights: flights as FlightOffer[], hotels: hotels as HotelOffer[], totalSAR: total, today: todayISO() });
   if (!rules.ok) throw new ExecuteError(`requirements:${rules.checks.filter((c) => !c.ok).map((c) => c.id).join(",")}`);
 
@@ -146,21 +155,36 @@ export async function autoSelect(plan: TripPlan, extrasSAR = 0): Promise<AutoSel
     hotels: Object.fromEntries(hotels.map((h) => [h!.city, h!.id])),
     activities: activities.map((a) => a.id),
     packageTotalSAR: Math.round(total * 100) / 100,
-    notes,
+    notes: [...notes, ...(times && times.arriveAt.slice(11, 16) > "16:00" ? [{ code: "arrivalAdjusted" as const, time: times.arriveAt.slice(11, 16) }] : [])],
+    flightTimes: times,
   };
+}
+
+/** Nearby arrival dates (±1–3 days, same length) on which every flight of the plan is available. */
+export async function alternativeDates(plan: TripPlan, max = 3): Promise<{ departureDate: string; returnDate: string }[]> {
+  const out: { departureDate: string; returnDate: string }[] = [];
+  const base = planCriteria(plan);
+  for (const delta of [1, -1, 2, -2, 3, -3]) {
+    if (out.length >= max) break;
+    const c: SearchCriteria = { ...base, departureDate: addDays(base.departureDate, delta), returnDate: addDays(base.returnDate, delta) };
+    if (validateCriteria(c, todayISO()).length) continue;
+    const results = await Promise.all(buildLegs(c).map((leg) => searchFlights({ leg, pax: c.pax, cabin: c.cabin })));
+    if (results.every((r) => r.offers.length)) out.push({ departureDate: c.departureDate, returnDate: c.returnDate });
+  }
+  return out.sort((a, b) => a.departureDate.localeCompare(b.departureDate));
 }
 
 /* ------------------------------------------------------------------ plan extras */
 
 export interface ExtraEvent {
-  itemId: string; eventId: string; sessionId: string; date: string; time: string; titleAr: string; titleEn: string;
+  itemId: string; key: string; eventId: string; sessionId: string; date: string; time: string; titleAr: string; titleEn: string;
   seats?: string[]; quantities?: Record<string, number>; tickets: number; totalSAR: number;
 }
 export interface ExtraTable {
-  itemId: string; restaurantId: string; day: string; time: string; party: number; feeSAR: number; titleAr: string; titleEn: string; meal: "lunch" | "dinner";
+  itemId: string; key: string; restaurantId: string; day: string; time: string; party: number; feeSAR: number; titleAr: string; titleEn: string; meal: "lunch" | "dinner";
 }
-export interface ExtraIssue { itemId: string; titleAr: string; titleEn: string; reason: "soldOut" | "closed" | "tooFar" | "full" | "tooMany" }
-export interface PlanExtras { events: ExtraEvent[]; tables: ExtraTable[]; issues: ExtraIssue[]; totalSAR: number }
+export interface ExtraIssue { itemId: string; titleAr: string; titleEn: string; reason: "soldOut" | "closed" | "tooFar" | "full" | "tooMany" | "flightConflict" }
+export interface PlanExtras { events: ExtraEvent[]; tables: ExtraTable[]; issues: ExtraIssue[]; totalSAR: number; heldUntil?: number | null }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
@@ -202,7 +226,11 @@ function pickQuantities(e: EventItem, ages: number[], adults: number, remaining:
   return Object.entries(q).every(([id, n]) => (remaining[id] ?? 0) >= n) ? q : null;
 }
 
-export async function planExtras(plan: TripPlan, now = new Date()): Promise<PlanExtras> {
+/**
+ * The plan's tickets and tables for the party. With the booked `flights`, activities that clash
+ * with them are left out; with `userId`, the traveller's own temporary holds don't count as taken.
+ */
+export async function planExtras(plan: TripPlan, now = new Date(), opts: { flights?: FlightTimes | null; userId?: string } = {}): Promise<PlanExtras> {
   const party = partyOf(plan.request.rooms);
   const ages = plan.request.rooms.flatMap((r) => r.childAges).filter((a) => a >= 2); // infants go on a lap
   const kids = party.youngest !== null;
@@ -210,9 +238,13 @@ export async function planExtras(plan: TripPlan, now = new Date()): Promise<Plan
   const lastBookable = addDays(todayISO(), BOOKING_DAYS_AHEAD);
   for (const day of plan.days) {
     // The table is booked for the time the day's schedule gives the meal (moved around events and prayers).
-    const schedule = scheduleDay(day, { pace: plan.request.pace, prayer: plan.request.prayer, kids }, CITY_CENTERS[day.city] ?? CITY_CENTERS.RUH);
+    const schedule = scheduleDay(day, { pace: plan.request.pace, prayer: plan.request.prayer, kids, flights: opts.flights }, CITY_CENTERS[day.city] ?? CITY_CENTERS.RUH);
     for (const item of day.items) {
       const base = { itemId: item.id, titleAr: item.titleAr, titleEn: item.titleEn };
+      if ((item.kind === "event" || item.kind === "restaurant") && schedule.find((e) => e.item?.id === item.id)?.warnings.includes("flight")) {
+        out.issues.push({ ...base, reason: "flightConflict" });
+        continue;
+      }
       if (item.kind === "event") {
         const [eventId, when = ""] = item.ref.slice("event:".length).split("@");
         const e = await getEvent(eventId, { from: day.date, to: day.date });
@@ -226,8 +258,9 @@ export async function planExtras(plan: TripPlan, now = new Date()): Promise<Plan
           out.issues.push({ ...base, reason: "tooMany" });
           continue;
         }
-        const avail = await eventAvailability(e, session.id);
-        const ev: ExtraEvent = { ...base, eventId, sessionId: session.id, date: day.date, time: when.slice(11, 16), tickets: count, totalSAR: 0 };
+        const key = `plan:${plan.id}:${item.id}:${session.id}`;
+        const avail = await eventAvailability(e, session.id, { now: now.getTime(), except: opts.userId ? orderIdFor(opts.userId, key) : undefined });
+        const ev: ExtraEvent = { ...base, key, eventId, sessionId: session.id, date: day.date, time: when.slice(11, 16), tickets: count, totalSAR: 0 };
         if (e.seating === "seated") {
           const seats = pickSeats(e, new Set(avail.unavailable), count);
           if (!seats) {
@@ -255,14 +288,15 @@ export async function planExtras(plan: TripPlan, now = new Date()): Promise<Plan
         }
         const size = Math.min(r.maxParty, party.adults + party.children + party.infants);
         const target = schedule.find((e) => e.item?.id === item.id)?.start ?? (item.meal === "lunch" ? 13 * 60 + 30 : kids ? 19 * 60 : 20 * 60 + 30);
-        const slot = (await tableAvailability(r, day.date, now))
+        const key = `plan:${plan.id}:${item.id}:${day.date}`;
+        const slot = (await tableAvailability(r, day.date, now, opts.userId ? bookingIdFor(opts.userId, key) : undefined))
           .filter((s) => s.bookable && s.left >= size && (item.meal === "lunch" ? toMin(s.time) < 17 * 60 : toMin(s.time) >= 17 * 60))
           .sort((a, b) => Math.abs(toMin(a.time) - target) - Math.abs(toMin(b.time) - target))[0];
         if (!slot) {
           out.issues.push({ ...base, reason: "full" });
           continue;
         }
-        out.tables.push({ ...base, restaurantId: r.id, day: day.date, time: slot.time, party: size, feeSAR: feeFor(r, size), meal: item.meal === "lunch" ? "lunch" : "dinner" });
+        out.tables.push({ ...base, key, restaurantId: r.id, day: day.date, time: slot.time, party: size, feeSAR: feeFor(r, size), meal: item.meal === "lunch" ? "lunch" : "dinner" });
       }
     }
   }
@@ -284,7 +318,7 @@ export async function bookPlanExtras(user: PublicUser, plan: TripPlan, extras: P
   for (const e of extras.events) {
     const base = { itemId: e.itemId, titleAr: e.titleAr, titleEn: e.titleEn };
     try {
-      const order = await placeOrder(user, { eventId: e.eventId, sessionId: e.sessionId, seats: e.seats, quantities: e.quantities, expectedTotalSAR: e.totalSAR, idempotencyKey: `plan:${bookingId}:${e.itemId}`, card }, now);
+      const order = await placeOrder(user, { eventId: e.eventId, sessionId: e.sessionId, seats: e.seats, quantities: e.quantities, expectedTotalSAR: e.totalSAR, idempotencyKey: e.key, card }, now);
       res.events.push({ ...base, orderId: order.id });
     } catch (err) {
       if (!(err instanceof EventOrderError)) console.error("plan event order failed", err);
@@ -294,7 +328,7 @@ export async function bookPlanExtras(user: PublicUser, plan: TripPlan, extras: P
   for (const t of extras.tables) {
     const base = { itemId: t.itemId, titleAr: t.titleAr, titleEn: t.titleEn };
     try {
-      const b = await bookTable(user, { restaurantId: t.restaurantId, day: t.day, time: t.time, party: t.party, expectedFeeSAR: t.feeSAR, idempotencyKey: `plan:${bookingId}:${t.itemId}`, card }, now);
+      const b = await bookTable(user, { restaurantId: t.restaurantId, day: t.day, time: t.time, party: t.party, expectedFeeSAR: t.feeSAR, idempotencyKey: t.key, card }, now);
       res.tables.push({ ...base, bookingId: b.id });
     } catch (err) {
       if (!(err instanceof RestaurantBookingError)) console.error("plan table booking failed", err);
@@ -305,4 +339,32 @@ export async function bookPlanExtras(user: PublicUser, plan: TripPlan, extras: P
 }
 
 /** Same extras as when the traveller saw them (checked again before paying). */
+/**
+ * Holds the plan's seats / tickets and tables while the traveller completes the booking. Those that
+ * can no longer be held move to the issues (and out of the amount to pay).
+ */
+export async function holdPlanExtras(user: PublicUser, extras: PlanExtras, minutes = HOLD_MINUTES): Promise<PlanExtras> {
+  const out: PlanExtras = { ...extras, events: [], tables: [], issues: [...extras.issues] };
+  let until = Infinity;
+  for (const e of extras.events) {
+    const h = await holdTickets(user, { eventId: e.eventId, sessionId: e.sessionId, seats: e.seats, quantities: e.quantities, idempotencyKey: e.key }, minutes);
+    if (h.ok) {
+      out.events.push(e);
+      until = Math.min(until, h.until);
+    } else out.issues.push({ itemId: e.itemId, titleAr: e.titleAr, titleEn: e.titleEn, reason: "soldOut" });
+  }
+  for (const t of extras.tables) {
+    const h = await holdTable(user, { restaurantId: t.restaurantId, day: t.day, time: t.time, party: t.party, idempotencyKey: t.key }, minutes);
+    if (h.ok) {
+      out.tables.push(t);
+      until = Math.min(until, h.until);
+    } else out.issues.push({ itemId: t.itemId, titleAr: t.titleAr, titleEn: t.titleEn, reason: "full" });
+  }
+  out.totalSAR = round2(out.events.reduce((a, e) => a + e.totalSAR, 0) + out.tables.reduce((a, t) => a + t.feeSAR, 0));
+  out.heldUntil = Number.isFinite(until) ? until : null;
+  return out;
+}
+
+export const HOLD_MINUTES = 20;
+
 export const extrasKey = (x: PlanExtras) => JSON.stringify([x.events.map((e) => [e.itemId, e.sessionId, e.totalSAR]), x.tables.map((t) => [t.itemId, t.day, t.time, t.feeSAR])]);

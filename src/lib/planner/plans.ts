@@ -10,6 +10,7 @@ import { VISA_INSURANCE_FEE_SAR } from "../config";
 import { addDays } from "../dates";
 import { store } from "../store";
 import { estimateBudget } from "./budget";
+import { flightTimesFrom } from "./schedule";
 import { loadPools, plannerCities } from "./catalog";
 import { buildSkeleton, fillDays, normalizeStays, PlanError, sanitizeRequest, type Generated } from "./generate";
 import { PLANNER_LIMITS, type TripPlan } from "./types";
@@ -99,7 +100,7 @@ export function bookingMatchesPlan(plan: Pick<TripPlan, "request" | "stays">, cr
 }
 
 /** Attaches the plan to the booking made from it (when it still matches); returns whether it was attached. */
-export async function linkPlanToBooking(userId: string, planId: unknown, booking: Pick<StoredBooking, "id" | "reference" | "criteria">): Promise<boolean> {
+export async function linkPlanToBooking(userId: string, planId: unknown, booking: Pick<StoredBooking, "id" | "reference" | "criteria"> & { flights?: StoredBooking["flights"] }): Promise<boolean> {
   if (typeof planId !== "string" || !planId) return false;
   const plan = await getPlan(userId, planId);
   if (!plan || plan.status !== "draft" || !bookingMatchesPlan(plan, booking.criteria)) return false;
@@ -107,11 +108,45 @@ export async function linkPlanToBooking(userId: string, planId: unknown, booking
   await store().update<TripPlan>(COL, planId, (p) => {
     if (p.status !== "draft") return p;
     ok = true;
-    return { ...p, status: "booked", bookingId: booking.id, bookingReference: booking.reference, updatedAt: new Date().toISOString() };
+    return { ...p, status: "booked", bookingId: booking.id, bookingReference: booking.reference, flightTimes: booking.flights ? flightTimesFrom(booking.flights) : null, updatedAt: new Date().toISOString() };
   });
   return ok;
 }
 
 export async function planForBooking(userId: string, bookingId: string): Promise<TripPlan | null> {
   return (await listPlans(userId)).find((p) => p.bookingId === bookingId) ?? null;
+}
+
+/**
+ * Moves a draft plan to a new arrival date (same cities and nights), keeping every activity:
+ * events are kept when they have a session at the same time on the new day, otherwise removed and
+ * reported.
+ */
+export async function shiftPlanDates(user: PublicUser, id: string, departureDate: unknown, today: string): Promise<{ plan: TripPlan; dropped: { titleAr: string; titleEn: string }[] }> {
+  const current = await getPlan(user.id, id);
+  if (!current) throw new PlanError("notFound");
+  if (current.status !== "draft") throw new PlanError("locked");
+  const req = sanitizeRequest({ ...current.request, departureDate }, today);
+  const nights = current.stays.reduce((a, s) => a + s.nights, 0);
+  const returnDate = addDays(req.departureDate, nights);
+  const skeleton = buildSkeleton(req.departureDate, current.stays);
+  const raw = current.days.map((d, i) => ({
+    date: skeleton[i].date,
+    title: d.title,
+    items: d.items.map((it) => ({
+      id: it.id, note: it.note, meal: it.meal,
+      ref: it.kind === "event" ? `${it.ref.split("@")[0]}@${skeleton[i].date}T${it.ref.split("T").pop()}` : it.ref,
+    })),
+  }));
+  const pools = await loadPools(current.stays.map((s) => s.city), req.departureDate, returnDate);
+  const days = fillDays(skeleton, raw, pools, req, current.locale);
+  const kept = new Set(days.flatMap((d) => d.items.map((x) => x.id)));
+  const dropped = current.days.flatMap((d) => d.items).filter((x) => !kept.has(x.id)).map((x) => ({ titleAr: x.titleAr, titleEn: x.titleEn }));
+  const saved = await store().update<TripPlan>(COL, id, (p) => ({
+    ...p, request: req, returnDate, days,
+    budget: estimateBudget(req, p.stays, days, p.budget.visaSAR / Math.max(1, req.rooms.reduce((a, r) => a + r.adults + r.childAges.length, 0))),
+    updatedAt: new Date().toISOString(),
+  }));
+  if (!saved) throw new PlanError("notFound");
+  return { plan: saved, dropped };
 }

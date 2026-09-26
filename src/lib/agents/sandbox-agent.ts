@@ -34,6 +34,8 @@ export function createSandboxAgent(opts: {
 
     async searchFlights({ leg, cabin }) {
       await wait();
+      // Test hook: SANDBOX_NO_FLIGHT_DATES=YYYY-MM-DD,… makes the sandbox agents return no flights on those dates.
+      if ((process.env.SANDBOX_NO_FLIGHT_DATES ?? "").split(",").map((d) => d.trim()).includes(leg.date)) return [];
       const r = rng(`${opts.id}|F|${leg.from}|${leg.to}|${leg.date}|${cabin}`);
       const domestic = leg.kind === "domestic";
       const count = r.int(2, 4);
