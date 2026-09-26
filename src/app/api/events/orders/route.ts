@@ -12,7 +12,7 @@ export const POST = handle(async (req: Request) => {
   const user = await currentUser();
   if (!user) return error("unauthorized", 401);
   const input = await body<OrderInput>(req);
-  if (!input?.card || typeof input.eventId !== "string" || typeof input.sessionId !== "string") return error("invalidRequest", 400);
+  if (!input || typeof input.eventId !== "string" || typeof input.sessionId !== "string") return error("invalidRequest", 400);
   try {
     return json({ order: await placeOrder(user, input) }, 201);
   } catch (e) {

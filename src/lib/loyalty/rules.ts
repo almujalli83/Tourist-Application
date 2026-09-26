@@ -12,13 +12,20 @@ export const LOYALTY = {
    * price sent to the Ministry of Tourism is what the traveller pays; eSIMs only earn.
    */
   redeemableOn: ["event", "train"] as EarnService[],
-  /** Points per riyal paid by card (visa & insurance fees are not counted). */
-  pointsPerSAR: { package: 2, event: 1, train: 1, esim: 1 } as Record<EarnService, number>,
+  /**
+   * Points for each full block of riyals paid by card (visa & insurance fees are not counted):
+   * packages 2 points per 50 SAR; event tickets, train tickets and eSIMs 1 point per 20 SAR.
+   */
+  earnRates: {
+    package: { points: 2, perSAR: 50 },
+    event: { points: 1, perSAR: 20 },
+    train: { points: 1, perSAR: 20 },
+    esim: { points: 1, perSAR: 20 },
+  } as Record<EarnService, { points: number; perSAR: number }>,
   /** 100 points = 5 SAR. */
   sarPerPoint: 0.05,
-  minRedeemPoints: 500,
-  /** Points pay at most this share of a purchase. */
-  maxRedeemShare: 0.3,
+  /** Points can be used from 100 (= SAR 5). */
+  minRedeemPoints: 100,
   /** Points expire 24 months after they were earned; a reminder is sent 30 days before. */
   expiryMonths: 24,
   expiryReminderDays: 30,
@@ -50,7 +57,9 @@ export function tierFor(spendSAR: number) {
 /** Points earned for a card payment (after the points discount, without government fees). */
 export function earnPoints(input: { service: EarnService; eligibleSAR: number; tierMultiplier?: number; campaignMultiplier?: number }): number {
   if (!(input.eligibleSAR > 0)) return 0;
-  const raw = input.eligibleSAR * LOYALTY.pointsPerSAR[input.service] * (input.tierMultiplier ?? 1) * (input.campaignMultiplier ?? 1);
+  const rate = LOYALTY.earnRates[input.service];
+  const blocks = Math.floor(input.eligibleSAR / rate.perSAR + 1e-9);
+  const raw = blocks * rate.points * (input.tierMultiplier ?? 1) * (input.campaignMultiplier ?? 1);
   return Math.floor(raw + 1e-9);
 }
 
@@ -60,10 +69,12 @@ export function pointsValueSAR(points: number): number {
 
 export const canRedeemOn = (service: string) => (LOYALTY.redeemableOn as string[]).includes(service);
 
-/** Most points usable on a purchase (30% of its price); 0 when less than the 500-point minimum could be used. */
+/**
+ * Most points usable on a purchase: the whole balance, up to the full price (then nothing is left
+ * to pay by card). 0 when less than the 100-point minimum could be used.
+ */
 export function maxRedeemable(input: { totalSAR: number; balance: number }): number {
-  const capSAR = input.totalSAR * LOYALTY.maxRedeemShare;
-  const max = Math.min(Math.floor(capSAR / LOYALTY.sarPerPoint + 1e-9), Math.floor(input.balance));
+  const max = Math.min(Math.floor(input.totalSAR / LOYALTY.sarPerPoint + 1e-9), Math.floor(input.balance));
   return max >= LOYALTY.minRedeemPoints ? max : 0;
 }
 

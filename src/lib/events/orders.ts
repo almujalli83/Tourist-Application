@@ -10,7 +10,7 @@ import { todayISO } from "../dates";
 import { notifyTravellers } from "../notify";
 import { awardPurchase, holdRedeem, LoyaltyError, quietly, releaseRedeem, returnRedeemed, reversePurchase } from "../loyalty/loyalty";
 import { pointsEmailLine } from "../loyalty/rules";
-import { chargeCard, refundPayment, type CardInput } from "../payment";
+import { chargeRest, refundPayment, type CardInput } from "../payment";
 import { store } from "../store";
 import { isKnownSeat, listCatalog, sessionDay, type DateRange, providerCancel, providerPurchase, providerSoldCount, providerSoldSeat } from "./catalog";
 import { listSeasons } from "./seasons";
@@ -177,7 +177,8 @@ export interface OrderInput {
   expectedTotalSAR: number;
   idempotencyKey: string;
   displayCurrency?: string;
-  card: CardInput;
+  /** Not needed when reward points pay the whole price. */
+  card?: CardInput;
   /** Reward points used on the order (service 10). */
   redeemPoints?: number;
 }
@@ -233,7 +234,7 @@ export async function placeOrder(user: PublicUser, input: OrderInput, now = new 
     throw err instanceof LoyaltyError ? new EventOrderError(err.code) : err;
   }
   const cardSAR = round2(totalSAR - (hold?.discountSAR ?? 0));
-  const pay = await chargeCard(input.card, cardSAR, now);
+  const pay = await chargeRest(input.card, cardSAR, now);
   if (!pay.ok) {
     await release(session.id, lines, id);
     await releaseRedeem(user.id, hold, now);
@@ -262,7 +263,7 @@ export async function placeOrder(user: PublicUser, input: OrderInput, now = new 
   };
   if (!(await store().insert("eventOrders", id, order))) {
     // Same request submitted twice at once: keep the first order, undo this one.
-    await refundPayment(pay.transactionId, cardSAR);
+    if (cardSAR > 0) await refundPayment(pay.transactionId, cardSAR);
     await releaseRedeem(user.id, hold, now);
     return (await store().get<EventOrder>("eventOrders", id))!;
   }
@@ -312,14 +313,14 @@ export async function cancelOrder(user: PublicUser, id: string, now = new Date()
   });
   if (!claimed) throw new EventOrderError("notCancellable");
   // The card is refunded what it paid; points used come back and points earned are taken back.
-  const refund = await refundPayment(o.payment.transactionId, o.payment.amountSAR);
+  const refund = o.payment.amountSAR > 0 ? await refundPayment(o.payment.transactionId, o.payment.amountSAR) : null;
   await providerCancel(o.providerRef);
   await release(o.session.id, o.tickets.map((t) => t.line), o.id);
   await quietly("event points return", () => returnRedeemed(user.id, o.id, now), 0);
   await quietly("event points reversal", () => reversePurchase(user.id, [o.id], 1, now), 0);
   const done = await store().update<EventOrder>("eventOrders", id, (cur) => ({
     ...cur,
-    cancellation: { at: now.toISOString(), refundSAR: refund.ok ? o.payment.amountSAR : 0, refundId: refund.ok ? refund.refundId : "" },
+    cancellation: { at: now.toISOString(), refundSAR: refund?.ok ? o.payment.amountSAR : 0, refundId: refund?.ok ? refund.refundId : "" },
   }));
   await notifyTravellers([o.holderEmail], orderEmail(done!, "cancelled", user.preferredLocale));
   return done!;

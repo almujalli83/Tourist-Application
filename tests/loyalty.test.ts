@@ -32,10 +32,12 @@ afterEach(() => {
 });
 
 describe("loyalty rules", () => {
-  it("earns per riyal by service, tier and campaign", () => {
-    expect(earnPoints({ service: "package", eligibleSAR: 1000 })).toBe(2000);
-    expect(earnPoints({ service: "event", eligibleSAR: 99.99 })).toBe(99);
-    expect(earnPoints({ service: "train", eligibleSAR: 100, tierMultiplier: 1.25, campaignMultiplier: 2 })).toBe(250);
+  it("earns per full block of riyals by service, tier and campaign", () => {
+    expect(earnPoints({ service: "package", eligibleSAR: 1000 })).toBe(40); // 2 per SAR 50
+    expect(earnPoints({ service: "package", eligibleSAR: 49.99 })).toBe(0);
+    expect(earnPoints({ service: "event", eligibleSAR: 99.99 })).toBe(4); // 1 per SAR 20
+    expect(earnPoints({ service: "esim", eligibleSAR: 100 })).toBe(5);
+    expect(earnPoints({ service: "train", eligibleSAR: 100, tierMultiplier: 1.25, campaignMultiplier: 2 })).toBe(12);
     expect(earnPoints({ service: "esim", eligibleSAR: 0 })).toBe(0);
     expect(tierFor(0).tier.id).toBe("silver");
     expect(tierFor(15_000).tier.id).toBe("gold");
@@ -43,16 +45,19 @@ describe("loyalty rules", () => {
     expect(tierFor(50_000).next).toBeNull();
   });
 
-  it("limits redemption to 30%, from 500 points, and keeps 2,000 SAR per adult paid on packages", () => {
+  it("allows the whole balance, from 100 points, up to the full price", () => {
     expect(pointsValueSAR(100)).toBe(5);
-    expect(maxRedeemable({ totalSAR: 1000, balance: 10_000 })).toBe(6000); // 300 SAR
+    expect(maxRedeemable({ totalSAR: 1000, balance: 10_000 })).toBe(10_000); // 500 SAR
+    expect(maxRedeemable({ totalSAR: 100, balance: 10_000 })).toBe(2000); // the full 100 SAR
     expect(maxRedeemable({ totalSAR: 1000, balance: 700 })).toBe(700);
-    expect(maxRedeemable({ totalSAR: 1000, balance: 400 })).toBe(0);
-    expect(maxRedeemable({ totalSAR: 50, balance: 10_000 })).toBe(0); // 30% is 15 SAR = 300 points < 500
+    expect(maxRedeemable({ totalSAR: 1000, balance: 100 })).toBe(100); // SAR 5
+    expect(maxRedeemable({ totalSAR: 1000, balance: 99 })).toBe(0);
+    expect(maxRedeemable({ totalSAR: 4.99, balance: 10_000 })).toBe(0); // 99 points < 100
     expect(canRedeemOn("event") && canRedeemOn("train")).toBe(true);
     expect(canRedeemOn("package") || canRedeemOn("esim")).toBe(false);
-    expect(redeemError(499, { totalSAR: 1000, balance: 5000 })).toBe("redeemBelowMinimum");
-    expect(redeemError(6001, { totalSAR: 1000, balance: 10_000 })).toBe("redeemAboveMaximum");
+    expect(redeemError(99, { totalSAR: 1000, balance: 5000 })).toBe("redeemBelowMinimum");
+    expect(redeemError(100, { totalSAR: 1000, balance: 5000 })).toBeNull();
+    expect(redeemError(20_001, { totalSAR: 1000, balance: 30_000 })).toBe("redeemAboveMaximum");
     expect(redeemError(800, { totalSAR: 1000, balance: 700 })).toBe("redeemBalance");
     expect(redeemError(1.5, { totalSAR: 1000, balance: 700 })).toBe("redeemInvalid");
     expect(redeemError(0, { totalSAR: 1000, balance: 0 })).toBeNull();
@@ -69,8 +74,8 @@ describe("points ledger", () => {
   it("keeps purchase points pending until the service is over, once per purchase", async () => {
     const u = await member("pend");
     const now = at("2026-10-01T10:00:00Z");
-    expect(await earn(u, `ev-${run}`, 300, "2026-10-05T20:00:00Z", now)).toBe(300);
-    expect(await earn(u, `ev-${run}`, 300, "2026-10-05T20:00:00Z", now)).toBe(300); // same purchase again: not added twice
+    expect(await earn(u, `ev-${run}`, 6000, "2026-10-05T20:00:00Z", now)).toBe(300);
+    expect(await earn(u, `ev-${run}`, 6000, "2026-10-05T20:00:00Z", now)).toBe(300); // same purchase again: not added twice
     let s = (await loyaltySummary(u, now)).summary;
     expect([s.available, s.pending, s.lifetimeEarned]).toEqual([0, 300, 300]);
     s = (await loyaltySummary(u, at("2026-10-06T00:00:00Z"))).summary;
@@ -82,14 +87,14 @@ describe("points ledger", () => {
   it("holds points before payment, releases them if the payment fails, and returns them on cancellation", async () => {
     const u = await member("redeem");
     const now = at("2026-10-01T10:00:00Z");
-    await earn(u, `a-${run}`, 2000, now.toISOString(), now);
+    await earn(u, `a-${run}`, 40_000, now.toISOString(), now);
     const hold = await holdRedeem(u, { points: 1000, totalSAR: 500, source: { kind: "event", id: `o-${run}` } }, now);
     expect(hold).toMatchObject({ points: 1000, discountSAR: 50 });
     expect((await loyaltySummary(u, now)).summary.available).toBe(1000);
     await releaseRedeem(u.id, hold, now);
     expect((await loyaltySummary(u, now)).summary.available).toBe(2000);
     await expect(holdRedeem(u, { points: 3000, totalSAR: 5000, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemBalance" });
-    await expect(holdRedeem(u, { points: 1000, totalSAR: 100, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemAboveMaximum" });
+    await expect(holdRedeem(u, { points: 1000, totalSAR: 40, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemAboveMaximum" });
     // Packages (price sent to MT) and eSIMs are never paid with points.
     await expect(holdRedeem(u, { points: 500, totalSAR: 5000, source: { kind: "package", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemNotAllowed" });
     await expect(holdRedeem(u, { points: 500, totalSAR: 5000, source: { kind: "esim", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemNotAllowed" });
@@ -108,7 +113,7 @@ describe("points ledger", () => {
   it("takes back earned points in proportion to a refund, owing what was already used", async () => {
     const u = await member("rev");
     const now = at("2026-10-01T10:00:00Z");
-    await earn(u, `p-${run}`, 1000, now.toISOString(), now);
+    await earn(u, `p-${run}`, 20_000, now.toISOString(), now);
     expect(await reversePurchase(u.id, [`p-${run}`], 0.25, now)).toBe(250);
     expect((await loyaltySummary(u, now)).summary.available).toBe(750);
     await holdRedeem(u, { points: 700, totalSAR: 5000, source: { kind: "event", id: `spent-${run}` } }, now);
@@ -117,7 +122,7 @@ describe("points ledger", () => {
     expect([s.available, s.deficit]).toEqual([0, 700]);
     expect(s.spend12mSAR).toBe(0);
     // The next points pay the deficit first.
-    await earn(u, `q-${run}`, 1000, now.toISOString(), now);
+    await earn(u, `q-${run}`, 20_000, now.toISOString(), now);
     s = (await loyaltySummary(u, now)).summary;
     expect([s.available, s.deficit]).toEqual([300, 0]);
   });
@@ -125,7 +130,7 @@ describe("points ledger", () => {
   it("expires points after 24 months with one reminder 30 days before", async () => {
     const u = await member("exp");
     const earned = at("2026-01-10T10:00:00Z");
-    await earn(u, `e-${run}`, 400, earned.toISOString(), earned);
+    await earn(u, `e-${run}`, 8000, earned.toISOString(), earned);
     const soon = at("2027-12-20T10:00:00Z");
     expect(await expiryReminders(u.id, soon)).toBe(1);
     expect(await expiryReminders(u.id, soon)).toBe(0);
@@ -145,12 +150,12 @@ describe("points ledger", () => {
     const now = at("2026-11-01T10:00:00Z");
     await earn(u, `big-${run}`, 16_000, now.toISOString(), now, "train");
     expect((await loyaltySummary(u, now)).summary.tier.id).toBe("gold");
-    expect(await earn(u, `t2-${run}`, 100, now.toISOString(), now, "train")).toBe(125);
+    expect(await earn(u, `t2-${run}`, 2000, now.toISOString(), now, "train")).toBe(125);
     const c = await createCampaign(admin, { nameAr: "موسم الرياض", nameEn: "Riyadh Season", from: "2026-11-01", to: "2026-11-30", multiplier: 2, services: ["event"], cities: ["RUH"] }, now);
-    expect(await earn(u, `t3-${run}`, 100, now.toISOString(), now, "event", ["RUH"])).toBe(250);
-    expect(await earn(u, `t4-${run}`, 100, now.toISOString(), now, "event", ["JED"])).toBe(125);
+    expect(await earn(u, `t3-${run}`, 2000, now.toISOString(), now, "event", ["RUH"])).toBe(250);
+    expect(await earn(u, `t4-${run}`, 2000, now.toISOString(), now, "event", ["JED"])).toBe(125);
     await updateCampaign(c.id, { active: false });
-    expect(await earn(u, `t5-${run}`, 100, now.toISOString(), now, "event", ["RUH"])).toBe(125);
+    expect(await earn(u, `t5-${run}`, 2000, now.toISOString(), now, "event", ["RUH"])).toBe(125);
     await expect(createCampaign(admin, { nameAr: "x", nameEn: "x", from: "2026-11-02", to: "2026-11-01", multiplier: 2 })).rejects.toMatchObject({ code: "campaignDates" });
     // A year later the spend no longer counts.
     expect((await loyaltySummary(u, at("2027-11-02T10:00:00Z"))).summary.tier.id).toBe("silver");
@@ -164,8 +169,8 @@ describe("points ledger", () => {
     expect(await joinWithReferral(inviter, code)).toBe(false); // own code
     expect(await joinWithReferral(friend, "NOPE")).toBe(false);
     expect(await joinWithReferral(friend, code.toLowerCase())).toBe(true);
-    await earn(friend, `f1-${run}`, 100, now.toISOString(), now);
-    await earn(friend, `f2-${run}`, 100, now.toISOString(), now);
+    await earn(friend, `f1-${run}`, 2000, now.toISOString(), now);
+    await earn(friend, `f2-${run}`, 2000, now.toISOString(), now);
     expect((await loyaltySummary(friend, now)).summary.available).toBe(200 + 250);
     expect((await loyaltySummary(inviter, now)).summary.available).toBe(500);
   });
@@ -205,8 +210,8 @@ describe("purchases", () => {
     const u = await member("buyer");
     const e = (await eventsCatalog()).find((x) => x.id === "ruh-boulevard-entry")!;
     const session = openSessions(e)[2];
-    const now = new Date();
-    await earn(u, `seed-${run}`, 1000, now.toISOString(), now);
+    // 1,000 points from the back office (no spend, so the tier stays silver).
+    await adminAdjust({ ...(await member("boss2")), isAdmin: true }, u.email, 1000, "test balance");
     const quantities = { adult: 5 };
     const price = e.ticketTypes!.find((t) => t.id === "adult")!.priceSAR * 5;
     expect(price).toBeGreaterThan(84);
@@ -214,7 +219,7 @@ describe("purchases", () => {
     const order = await placeOrder(u, { eventId: e.id, sessionId: session.id, quantities, expectedTotalSAR: price, idempotencyKey: `pts-${run}`, card, redeemPoints: max });
     expect(order.totalSAR).toBe(price);
     expect(order.payment.amountSAR).toBe(Math.round((price - pointsValueSAR(max)) * 100) / 100);
-    expect(order.loyalty).toMatchObject({ redeemedPoints: max, discountSAR: pointsValueSAR(max), earnedPoints: Math.floor(order.payment.amountSAR) });
+    expect(order.loyalty).toMatchObject({ redeemedPoints: max, discountSAR: pointsValueSAR(max), earnedPoints: Math.floor(order.payment.amountSAR / 20) });
     let s = (await loyaltySummary(u)).summary;
     expect(s.available).toBe(1000 - max);
     expect(s.pending).toBe(order.loyalty!.earnedPoints);
@@ -231,6 +236,28 @@ describe("purchases", () => {
   });
 });
 
+describe("paid in full with points", () => {
+  it("confirms an event order without a card when points cover the price, and gives them back on cancellation", async () => {
+    const u = await member("allpoints");
+    await adminAdjust({ ...(await member("boss3")), isAdmin: true }, u.email, 10_000, "test balance");
+    const e = (await eventsCatalog()).find((x) => x.id === "ruh-boulevard-entry")!;
+    const session = openSessions(e)[3];
+    const price = e.ticketTypes!.find((t) => t.id === "adult")!.priceSAR * 2;
+    const points = maxRedeemable({ totalSAR: price, balance: 10_000 });
+    expect(pointsValueSAR(points)).toBe(price);
+    // Without enough points, a card is still needed.
+    await expect(placeOrder(u, { eventId: e.id, sessionId: session.id, quantities: { adult: 2 }, expectedTotalSAR: price, idempotencyKey: `np-${run}`, redeemPoints: points - 100 })).rejects.toMatchObject({ code: "payment_invalid_card" });
+    expect((await loyaltySummary(u)).summary.available).toBe(10_000);
+    const order = await placeOrder(u, { eventId: e.id, sessionId: session.id, quantities: { adult: 2 }, expectedTotalSAR: price, idempotencyKey: `ap-${run}`, redeemPoints: points });
+    expect(order.payment).toMatchObject({ method: "points", amountSAR: 0 });
+    expect(order.loyalty).toMatchObject({ redeemedPoints: points, earnedPoints: 0 });
+    expect((await loyaltySummary(u)).summary.available).toBe(10_000 - points);
+    const cancelled = await cancelOrder(u, order.id);
+    expect(cancelled.cancellation?.refundSAR).toBe(0);
+    expect((await loyaltySummary(u)).summary.available).toBe(10_000);
+  });
+});
+
 describe("sandbox samples", () => {
   it("adds sample points once for individual members (DEMO_LOYALTY=off disables them)", async () => {
     process.env.DEMO_LOYALTY = "off";
@@ -243,9 +270,10 @@ describe("sandbox samples", () => {
     await seedDemoLoyalty(u);
     const { summary, entries } = await loyaltySummary(u);
     expect(entries.every((e) => e.demo)).toBe(true);
-    expect(entries).toHaveLength(5);
-    expect(summary).toMatchObject({ available: 2250, pending: 180, demo: true });
-    expect(summary.expiring?.points).toBe(300);
+    expect(entries).toHaveLength(6);
+    // Event 15 (SAR 300) + trip 96 (SAR 2,400) + review 50 + sample balance 2,000 left; event 9 pending (SAR 180).
+    expect(summary).toMatchObject({ available: 2161, pending: 9, demo: true });
+    expect(summary.expiring?.points).toBe(15);
     const co = await member("demo-co", "company");
     await seedDemoLoyalty(co);
     expect(await getAccount(co.id)).toBeNull();

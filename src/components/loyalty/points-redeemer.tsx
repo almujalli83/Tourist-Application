@@ -20,7 +20,7 @@ export const afterPoints = (totalSAR: number, points: number) => Math.round((tot
 
 /**
  * Checkout box of the loyalty programme: the member's balance, the choice to pay part with points
- * (event and train tickets only: up to 30%, from 500 points) and the points this purchase will
+ * (event and train tickets only: the whole balance up to the full price, from 100 points) and the points this purchase will
  * earn. Hidden for company accounts and signed-out visitors.
  */
 export function PointsRedeemer({
