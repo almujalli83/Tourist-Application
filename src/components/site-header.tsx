@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { CURRENCIES } from "@/lib/currency";
 import { useApp } from "./app-provider";
 import { ChevronIcon, GlobeIcon, Logo, MenuIcon, UserIcon, XIcon } from "./icons";
+import { NotificationBell } from "./notification-bell";
 import { cx } from "./ui";
 
 export function SiteHeader() {
@@ -33,6 +34,7 @@ export function SiteHeader() {
     ? [
         { href: `/${locale}/account`, label: t.nav.myBookings },
         { href: `/${locale}/account/wallet`, label: t.wallet.nav },
+        { href: `/${locale}/account/notifications`, label: t.account.notifications.nav },
         ...(user.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
       ]
     : [];
@@ -109,51 +111,57 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 xl:flex">
-          {currencySelect}
-          <Link href={switchHref} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-medium hover:bg-white/10 2xl:px-3" hrefLang={otherLocale} aria-label={t.nav.language}>
-            <GlobeIcon className="size-4" />
-            <span className="hidden 2xl:inline">{t.nav.language}</span>
-            <span className="2xl:hidden">{otherLocale === "en" ? "EN" : "ع"}</span>
-          </Link>
-          {user ? (
-            <div className="relative" ref={accountRef}>
-              <button
-                type="button"
-                onClick={() => setAccountOpen((o) => !o)}
-                aria-expanded={accountOpen}
-                aria-haspopup="menu"
-                className={cx(
-                  "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-white/10 px-3 text-sm font-medium hover:bg-white/15",
-                  accountLinks.some((l) => l.href === activeHref) && "text-gold-100",
-                )}
-              >
-                <UserIcon className="size-4" />
-                {t.nav.account}
-                <ChevronIcon className={cx("size-3.5 transition-transform", accountOpen ? "-rotate-90" : "rotate-90")} />
-              </button>
-              {accountOpen && (
-                <div role="menu" className="absolute end-0 top-11 z-50 w-56 overflow-hidden rounded-xl bg-white py-1 text-ink shadow-xl ring-1 ring-black/5">
-                  {accountLinks.map((l) => (
-                    <Link key={l.href} role="menuitem" href={l.href} onClick={() => setAccountOpen(false)} className={cx("block px-4 py-2.5 text-sm font-medium hover:bg-brand-50", l.href === activeHref && "bg-brand-50 text-brand-800")}>
-                      {l.label}
-                    </Link>
-                  ))}
-                  <button role="menuitem" onClick={logout} className="block w-full border-t border-slate-100 px-4 py-2.5 text-start text-sm text-slate-600 hover:bg-slate-50">{t.nav.logout}</button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link href={`/${locale}/login`} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-gold-500 px-3 text-sm font-semibold hover:bg-gold-600 2xl:px-4">
-              <UserIcon className="size-4" />
-              {t.nav.login}
+        <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 xl:flex">
+            {currencySelect}
+            <Link href={switchHref} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-medium hover:bg-white/10 2xl:px-3" hrefLang={otherLocale} aria-label={t.nav.language}>
+              <GlobeIcon className="size-4" />
+              <span className="hidden 2xl:inline">{t.nav.language}</span>
+              <span className="2xl:hidden">{otherLocale === "en" ? "EN" : "ع"}</span>
             </Link>
-          )}
+          </div>
+          {user && <NotificationBell />}
+          <div className="hidden xl:block">
+            {user ? (
+              <div className="relative" ref={accountRef}>
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen((o) => !o)}
+                  aria-expanded={accountOpen}
+                  aria-haspopup="menu"
+                  className={cx(
+                    "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-white/10 px-3 text-sm font-medium hover:bg-white/15",
+                    accountLinks.some((l) => l.href === activeHref) && "text-gold-100",
+                  )}
+                >
+                  <UserIcon className="size-4" />
+                  {t.nav.account}
+                  <ChevronIcon className={cx("size-3.5 transition-transform", accountOpen ? "-rotate-90" : "rotate-90")} />
+                </button>
+                {accountOpen && (
+                  <div role="menu" className="absolute end-0 top-11 z-50 w-56 overflow-hidden rounded-xl bg-white py-1 text-ink shadow-xl ring-1 ring-black/5">
+                    {accountLinks.map((l) => (
+                      <Link key={l.href} role="menuitem" href={l.href} onClick={() => setAccountOpen(false)} className={cx("block px-4 py-2.5 text-sm font-medium hover:bg-brand-50", l.href === activeHref && "bg-brand-50 text-brand-800")}>
+                        {l.label}
+                      </Link>
+                    ))}
+                    <button role="menuitem" onClick={logout} className="block w-full border-t border-slate-100 px-4 py-2.5 text-start text-sm text-slate-600 hover:bg-slate-50">{t.nav.logout}</button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link href={`/${locale}/login`} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-gold-500 px-3 text-sm font-semibold hover:bg-gold-600 2xl:px-4">
+                <UserIcon className="size-4" />
+                {t.nav.login}
+              </Link>
+            )}
+          </div>
+          <div className="xl:hidden">
+            <button className="grid size-10 place-items-center rounded-md hover:bg-white/10" onClick={() => setOpen((o) => !o)} aria-label={t.nav.menu} aria-expanded={open}>
+              {open ? <XIcon className="size-6" /> : <MenuIcon className="size-6" />}
+            </button>
+          </div>
         </div>
-
-        <button className="grid size-10 place-items-center rounded-md hover:bg-white/10 xl:hidden" onClick={() => setOpen((o) => !o)} aria-label={t.nav.menu} aria-expanded={open}>
-          {open ? <XIcon className="size-6" /> : <MenuIcon className="size-6" />}
-        </button>
       </div>
 
       {open && (
