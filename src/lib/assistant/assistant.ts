@@ -38,6 +38,7 @@ const PAGES = [
   ["Notifications: trip reminders (before arrival, before departure, visa expiry) and rating requests", "/{locale}/account/notifications"],
   ["My reviews: rate verified experiences (trip, hotels, airlines, events, restaurants, landmarks, Saudi Trip services); low ratings link to the Ministry of Tourism complaint service", "/{locale}/account/reviews"],
   ["Service ratings (public verified ratings of Saudi Trip services)", "/{locale}/ratings"],
+  ["Prayer times (optional): Umm al-Qura times by location, trip city or chosen city; Qibla compass; nearest mosques and grand mosques for Friday; optional alert before each prayer", "/{locale}/prayer"],
   ["Events & Saudi seasons tickets", "/{locale}/events"],
   ["Event page", "/{locale}/events/{eventId}"],
   ["Restaurants & table booking", "/{locale}/restaurants"],

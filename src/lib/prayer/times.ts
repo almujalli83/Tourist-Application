@@ -74,3 +74,58 @@ export function prayerTimes(date: string, lat: number, lng: number): PrayerTimes
     isha: hhmm(maghrib + (isRamadan(date) ? 2 : 1.5)),
   };
 }
+
+/* ------------------------------------------------------------------ helpers (client-safe) */
+
+/** The Kaaba, Makkah. */
+export const KAABA = { lat: 21.422487, lng: 39.826206 };
+
+/** Qibla direction from a point: degrees clockwise from true north (great-circle initial bearing). */
+export function qiblaBearing(lat: number, lng: number): number {
+  const φ1 = rad(lat);
+  const φ2 = rad(KAABA.lat);
+  const Δλ = rad(KAABA.lng - lng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return Math.round(fix(deg(Math.atan2(y, x)), 360) * 10) / 10;
+}
+
+/** Hijri (Umm al-Qura) date of a Gregorian day, e.g. "14 ربيع الآخر 1448 هـ". */
+export function hijriDate(date: string, locale: "ar" | "en"): string {
+  try {
+    return new Intl.DateTimeFormat(locale === "ar" ? "ar-SA-u-ca-islamic-umalqura-nu-latn" : "en-u-ca-islamic-umalqura", {
+      day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+    }).format(new Date(`${date}T12:00:00Z`));
+  } catch {
+    return "";
+  }
+}
+
+/** Is the day (YYYY-MM-DD) a Friday — Dhuhr is then the Friday (Jumu'ah) prayer. */
+export const isFriday = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay() === 5;
+
+const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** The five daily prayers (sunrise is shown but is not a prayer). */
+export const DAILY_PRAYERS: PrayerName[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+
+/**
+ * The next prayer from a Saudi-time moment (day + minutes since midnight): today's, or tomorrow's
+ * Fajr after Isha. Returns its name, day, time and minutes to go.
+ */
+export function nextPrayer(day: string, nowMin: number, lat: number, lng: number): { name: PrayerName; day: string; time: string; inMin: number } {
+  const today = prayerTimes(day, lat, lng);
+  for (const name of DAILY_PRAYERS) {
+    const m = toMin(today[name]);
+    if (m > nowMin) return { name, day, time: today[name], inMin: m - nowMin };
+  }
+  const next = new Date(Date.parse(`${day}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const fajr = prayerTimes(next, lat, lng).fajr;
+  return { name: "fajr", day: next, time: fajr, inMin: 1440 - nowMin + toMin(fajr) };
+}
+
+/** Saudi calendar day and minutes since midnight of an instant. */
+export function ksaNow(now: Date): { day: string; min: number } {
+  const k = new Date(now.getTime() + TZ * 3_600_000);
+  return { day: k.toISOString().slice(0, 10), min: k.getUTCHours() * 60 + k.getUTCMinutes() };
+}
