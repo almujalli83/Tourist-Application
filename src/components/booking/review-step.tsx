@@ -95,12 +95,15 @@ export function ReviewStep() {
           expectedTotalSAR: price.totalSAR,
           esim: booking.esim ? { planId: booking.esim.planId, travellers: booking.esim.travellers, expectedSAR: booking.esimSAR } : undefined,
           tripPlanId: booking.tripPlanId ?? undefined,
+          planExtras: booking.planAuto ? { expectedSAR: booking.planExtrasSAR } : undefined,
           displayCurrency: currency,
           clientReference: clientReference || undefined,
           card: { holder: card.holder, number: card.number, expMonth, expYear, cvc: card.cvc },
         }),
       });
       const data = await res.json();
+      // Tickets or tables changed availability: show the new amount before paying again.
+      if (!res.ok && data.error === "planExtrasChanged" && data.details) booking.setPlanExtras(data.details);
       if (!res.ok) throw new Error(data.error ?? "generic");
       // The confirmation page clears the wizard state (clearing it here would redirect to search).
       router.push(`/${locale}/package-visa/confirmation/${data.booking.id}`);
@@ -110,14 +113,16 @@ export function ReviewStep() {
     }
   }
 
-  const errorText = error ? (t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic : null;
+  const errorText = error ? (t.review.errors as Record<string, string>)[error] ?? (t.planner.exec.errors as Record<string, string>)[error] ?? t.review.errors.generic : null;
+  const travellersHref = `/${locale}/package-visa/${booking.planAuto ? "documents" : "travellers"}`;
+  const extras = booking.planAuto?.extras;
 
   return (
     <WizardShell step={6} title={t.review.title} subtitle={t.review.subtitle}>
       <div className="grid gap-4">
         {!valid && (
           <Alert tone="error">
-            {t.travellers.fixErrors} — <Link className="font-semibold underline" href={`/${locale}/package-visa/travellers`}>{t.common.edit}</Link>
+            {t.travellers.fixErrors} — <Link className="font-semibold underline" href={travellersHref}>{t.common.edit}</Link>
           </Alert>
         )}
 
@@ -168,6 +173,32 @@ export function ReviewStep() {
                     <p className="ltr-nums text-xs text-slate-500">{cityName(a.city, locale)} · {a.date} {a.timeFrom}</p>
                   </div>
                   <span className="ltr-nums font-semibold">{money(a.totalSAR)}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {extras && (extras.events.length > 0 || extras.tables.length > 0) && (
+          <Card className="p-5 sm:p-6" data-testid="review-plan-extras">
+            <SectionTitle title={t.planner.exec.totals.extras} icon={<TicketIcon className="size-5" />} subtitle={t.planner.exec.paidTogether} />
+            <ul className="mt-4 divide-y divide-slate-100">
+              {extras.events.map((e) => (
+                <li key={e.itemId} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                  <div>
+                    <p className="font-semibold">{locale === "ar" ? e.titleAr : e.titleEn}</p>
+                    <p className="ltr-nums text-xs text-slate-500">{e.date} {e.time} · {e.seats ? e.seats.join(", ") : fmt(t.planner.exec.tickets, { n: e.tickets })}</p>
+                  </div>
+                  <span className="ltr-nums font-semibold">{money(e.totalSAR)}</span>
+                </li>
+              ))}
+              {extras.tables.map((r) => (
+                <li key={r.itemId} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                  <div>
+                    <p className="font-semibold">{locale === "ar" ? r.titleAr : r.titleEn}</p>
+                    <p className="ltr-nums text-xs text-slate-500">{r.day} {r.time} · {fmt(t.planner.exec.table, { time: r.time, n: r.party })}</p>
+                  </div>
+                  <span className="ltr-nums font-semibold">{r.feeSAR ? money(r.feeSAR) : t.planner.exec.tableFree}</span>
                 </li>
               ))}
             </ul>
@@ -250,7 +281,7 @@ export function ReviewStep() {
           </form>
         )}
         <div className="lg:hidden">
-          <Button variant="secondary" className="w-full" onClick={() => router.push(`/${locale}/package-visa/travellers`)}>{t.common.back}</Button>
+          <Button variant="secondary" className="w-full" onClick={() => router.push(travellersHref)}>{t.common.back}</Button>
         </div>
       </div>
     </WizardShell>

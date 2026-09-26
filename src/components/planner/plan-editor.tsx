@@ -11,7 +11,7 @@ import { CITY_CENTERS } from "@/lib/guide/centers";
 import { directionsLinks } from "@/lib/guide/geo";
 import { validateCriteria } from "@/lib/itinerary";
 import { withActivities } from "@/lib/planner/budget";
-import { planCriteria, writeGuestPlan, writeHandoff } from "@/lib/planner/handoff";
+import { planCriteria, writeGuestPlan } from "@/lib/planner/handoff";
 import { dayWarnings, fmtMin, scheduleDay, type ScheduledEntry } from "@/lib/planner/schedule";
 import { isFlexible, maxItems, type PlanDay, type PlanItem, type TripPlan } from "@/lib/planner/types";
 import { STATIONS, LINES } from "@/lib/trains/network";
@@ -149,7 +149,7 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
     }
   }
 
-  function approve() {
+  async function approve() {
     if (!plan.id) return;
     const criteria = planCriteria(plan);
     const errs = validateCriteria(criteria, todayISO());
@@ -157,8 +157,14 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
       setApproveErrors(errs.map((e) => (t.search.errors as Record<string, string>)[e] ?? e));
       return;
     }
-    writeHandoff(plan.id, criteria);
-    router.push(`/${locale}/package-visa`);
+    // The system carries out the saved plan: save the last edits first.
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      version.current++;
+      await fetch(`/api/planner/plans/${plan.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ days: payloadDays(plan.days) }) }).catch(() => {});
+    }
+    router.push(`/${locale}/package-visa/plan?plan=${encodeURIComponent(plan.id)}`);
   }
 
   const points: MapPoint[] = useMemo(() => {

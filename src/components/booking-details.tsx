@@ -103,6 +103,25 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
             <p className="text-slate-600">{fmt(t.planner.bookingCard.desc, { days: booking.criteria.stays.reduce((a, s) => a + s.nights, 0) + 1 })}</p>
           </div>
           <Link href={`/${locale}/planner/${booking.tripPlanId}`} className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">{t.planner.bookingCard.open}</Link>
+          {booking.planExtras && (booking.planExtras.events.length > 0 || booking.planExtras.tables.length > 0 || booking.planExtras.issues.length > 0) && (
+            <ul className="w-full space-y-1.5 border-t border-slate-100 pt-3 text-sm" data-testid="booking-plan-extras">
+              {booking.planExtras.events.map((e) => (
+                <li key={e.itemId} className="flex flex-wrap justify-between gap-2">
+                  <span>{t.planner.exec.events}: {locale === "ar" ? e.titleAr : e.titleEn}</span>
+                  {e.orderId ? <Link href={`/${locale}/account/tickets/${e.orderId}`} className="font-semibold text-brand-700 hover:underline">{t.wallet.view}</Link> : <span className="text-red-700">{t.planner.exec.errors.generic}</span>}
+                </li>
+              ))}
+              {booking.planExtras.tables.map((r) => (
+                <li key={r.itemId} className="flex flex-wrap justify-between gap-2">
+                  <span>{t.planner.exec.tables}: {locale === "ar" ? r.titleAr : r.titleEn}</span>
+                  {r.bookingId ? <Link href={`/${locale}/account/table-bookings/${r.bookingId}`} className="font-semibold text-brand-700 hover:underline">{t.wallet.view}</Link> : <span className="text-red-700">{t.planner.exec.errors.generic}</span>}
+                </li>
+              ))}
+              {booking.planExtras.issues.map((i) => (
+                <li key={i.itemId} className="text-amber-800">{locale === "ar" ? i.titleAr : i.titleEn}: {(t.planner.exec.issues as Record<string, string>)[i.reason] ?? i.reason}</li>
+              ))}
+            </ul>
+          )}
         </Card>
       )}
       {eligibility?.allowed && (
