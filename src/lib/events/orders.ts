@@ -57,6 +57,15 @@ interface SessionSeats {
   taken: Record<string, string>;
   /** Ticket type id → tickets sold here. */
   sold: Record<string, number>;
+  /** Temporary holds (e.g. while a traveller completes a plan's booking): order id → what is held and until when. */
+  holds?: Record<string, SeatHold>;
+}
+
+interface SeatHold { seats: string[]; counts: Record<string, number>; until: number }
+
+/** Unexpired holds other than `except`. */
+function activeHolds(doc: SessionSeats, now: number, except?: string): SeatHold[] {
+  return Object.entries(doc.holds ?? {}).filter(([id, h]) => id !== except && h.until > now).map(([, h]) => h);
 }
 
 async function sessionDoc(sessionId: string): Promise<SessionSeats> {
@@ -75,29 +84,35 @@ export interface Availability {
   remaining: Record<string, number>;
 }
 
-export async function availability(e: EventItem, sessionId: string): Promise<Availability> {
+export async function availability(e: EventItem, sessionId: string, opts: { now?: number; except?: string } = {}): Promise<Availability> {
   const doc = await sessionDoc(sessionId);
+  const holds = activeHolds(doc, opts.now ?? Date.now(), opts.except);
+  const held = new Set(holds.flatMap((h) => h.seats));
   const unavailable: string[] = [];
   for (const sec of e.sections ?? []) {
     for (let r = 0; r < sec.rows; r++) {
       for (let n = 1; n <= sec.seatsPerRow; n++) {
         const id = `${sec.id}-${String.fromCharCode(65 + r)}${n}`;
-        if (doc.taken[id] || providerSoldSeat(sessionId, id)) unavailable.push(id);
+        if (doc.taken[id] || held.has(id) || providerSoldSeat(sessionId, id)) unavailable.push(id);
       }
     }
   }
   const remaining: Record<string, number> = {};
-  for (const t of e.ticketTypes ?? []) remaining[t.id] = Math.max(0, t.capacity - providerSoldCount(sessionId, t) - (doc.sold[t.id] ?? 0));
+  for (const t of e.ticketTypes ?? []) remaining[t.id] = Math.max(0, t.capacity - providerSoldCount(sessionId, t) - (doc.sold[t.id] ?? 0) - holds.reduce((a, h) => a + (h.counts[t.id] ?? 0), 0));
   return { unavailable, remaining };
 }
 
 /** Reserves the seats / tickets for the order; returns false when any is no longer available. */
-async function reserve(e: EventItem, sessionId: string, lines: OrderLine[], orderId: string): Promise<boolean> {
+async function reserve(e: EventItem, sessionId: string, lines: OrderLine[], orderId: string, hold?: { until: number }): Promise<boolean> {
   await sessionDoc(sessionId);
   let ok = true;
+  const now = Date.now();
   await store().update<SessionSeats>("eventSeats", sessionId, (doc) => {
+    // Other travellers' temporary holds count as taken; this order's own hold is used up by it.
+    const holds = activeHolds(doc, now, orderId);
+    const held = new Set(holds.flatMap((h) => h.seats));
     const seats = lines.filter((l) => l.seat).map((l) => l.seat!);
-    if (seats.some((seat) => doc.taken[seat] || providerSoldSeat(sessionId, seat))) {
+    if (seats.some((seat) => doc.taken[seat] || held.has(seat) || providerSoldSeat(sessionId, seat))) {
       ok = false;
       return doc;
     }
@@ -105,18 +120,33 @@ async function reserve(e: EventItem, sessionId: string, lines: OrderLine[], orde
     for (const l of lines) if (l.kind === "general") counts[l.typeId] = (counts[l.typeId] ?? 0) + 1;
     for (const [typeId, n] of Object.entries(counts)) {
       const t = e.ticketTypes!.find((x) => x.id === typeId)!;
-      if (providerSoldCount(sessionId, t) + (doc.sold[typeId] ?? 0) + n > t.capacity) {
+      if (providerSoldCount(sessionId, t) + (doc.sold[typeId] ?? 0) + holds.reduce((a, h) => a + (h.counts[typeId] ?? 0), 0) + n > t.capacity) {
         ok = false;
         return doc;
       }
     }
+    // Expired holds are cleaned up on the way.
+    const keep = Object.fromEntries(Object.entries(doc.holds ?? {}).filter(([id, h]) => id !== orderId && h.until > now));
+    if (hold) return { ...doc, holds: { ...keep, [orderId]: { seats, counts, until: hold.until } } };
     const taken = { ...doc.taken };
     for (const seat of seats) taken[seat] = orderId;
     const sold = { ...doc.sold };
     for (const [typeId, n] of Object.entries(counts)) sold[typeId] = (sold[typeId] ?? 0) + n;
-    return { ...doc, taken, sold };
+    return { ...doc, taken, sold, holds: keep };
   });
   return ok;
+}
+
+/**
+ * Holds seats / tickets for a while without paying (the order that later uses the same
+ * idempotency key takes them over). Returns false when they are no longer available.
+ */
+export async function holdTickets(user: PublicUser, input: Pick<OrderInput, "eventId" | "sessionId" | "seats" | "quantities" | "idempotencyKey">, minutes: number, e?: EventItem): Promise<{ ok: boolean; until: number }> {
+  const ev = e ?? (await getEventForSession(input.eventId, input.sessionId));
+  if (!ev) return { ok: false, until: 0 };
+  const until = Date.now() + minutes * 60_000;
+  const ok = await reserve(ev, input.sessionId, buildLines(ev, input.seats, input.quantities), orderIdFor(user.id, input.idempotencyKey), { until });
+  return { ok, until };
 }
 
 async function release(sessionId: string, lines: OrderLine[], orderId: string) {
@@ -149,7 +179,8 @@ export interface OrderInput {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const orderIdFor = (userId: string, key: string) => createHash("sha256").update(`${userId}|${key}`).digest("hex").slice(0, 24);
+/** Order id of a user's order with this idempotency key (also the id of its temporary hold). */
+export const orderIdFor = (userId: string, key: string) => createHash("sha256").update(`${userId}|${key}`).digest("hex").slice(0, 24);
 
 /** The order lines requested (validated against the event); no availability check. */
 export function buildLines(e: EventItem, seats: string[] = [], quantities: Record<string, number> = {}): OrderLine[] {

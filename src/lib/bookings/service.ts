@@ -18,6 +18,7 @@ import type { ActivityOffer, BookingSelection, FlightOffer, HotelOffer, Travelle
 import { validatePackageComposition, validateTraveller } from "../visa-validation";
 import type { StoredApplicant, StoredBooking } from "./types";
 import { bookPlanExtras, planExtras, type PlanExtras } from "../planner/execute";
+import { flightTimesFrom } from "../planner/schedule";
 import { bookingMatchesPlan, getPlan, linkPlanToBooking } from "../planner/plans";
 import type { TripPlan } from "../planner/types";
 
@@ -152,7 +153,9 @@ export async function createBooking(user: PublicUser, input: CreateBookingInput)
   if (input.planExtras && input.tripPlanId) {
     plan = await getPlan(user.id, input.tripPlanId);
     if (!plan || plan.status !== "draft" || !bookingMatchesPlan(plan, selection.criteria)) throw new BookingError("planChanged");
-    extras = await planExtras(plan);
+    // Same tickets and tables as shown, fitted to the chosen flights (the traveller's own holds are theirs).
+    const chosen = resolveSelection(selection).flights;
+    extras = await planExtras(plan, new Date(), { flights: flightTimesFrom(chosen), userId: user.id });
     if (Math.abs(extras.totalSAR - Number(input.planExtras.expectedSAR)) > 0.009) throw new BookingError("planExtrasChanged", extras);
   }
 

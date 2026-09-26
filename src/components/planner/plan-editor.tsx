@@ -61,7 +61,8 @@ export function PlanEditor({ initial, warning, onNew }: { initial: TripPlan; war
   const editable = plan.status === "draft";
   const day = plan.days[Math.min(dayIdx, plan.days.length - 1)];
   const kids = plan.request.rooms.some((r) => r.childAges.length > 0);
-  const ctx = useMemo(() => ({ pace: plan.request.pace, prayer: plan.request.prayer, kids }), [plan.request.pace, plan.request.prayer, kids]);
+  // Once booked, the days follow the booked flights' times.
+  const ctx = useMemo(() => ({ pace: plan.request.pace, prayer: plan.request.prayer, kids, flights: plan.flightTimes ?? null }), [plan.request.pace, plan.request.prayer, kids, plan.flightTimes]);
   const schedules = useMemo(() => plan.days.map((d) => scheduleDay(d, ctx, CITY_CENTERS[d.city] ?? CITY_CENTERS.RUH)), [plan.days, ctx]);
   const entries = useMemo(() => schedules[Math.min(dayIdx, plan.days.length - 1)] ?? [], [schedules, dayIdx, plan.days.length]);
   const guests = plan.request.rooms.reduce((a, r) => a + r.adults + r.childAges.length, 0);

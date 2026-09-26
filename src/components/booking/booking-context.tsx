@@ -6,6 +6,7 @@ import type { ActivityOffer, FlightLeg, FlightOffer, HotelOffer, SearchCriteria,
 import { expectedTravellers } from "@/lib/occupancy";
 import { emptyTraveller } from "@/lib/visa-validation";
 import type { AutoNote, PlanExtras } from "@/lib/planner/execute";
+import type { FlightTimes } from "@/lib/planner/schedule";
 
 const STORAGE_KEY = "ta_booking_v2";
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
@@ -57,7 +58,7 @@ interface State {
   planAuto: PlanAuto | null;
 }
 
-export interface PlanAuto { extras: PlanExtras; notes: AutoNote[] }
+export interface PlanAuto { extras: PlanExtras; notes: AutoNote[]; flightTimes?: FlightTimes | null }
 
 export interface PlanAutoInput {
   criteria: SearchCriteria;
@@ -69,6 +70,7 @@ export interface PlanAutoInput {
   activities: string[];
   extras: PlanExtras;
   notes: AutoNote[];
+  flightTimes?: FlightTimes | null;
 }
 
 export interface EsimChoice { planId: string; priceSAR: number; travellers: number[] }
@@ -175,7 +177,7 @@ export function BookingProvider({ children, visaFeeSAR }: { children: ReactNode;
       flightResults: a.flightResults, hotelResults: a.hotelResults, activityResults: a.activityResults,
       flights: a.flights, hotels: a.hotels, activities: a.activities,
       tripPlanId: planId,
-      planAuto: { extras: a.extras, notes: a.notes },
+      planAuto: { extras: a.extras, notes: a.notes, flightTimes: a.flightTimes },
     }));
   }, []);
 

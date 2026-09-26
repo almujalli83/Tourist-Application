@@ -104,6 +104,8 @@ export interface TripPlan {
   status: "draft" | "booked";
   bookingId?: string | null;
   bookingReference?: string | null;
+  /** Times of the booked flights (set when booked); the days are fitted to them. */
+  flightTimes?: import("./schedule").FlightTimes | null;
 }
 
 /** Most activities a day can hold (meals and events included). */

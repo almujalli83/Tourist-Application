@@ -54,7 +54,15 @@ interface DayCovers {
   covers: Record<string, number>;
   /** Booking id → its slot (so holds are released exactly once). */
   holds: Record<string, { time: string; party: number }>;
+  /** Temporary holds before payment (e.g. a plan's table): booking id → slot and expiry. */
+  temp?: Record<string, { time: string; party: number; until: number }>;
 }
+
+/** Covers of unexpired temporary holds at a time, other than `except`. */
+const tempCovers = (doc: DayCovers, time: string, now: number, except?: string) =>
+  Object.entries(doc.temp ?? {}).reduce((a, [id, h]) => a + (id !== except && h.until > now && h.time === time ? h.party : 0), 0);
+/** Booking id of a user's booking with this idempotency key (also the id of its temporary hold). */
+export const bookingIdFor = (userId: string, key: string) => createHash("sha256").update(`${userId}|table|${key}`).digest("hex").slice(0, 24);
 
 const dayDocId = (rid: string, day: string) => `${rid}:${day}`;
 
@@ -70,32 +78,43 @@ async function dayDoc(rid: string, day: string): Promise<DayCovers> {
 export interface SlotAvailability { time: string; left: number; bookable: boolean }
 
 /** Seating times of a day with the covers left; `bookable` also checks the booking notice. */
-export async function availability(r: Restaurant, day: string, now = new Date()): Promise<SlotAvailability[]> {
+export async function availability(r: Restaurant, day: string, now = new Date(), except?: string): Promise<SlotAvailability[]> {
   if (!isValidISODate(day)) return [];
   const doc = await dayDoc(r.id, day);
   const limit = now.getTime() + MIN_NOTICE_MINUTES * 60_000;
   return seatingTimes(r, day).map((time) => {
-    const left = Math.max(0, r.coversPerSlot - providerBookedCovers(r, day, time) - (doc.covers[time] ?? 0));
+    const left = Math.max(0, r.coversPerSlot - providerBookedCovers(r, day, time) - (doc.covers[time] ?? 0) - tempCovers(doc, time, now.getTime(), except));
     return { time, left, bookable: left > 0 && Date.parse(slotInstant(day, time)) > limit };
   });
 }
 
 /** Holds `slot` for the booking, releasing `previous` in the same step when it is on the same day. */
-async function hold(r: Restaurant, slot: Slot, bookingId: string, previous?: Slot): Promise<boolean> {
+async function hold(r: Restaurant, slot: Slot, bookingId: string, previous?: Slot, temporaryUntil?: number): Promise<boolean> {
   await dayDoc(r.id, slot.day);
   let ok = true;
+  const now = Date.now();
   await store().update<DayCovers>("restaurantSlots", dayDocId(r.id, slot.day), (doc) => {
+    const temp = Object.fromEntries(Object.entries(doc.temp ?? {}).filter(([id, h]) => id !== bookingId && h.until > now));
+    const othersTemp = tempCovers(doc, slot.time, now, bookingId);
+    // A temporary hold only reserves the covers until it expires (or the booking takes it over).
+    if (temporaryUntil) {
+      if (providerBookedCovers(r, slot.day, slot.time) + (doc.covers[slot.time] ?? 0) + othersTemp + slot.party > r.coversPerSlot) {
+        ok = false;
+        return doc;
+      }
+      return { ...doc, temp: { ...temp, [bookingId]: { time: slot.time, party: slot.party, until: temporaryUntil } } };
+    }
     const covers = { ...doc.covers };
     const holds = { ...doc.holds };
     const prev = holds[bookingId];
     if (prev && previous?.day === slot.day) covers[prev.time] = Math.max(0, (covers[prev.time] ?? 0) - prev.party);
-    if (providerBookedCovers(r, slot.day, slot.time) + (covers[slot.time] ?? 0) + slot.party > r.coversPerSlot) {
+    if (providerBookedCovers(r, slot.day, slot.time) + (covers[slot.time] ?? 0) + othersTemp + slot.party > r.coversPerSlot) {
       ok = false;
       return doc;
     }
     covers[slot.time] = (covers[slot.time] ?? 0) + slot.party;
     holds[bookingId] = { time: slot.time, party: slot.party };
-    return { ...doc, covers, holds };
+    return { ...doc, covers, holds, temp };
   });
   return ok;
 }
@@ -134,7 +153,7 @@ export interface BookInput extends Slot {
 
 export async function bookTable(user: PublicUser, input: BookInput, now = new Date()): Promise<RestaurantBooking> {
   if (!input.idempotencyKey || input.idempotencyKey.length > 100) throw new RestaurantBookingError("idempotencyKey", 400);
-  const id = createHash("sha256").update(`${user.id}|table|${input.idempotencyKey}`).digest("hex").slice(0, 24);
+  const id = bookingIdFor(user.id, input.idempotencyKey);
   const existing = await store().get<RestaurantBooking>("restaurantBookings", id);
   if (existing) return existing;
 
@@ -181,6 +200,20 @@ export async function bookTable(user: PublicUser, input: BookInput, now = new Da
   }
   await notifyTravellers([user.email], bookingEmail(booking, "confirmed", user.preferredLocale));
   return booking;
+}
+
+/** Holds a table for a while without booking it (the booking made later with the same key takes it over). */
+export async function holdTable(user: PublicUser, input: Slot & { restaurantId: string; idempotencyKey: string }, minutes: number, now = new Date()): Promise<{ ok: boolean; until: number }> {
+  const r = getRestaurant(input.restaurantId);
+  if (!r) return { ok: false, until: 0 };
+  const slot = { day: input.day, time: input.time, party: Number(input.party) };
+  try {
+    checkSlot(r, slot, now);
+  } catch {
+    return { ok: false, until: 0 };
+  }
+  const until = now.getTime() + minutes * 60_000;
+  return { ok: await hold(r, slot, bookingIdFor(user.id, input.idempotencyKey), undefined, until), until };
 }
 
 /* ---------------------------------------------------------- read */

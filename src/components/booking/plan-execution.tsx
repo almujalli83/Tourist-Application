@@ -24,6 +24,9 @@ function Inner() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [stepShown, setStepShown] = useState(0);
+  const [alternatives, setAlternatives] = useState<{ departureDate: string; returnDate: string }[] | null>(null);
+  const [dropped, setDropped] = useState<string[] | null>(null);
+  const [shifting, setShifting] = useState(false);
   const started = useRef(false);
 
   const hasSelection = !!booking.planAuto && booking.selectedFlights.length > 0 && booking.selectedHotels.length > 0;
@@ -32,12 +35,16 @@ function Inner() {
   async function run(id: string) {
     setWorking(true);
     setError(null);
+    setAlternatives(null);
     setStepShown(0);
     const timer = setInterval(() => setStepShown((n) => Math.min(n + 1, x.workingSteps.length - 1)), 900);
     try {
       const r = await fetch(`/api/planner/plans/${encodeURIComponent(id)}/execute`, { method: "POST" });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error ?? "generic");
+      if (!r.ok) {
+        if (d.error === "noFlights") setAlternatives(d.details?.alternatives ?? []);
+        throw new Error(d.error ?? "generic");
+      }
       booking.startFromPlanAuto(d as PlanAutoInput, id);
       if (planId) router.replace(`/${locale}/package-visa/plan`);
     } catch (e) {
@@ -56,11 +63,30 @@ function Inner() {
   }, [needsRun]);
 
   const backToPlan = `/${locale}/planner/${planId ?? booking.tripPlanId ?? ""}`;
-  if (!booking.hydrated || working || (needsRun && !error)) {
+  const currentId = planId ?? booking.tripPlanId;
+
+  /** The traveller picked other dates: the plan moves there, then the system tries again. */
+  async function shift(departureDate: string) {
+    if (!currentId) return;
+    setShifting(true);
+    try {
+      const r = await fetch(`/api/planner/plans/${encodeURIComponent(currentId)}/dates`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ departureDate }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? "generic");
+      setDropped(d.dropped.map((x: { titleAr: string; titleEn: string }) => (locale === "ar" ? x.titleAr : x.titleEn)));
+      started.current = true;
+      await run(currentId);
+    } catch (e) {
+      setError((x.errors as Record<string, string>)[(e as Error).message] ?? x.errors.generic);
+    } finally {
+      setShifting(false);
+    }
+  }
+  if (!booking.hydrated || working || shifting || (needsRun && !error)) {
     return (
       <div className="mx-auto grid min-h-[60vh] max-w-lg place-items-center px-4 py-10" data-testid="plan-working">
         <Card className="w-full space-y-4 p-6">
-          <p className="flex items-center gap-2 text-lg font-bold"><Spinner className="size-5 text-brand-700" />{x.working}</p>
+          <p className="flex items-center gap-2 text-lg font-bold"><Spinner className="size-5 text-brand-700" />{shifting ? x.shifting : x.working}</p>
           <ul className="space-y-2 text-sm">
             {x.workingSteps.map((s, i) => (
               <li key={s} className={i <= stepShown ? "flex items-center gap-2 text-ink" : "flex items-center gap-2 text-slate-400"}>
@@ -69,6 +95,21 @@ function Inner() {
             ))}
           </ul>
         </Card>
+      </div>
+    );
+  }
+  if (alternatives) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 px-4 py-10" data-testid="plan-no-flights">
+        <Alert tone="warning">{alternatives.length ? x.noFlightsAsk : x.noAlternatives}</Alert>
+        <div className="grid gap-2">
+          {alternatives.map((a) => (
+            <Button key={a.departureDate} variant="secondary" onClick={() => void shift(a.departureDate)} data-testid="plan-alt-date">
+              {fmt(x.shiftTo, { from: fmtDay(a.departureDate, locale), to: fmtDay(a.returnDate, locale) })}
+            </Button>
+          ))}
+        </div>
+        <Link href={backToPlan} className="inline-flex h-11 items-center rounded-lg px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25">{x.backToPlan}</Link>
       </div>
     );
   }
@@ -91,6 +132,7 @@ function Inner() {
     if (n.code === "budgetDowngrade") return fmt(x.notes.budgetDowngrade, { stars: n.stars });
     if (n.code === "addedActivities") return fmt(x.notes.addedActivities, { n: n.count });
     if (n.code === "overBudget") return fmt(x.notes.overBudget, { total: money(n.totalSAR), max: money(n.maxSAR) });
+    if (n.code === "arrivalAdjusted") return fmt(x.arrivalAdjusted, { time: n.time });
     return "";
   };
 
@@ -99,6 +141,10 @@ function Inner() {
       <Link href={`/${locale}/package-visa/documents`} className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800" data-testid="plan-continue">{x.continue}</Link>
     }>
       <div className="space-y-4" data-testid="plan-execution">
+        {dropped && dropped.length > 0 && <Alert tone="warning">{fmt(x.dropped, { list: dropped.join(locale === "ar" ? "، " : ", ") })}</Alert>}
+        {extras.heldUntil && (extras.events.length > 0 || extras.tables.length > 0) && (
+          <div data-testid="plan-held"><Alert tone="success">{fmt(x.heldUntil, { time: new Date(extras.heldUntil).toLocaleTimeString(locale === "ar" ? "ar-SA-u-nu-latn" : "en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Riyadh" }) })}</Alert></div>
+        )}
         {notes.length > 0 && (
           <Alert tone="info">
             <p className="font-semibold">{x.changesTitle}</p>
