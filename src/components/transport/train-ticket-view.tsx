@@ -88,7 +88,7 @@ export function TrainTicketView({ id }: { id: string }) {
           <div><dt className="text-xs text-slate-500">{tk.pnr}</dt><dd className="ltr-nums font-bold">{o.pnr}</dd></div>
           <div><dt className="text-xs text-slate-500">{tk.paid}</dt><dd className="font-semibold">{money(o.payment.amountSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</dd></div>
         </dl>
-        <OrderPoints loyalty={o.loyalty} className="mt-4" />
+        <OrderPoints loyalty={o.loyalty} totalSAR={o.totalSAR} className="mt-4" />
         <ul className="mt-4 space-y-2">
           {o.legs.map((l, i) => {
             const line = net.lines.find((x) => x.id === l.trip.lineId);

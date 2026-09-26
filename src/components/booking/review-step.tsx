@@ -10,7 +10,7 @@ import { countryName } from "@/lib/data/countries";
 import type { PrivacyPolicyResponse } from "@/lib/mt-evisa/types";
 import { useApp } from "../app-provider";
 import { AuthForm } from "../auth-form";
-import { afterPoints, loyaltyError, PointsRedeemer } from "../loyalty/points-redeemer";
+import { PointsRedeemer } from "../loyalty/points-redeemer";
 import { CardIcon, HotelIcon, LockIcon, PlaneIcon, ShieldIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Button, Card, Field, Input, SectionTitle, Stars } from "../ui";
 import { useBooking } from "./booking-context";
@@ -65,7 +65,6 @@ export function ReviewStep() {
   const packageOk = check.ok;
   const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [clientReference, setClientReference] = useState("");
-  const [points, setPoints] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const price = booking.price;
@@ -100,7 +99,6 @@ export function ReviewStep() {
           planExtras: booking.planAuto ? { expectedSAR: booking.planExtrasSAR } : undefined,
           displayCurrency: currency,
           clientReference: clientReference || undefined,
-          redeemPoints: points || undefined,
           card: { holder: card.holder, number: card.number, expMonth, expYear, cvc: card.cvc },
         }),
       });
@@ -116,7 +114,7 @@ export function ReviewStep() {
     }
   }
 
-  const errorText = error ? loyaltyError(t, error) ?? (t.review.errors as Record<string, string>)[error] ?? (t.planner.exec.errors as Record<string, string>)[error] ?? t.review.errors.generic : null;
+  const errorText = error ? (t.review.errors as Record<string, string>)[error] ?? (t.planner.exec.errors as Record<string, string>)[error] ?? t.review.errors.generic : null;
   const travellersHref = `/${locale}/package-visa/${booking.planAuto ? "documents" : "travellers"}`;
   const extras = booking.planAuto?.extras;
 
@@ -280,24 +278,23 @@ export function ReviewStep() {
                     onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required />
                 </Field>
               </div>
-              {price && check.check && (
+              {price && (
                 <PointsRedeemer
                   className="mt-4"
                   service="package"
                   totalSAR={price.totalSAR}
-                  floorSAR={check.check.minPriceSAR}
                   earnBase={price.totalSAR - price.visaInsuranceSAR}
                   extraEarn={booking.esimSAR ? [{ service: "esim", sar: booking.esimSAR }] : []}
                   cities={booking.criteria?.stays.map((st) => st.city)}
-                  value={points}
-                  onChange={setPoints}
+                  value={0}
+                  onChange={() => undefined}
                 />
               )}
               <Alert tone="info" className="mt-4"><Badge tone="gold" className="me-2">{t.common.sandbox}</Badge>{t.review.testCards}</Alert>
               {errorText && <Alert tone="error" className="mt-4">{errorText}</Alert>}
               <Button type="submit" size="lg" variant="gold" className="mt-5 w-full" loading={submitting} disabled={!valid || !price || !packageOk}>
                 <LockIcon className="size-5" />
-                {submitting ? t.review.paying : fmt(t.review.pay, { amount: price ? money(afterPoints(booking.amountToPaySAR, points)) : "" })}
+                {submitting ? t.review.paying : fmt(t.review.pay, { amount: price ? money(booking.amountToPaySAR) : "" })}
               </Button>
             </Card>
           </form>

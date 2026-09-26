@@ -2,8 +2,8 @@
  * Loyalty programme (service 10): individual accounts earn points on what they pay by card for
  * packages, event tickets, train tickets and eSIMs (visa & insurance fees excluded), plus bonuses
  * for verified reviews and referrals. Purchase points are pending until the trip or service is
- * over, expire after 24 months, and pay up to 30% of a purchase (100 points = 5 SAR, from 500
- * points). Tiers by 12-month spend multiply purchase points; campaigns set by the back office too.
+ * over, expire after 24 months, and pay up to 30% of event or train tickets (100 points = 5 SAR,
+ * from 500 points; packages are never discounted). Tiers by 12-month spend multiply purchase points; campaigns set by the back office too.
  *
  * Each member has one ledger document (collection "loyalty", id = user id), changed atomically.
  */
@@ -14,7 +14,7 @@ import { notifyTravellers } from "../notify";
 import type { AppNotification } from "../reminders/reminders";
 import { getUserByEmail, getUserById } from "../repo";
 import { store } from "../store";
-import { bestCampaign, earnPoints, expiryFrom, LOYALTY, pointsValueSAR, redeemError, tierFor, type EarnService } from "./rules";
+import { bestCampaign, canRedeemOn, earnPoints, expiryFrom, LOYALTY, pointsValueSAR, redeemError, tierFor, type EarnService } from "./rules";
 import type { LoyaltyAccount, LoyaltyCampaign, LoyaltyEntry, LoyaltySource, LoyaltySummary } from "./types";
 export type { OrderLoyalty } from "./types";
 
@@ -317,20 +317,21 @@ export interface RedeemHold {
 }
 
 /**
- * Takes the points used on a purchase before the card is charged. `floorSAR` is the amount that
- * must stay paid (packages: 2,000 SAR per adult). Release the hold if the purchase fails.
+ * Takes the points used on a purchase (event or train tickets) before the card is charged.
+ * Release the hold if the purchase fails.
  */
 export async function holdRedeem(
   user: Member,
-  input: { points: number | undefined; totalSAR: number; floorSAR?: number; source: LoyaltySource },
+  input: { points: number | undefined; totalSAR: number; source: LoyaltySource },
   now = new Date(),
 ): Promise<RedeemHold | null> {
   const points = Number(input.points ?? 0);
   if (!points) return null;
   if (!isEligible(user)) throw new LoyaltyError("notEligible");
+  if (!canRedeemOn(input.source.kind)) throw new LoyaltyError("redeemNotAllowed");
   const { result } = await change(user.id, now, (acc): RedeemHold | string => {
     const balance = summarize(acc, now).available;
-    const err = redeemError(points, { totalSAR: input.totalSAR, balance, floorSAR: input.floorSAR });
+    const err = redeemError(points, { totalSAR: input.totalSAR, balance });
     if (err) return err;
     const { from } = take(acc, points, now);
     const entry: LoyaltyEntry = { id: randomUUID(), at: iso(now), type: "redeem", points: -points, source: input.source, discountSAR: pointsValueSAR(points), from };

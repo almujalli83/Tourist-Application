@@ -162,7 +162,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
           <p className="ltr-nums text-lg font-bold">{money(booking.payment.amountSAR)}</p>
           <p className="ltr-nums text-xs text-slate-500">{booking.payment.method.toUpperCase()} •••• {booking.payment.last4}</p>
         </div>
-        {booking.loyalty && <OrderPoints loyalty={booking.loyalty} className="sm:col-span-full" />}
+        {booking.loyalty && <OrderPoints loyalty={booking.loyalty} totalSAR={booking.price.totalSAR} className="sm:col-span-full" />}
       </Card>
 
       <Card className="overflow-hidden">

@@ -6,7 +6,7 @@ import {
   adminAdjust, awardPurchase, awardReviewBonus, createCampaign, ensureAccount, expiryReminders, getAccount, holdRedeem, joinWithReferral,
   loyaltyOverview, loyaltySummary, memberDetails, packageAvailableAt, redeemedOn, releaseRedeem, returnRedeemed, reversePurchase, runLoyalty, updateCampaign,
 } from "@/lib/loyalty/loyalty";
-import { earnPoints, maxRedeemable, pointsValueSAR, redeemError, tierFor } from "@/lib/loyalty/rules";
+import { canRedeemOn, earnPoints, maxRedeemable, pointsValueSAR, redeemError, tierFor, vatBreakdown } from "@/lib/loyalty/rules";
 import { listNotifications } from "@/lib/reminders/reminders";
 import { createUser } from "@/lib/repo";
 
@@ -49,14 +49,19 @@ describe("loyalty rules", () => {
     expect(maxRedeemable({ totalSAR: 1000, balance: 700 })).toBe(700);
     expect(maxRedeemable({ totalSAR: 1000, balance: 400 })).toBe(0);
     expect(maxRedeemable({ totalSAR: 50, balance: 10_000 })).toBe(0); // 30% is 15 SAR = 300 points < 500
-    // Two adults: 4,000 SAR must stay paid, so only 200 SAR of a 4,200 SAR package.
-    expect(maxRedeemable({ totalSAR: 4200, balance: 100_000, floorSAR: 4000 })).toBe(4000);
-    expect(maxRedeemable({ totalSAR: 4010, balance: 100_000, floorSAR: 4000 })).toBe(0);
+    expect(canRedeemOn("event") && canRedeemOn("train")).toBe(true);
+    expect(canRedeemOn("package") || canRedeemOn("esim")).toBe(false);
     expect(redeemError(499, { totalSAR: 1000, balance: 5000 })).toBe("redeemBelowMinimum");
     expect(redeemError(6001, { totalSAR: 1000, balance: 10_000 })).toBe("redeemAboveMaximum");
     expect(redeemError(800, { totalSAR: 1000, balance: 700 })).toBe("redeemBalance");
     expect(redeemError(1.5, { totalSAR: 1000, balance: 700 })).toBe("redeemInvalid");
     expect(redeemError(0, { totalSAR: 1000, balance: 0 })).toBeNull();
+  });
+
+  it("takes the points discount off before VAT", () => {
+    // 230 SAR incl. VAT, 30 SAR of points: VAT on the 200 SAR paid.
+    expect(vatBreakdown(230, 30)).toEqual({ totalSAR: 230, discountSAR: 30, paidSAR: 200, netSAR: 173.91, vatSAR: 26.09 });
+    expect(vatBreakdown(115).vatSAR).toBe(15);
   });
 });
 
@@ -85,8 +90,9 @@ describe("points ledger", () => {
     expect((await loyaltySummary(u, now)).summary.available).toBe(2000);
     await expect(holdRedeem(u, { points: 3000, totalSAR: 5000, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemBalance" });
     await expect(holdRedeem(u, { points: 1000, totalSAR: 100, source: { kind: "event", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemAboveMaximum" });
-    // Packages: 2,000 SAR per adult stays paid (one adult, 2,010 SAR package → at most 10 SAR).
-    await expect(holdRedeem(u, { points: 500, totalSAR: 2010, floorSAR: 2000, source: { kind: "package", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemAboveMaximum" });
+    // Packages (price sent to MT) and eSIMs are never paid with points.
+    await expect(holdRedeem(u, { points: 500, totalSAR: 5000, source: { kind: "package", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemNotAllowed" });
+    await expect(holdRedeem(u, { points: 500, totalSAR: 5000, source: { kind: "esim", id: "x" } }, now)).rejects.toMatchObject({ code: "redeemNotAllowed" });
 
     await holdRedeem(u, { points: 600, totalSAR: 500, source: { kind: "event", id: `o2-${run}` } }, now);
     expect(redeemedOn(await getAccount(u.id), `o2-${run}`)).toEqual({ points: 600, discountSAR: 30 });

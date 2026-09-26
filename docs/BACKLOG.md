@@ -27,10 +27,10 @@ platform: i18n (ar/en), multi-currency, B2C/B2B accounts, travel-agent aggregato
 
 ## Service 10 — Loyalty programme «Saudi Trip Rewards» (delivered)
 - [x] Points on card payments (packages 2/SAR without visa fees; events, trains, eSIM 1/SAR), pending until the service is over
-- [x] Redeem 100 pts = SAR 5, from 500 pts, up to 30%; packages keep SAR 2,000 per adult paid (full price to MT)
+- [x] Redeem 100 pts = SAR 5, from 500 pts, up to 30%, on event and train tickets only (packages never discounted: MT gets the price paid)
 - [x] Tiers by 12-month spend, 24-month expiry with a 30-day reminder, review and referral bonuses
 - [x] Cancellations: points used returned, points earned reversed pro rata; back-office adjustments (audited), liability report, campaigns
-- [ ] Accountant decision on the VAT / ZATCA invoice treatment of the points discount
+- [x] VAT: points discount is a price reduction before VAT (VAT on the amount paid); issuing points carries no VAT
 
 ## Future services
 - [ ] Tourist eVisa (standalone)

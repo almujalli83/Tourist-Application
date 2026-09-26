@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { fmt, type Dictionary } from "@/i18n";
-import { bestCampaign, earnPoints, LOYALTY, maxRedeemable, pointsValueSAR, type EarnService } from "@/lib/loyalty/rules";
+import { bestCampaign, canRedeemOn, earnPoints, LOYALTY, maxRedeemable, pointsValueSAR, vatBreakdown, type EarnService } from "@/lib/loyalty/rules";
 import type { OrderLoyalty } from "@/lib/loyalty/types";
 import { useApp } from "../app-provider";
 import { GiftIcon } from "../icons";
@@ -20,13 +20,12 @@ export const afterPoints = (totalSAR: number, points: number) => Math.round((tot
 
 /**
  * Checkout box of the loyalty programme: the member's balance, the choice to pay part with points
- * (up to 30%, from 500 points; packages keep 2,000 SAR per adult paid) and the points this
- * purchase will earn. Hidden for company accounts and signed-out visitors.
+ * (event and train tickets only: up to 30%, from 500 points) and the points this purchase will
+ * earn. Hidden for company accounts and signed-out visitors.
  */
 export function PointsRedeemer({
   service,
   totalSAR,
-  floorSAR,
   earnBase,
   extraEarn = [],
   cities = [],
@@ -37,8 +36,6 @@ export function PointsRedeemer({
   service: EarnService;
   /** Price the points can pay part of. */
   totalSAR: number;
-  /** Amount that must stay paid (packages). */
-  floorSAR?: number;
   /** Amount earning points before the discount (defaults to the price; packages leave out visa fees). */
   earnBase?: number;
   /** Other items paid together that earn points on their own (e.g. eSIMs with a package). */
@@ -53,7 +50,8 @@ export function PointsRedeemer({
   const eligible = user?.accountType === "individual";
   const data = useLoyalty(eligible);
   const s = data?.summary;
-  const max = s ? maxRedeemable({ totalSAR, balance: s.available, floorSAR }) : 0;
+  const redeemable = canRedeemOn(service);
+  const max = s && redeemable ? maxRedeemable({ totalSAR, balance: s.available }) : 0;
 
   // Keep the chosen points within what this price allows.
   useEffect(() => {
@@ -82,7 +80,9 @@ export function PointsRedeemer({
         <Badge tone="gold">{l.tiers[s.tier.id as keyof typeof l.tiers]}</Badge>
       </div>
       <p className="mt-1 text-slate-700">{fmt(l.checkout.balance, { n: s.available.toLocaleString("en"), amount: money(pointsValueSAR(s.available)) })}</p>
-      {max > 0 ? (
+      {!redeemable ? (
+        <p className="mt-1 text-xs text-slate-500">{l.checkout.earnOnly}</p>
+      ) : max > 0 ? (
         <div className="mt-2 space-y-2">
           <label className="flex cursor-pointer items-center gap-2 font-medium">
             <input type="checkbox" className="size-4 accent-brand-700" checked={using} onChange={(e) => onChange(e.target.checked ? max : 0)} data-testid="points-use" />
@@ -106,14 +106,15 @@ export function PointsRedeemer({
                 />
                 <span className="font-semibold text-emerald-700" data-testid="points-discount">−{money(pointsValueSAR(value))}</span>
               </div>
-              <p className="mt-1 text-xs text-slate-500">{fmt(floorSAR ? l.checkout.rangePackage : l.checkout.range, { min: LOYALTY.minRedeemPoints, max: max.toLocaleString("en") })}</p>
+              <p className="mt-1 text-xs text-slate-500">{fmt(l.checkout.range, { min: LOYALTY.minRedeemPoints, max: max.toLocaleString("en") })}</p>
+              {value >= LOYALTY.minRedeemPoints && <p className="mt-1 text-xs text-slate-500">{fmt(l.checkout.vat, { vat: money(vatBreakdown(totalSAR, pointsValueSAR(value)).vatSAR) })}</p>}
               {value > 0 && value < LOYALTY.minRedeemPoints && <p className="mt-1 text-xs text-red-600">{l.errors.redeemBelowMinimum}</p>}
             </div>
           )}
         </div>
       ) : (
         <p className="mt-1 text-xs text-slate-500">
-          {s.available < LOYALTY.minRedeemPoints ? fmt(l.checkout.needMin, { min: LOYALTY.minRedeemPoints }) : l.checkout.noRoom}
+          {fmt(l.checkout.needMin, { min: LOYALTY.minRedeemPoints })}
         </p>
       )}
       {earned.points > 0 && (
@@ -126,8 +127,8 @@ export function PointsRedeemer({
   );
 }
 
-/** Points used and earned on a booking or order (booking pages). */
-export function OrderPoints({ loyalty, className }: { loyalty?: OrderLoyalty; className?: string }) {
+/** Points used and earned on a booking or order (booking pages), with the VAT after the points discount. */
+export function OrderPoints({ loyalty, totalSAR, className }: { loyalty?: OrderLoyalty; totalSAR: number; className?: string }) {
   const { t, locale, money } = useApp();
   if (!loyalty || (!loyalty.redeemedPoints && !loyalty.earnedPoints)) return null;
   const o = t.loyalty.order;
@@ -135,9 +136,18 @@ export function OrderPoints({ loyalty, className }: { loyalty?: OrderLoyalty; cl
     <div className={cx("rounded-lg bg-gold-50 p-3 text-sm ring-1 ring-gold-500/30", className)} data-testid="order-points">
       <p className="flex items-center gap-2 font-semibold"><GiftIcon className="size-4 text-gold-600" />{o.title}</p>
       <dl className="mt-2 space-y-1">
-        {loyalty.redeemedPoints > 0 && (
-          <div className="flex justify-between gap-3"><dt>{o.used}</dt><dd className="ltr-nums font-semibold">{loyalty.redeemedPoints.toLocaleString("en")} (−{money(loyalty.discountSAR)})</dd></div>
-        )}
+        {loyalty.redeemedPoints > 0 && (() => {
+          const v = vatBreakdown(totalSAR, loyalty.discountSAR);
+          return (
+            <>
+              <div className="flex justify-between gap-3"><dt>{o.price}</dt><dd className="ltr-nums">{money(v.totalSAR)}</dd></div>
+              <div className="flex justify-between gap-3"><dt>{fmt(o.used, { n: loyalty.redeemedPoints.toLocaleString("en") })}</dt><dd className="ltr-nums font-semibold">−{money(v.discountSAR)}</dd></div>
+              <div className="flex justify-between gap-3 border-t border-gold-500/30 pt-1 font-semibold"><dt>{o.paidCard}</dt><dd className="ltr-nums">{money(v.paidSAR)}</dd></div>
+              <div className="flex justify-between gap-3 text-xs text-slate-600"><dt>{o.net}</dt><dd className="ltr-nums">{money(v.netSAR)}</dd></div>
+              <div className="flex justify-between gap-3 text-xs text-slate-600"><dt>{o.vat}</dt><dd className="ltr-nums">{money(v.vatSAR)}</dd></div>
+            </>
+          );
+        })()}
         {loyalty.earnedPoints > 0 && (
           <div className="flex justify-between gap-3"><dt>{o.earned}</dt><dd className="ltr-nums font-semibold text-emerald-700">+{loyalty.earnedPoints.toLocaleString("en")}</dd></div>
         )}

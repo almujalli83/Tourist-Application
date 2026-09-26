@@ -87,7 +87,7 @@ export function TicketView({ id }: { id: string }) {
           <div><dt className="text-xs text-slate-500">{tk.paid}</dt><dd className="font-semibold">{money(o.payment.amountSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</dd></div>
           <div><dt className="text-xs text-slate-500">{tk.providerRef}</dt><dd className="ltr-nums font-semibold">{t.events.providers[o.provider]} · {o.providerRef}</dd></div>
         </dl>
-        <OrderPoints loyalty={o.loyalty} className="mt-4" />
+        <OrderPoints loyalty={o.loyalty} totalSAR={o.totalSAR} className="mt-4" />
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 print:hidden">
           {!cancelled && <PrintButton label={tk.print} />}
           {data.canCancel ? (
