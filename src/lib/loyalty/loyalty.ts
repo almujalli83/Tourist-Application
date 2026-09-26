@@ -3,7 +3,7 @@
  * packages, event tickets, train tickets and eSIMs (visa & insurance fees excluded), plus bonuses
  * for verified reviews and referrals. Purchase points are pending until the trip or service is
  * over, expire after 24 months, and pay event or train tickets, up to the full price (100 points = 5 SAR,
- * from 500 points; packages are never discounted). Tiers by 12-month spend multiply purchase points; campaigns set by the back office too.
+ * from 100 points; packages are never discounted). Tiers by 12-month spend multiply purchase points; campaigns set by the back office too.
  *
  * Each member has one ledger document (collection "loyalty", id = user id), changed atomically.
  */

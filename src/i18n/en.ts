@@ -1684,7 +1684,7 @@ const en: Dictionary = {
     order: { title: "Reward points", price: "Price", used: "Points discount ({n} points)", discount: "Points discount", earned: "Points earned", paidCard: "Paid by card (incl. VAT)", net: "Amount before VAT", vat: "VAT 15%", view: "View my points" },
     errors: {
       redeemInvalid: "Invalid number of points.",
-      redeemBelowMinimum: "The minimum you can use is 500 points.",
+      redeemBelowMinimum: "The minimum you can use is 100 points (SAR 5).",
       redeemBalance: "Your available balance isn't enough for these points.",
       redeemAboveMaximum: "That's more points than this booking allows.",
       notEligible: "Saudi Trip Rewards is for individual accounts only.",

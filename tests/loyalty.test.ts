@@ -45,16 +45,18 @@ describe("loyalty rules", () => {
     expect(tierFor(50_000).next).toBeNull();
   });
 
-  it("allows the whole balance, from 500 points, up to the full price", () => {
+  it("allows the whole balance, from 100 points, up to the full price", () => {
     expect(pointsValueSAR(100)).toBe(5);
     expect(maxRedeemable({ totalSAR: 1000, balance: 10_000 })).toBe(10_000); // 500 SAR
     expect(maxRedeemable({ totalSAR: 100, balance: 10_000 })).toBe(2000); // the full 100 SAR
     expect(maxRedeemable({ totalSAR: 1000, balance: 700 })).toBe(700);
-    expect(maxRedeemable({ totalSAR: 1000, balance: 400 })).toBe(0);
-    expect(maxRedeemable({ totalSAR: 20, balance: 10_000 })).toBe(0); // 20 SAR = 400 points < 500
+    expect(maxRedeemable({ totalSAR: 1000, balance: 100 })).toBe(100); // SAR 5
+    expect(maxRedeemable({ totalSAR: 1000, balance: 99 })).toBe(0);
+    expect(maxRedeemable({ totalSAR: 4.99, balance: 10_000 })).toBe(0); // 99 points < 100
     expect(canRedeemOn("event") && canRedeemOn("train")).toBe(true);
     expect(canRedeemOn("package") || canRedeemOn("esim")).toBe(false);
-    expect(redeemError(499, { totalSAR: 1000, balance: 5000 })).toBe("redeemBelowMinimum");
+    expect(redeemError(99, { totalSAR: 1000, balance: 5000 })).toBe("redeemBelowMinimum");
+    expect(redeemError(100, { totalSAR: 1000, balance: 5000 })).toBeNull();
     expect(redeemError(20_001, { totalSAR: 1000, balance: 30_000 })).toBe("redeemAboveMaximum");
     expect(redeemError(800, { totalSAR: 1000, balance: 700 })).toBe("redeemBalance");
     expect(redeemError(1.5, { totalSAR: 1000, balance: 700 })).toBe("redeemInvalid");
