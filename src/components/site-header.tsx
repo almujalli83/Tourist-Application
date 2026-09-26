@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { CURRENCIES } from "@/lib/currency";
 import { useApp } from "./app-provider";
 import { ChevronIcon, GlobeIcon, Logo, MenuIcon, UserIcon, XIcon } from "./icons";
+import { PointsChip } from "./loyalty/points-chip";
 import { NotificationBell } from "./notification-bell";
 import { cx } from "./ui";
 
@@ -35,6 +36,7 @@ export function SiteHeader() {
         { href: `/${locale}/account`, label: t.nav.myBookings },
         { href: `/${locale}/account/wallet`, label: t.wallet.nav },
         { href: `/${locale}/account/notifications`, label: t.account.notifications.nav },
+        ...(user.accountType === "individual" ? [{ href: `/${locale}/account/loyalty`, label: t.loyalty.nav }] : []),
         { href: `/${locale}/account/reviews`, label: t.reviews.nav },
         ...(user.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
       ]
@@ -121,6 +123,7 @@ export function SiteHeader() {
               <span className="2xl:hidden">{otherLocale === "en" ? "EN" : "ع"}</span>
             </Link>
           </div>
+          {user && <PointsChip className="hidden sm:flex xl:hidden" />}
           {user && <NotificationBell />}
           <div className="hidden xl:block">
             {user ? (

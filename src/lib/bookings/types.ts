@@ -1,3 +1,4 @@
+import type { OrderLoyalty } from "../loyalty/types";
 import type { PriceBreakdown } from "../pricing";
 import type { ActivityOffer, FlightOffer, HotelOffer, PaxType, SearchCriteria } from "../types";
 
@@ -58,6 +59,8 @@ export interface StoredBooking {
     tables: { itemId: string; titleAr: string; titleEn: string; bookingId: string | null; error?: string }[];
     issues: { itemId: string; titleAr: string; titleEn: string; reason: string }[];
   };
+  /** Reward points used and earned (service 10): the card paid `payment.amountSAR` for the package. */
+  loyalty?: OrderLoyalty;
   /** Incremented by every package change; a change must be priced on the current version. */
   version?: number;
   /** Held while a package change is being applied (prevents concurrent changes). */

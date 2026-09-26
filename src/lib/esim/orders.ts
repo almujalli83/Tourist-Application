@@ -7,6 +7,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { displayName, type PublicUser } from "../auth/types";
 import { notifyTravellers } from "../notify";
+import { awardPurchase, holdRedeem, LoyaltyError, quietly, releaseRedeem, returnRedeemed, reversePurchase } from "../loyalty/loyalty";
+import type { OrderLoyalty } from "../loyalty/types";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { listBookingsByUser } from "../repo";
 import { getSavedTraveller, listWithKeys } from "../saved-travellers-repo";
@@ -39,6 +41,8 @@ export interface EsimOrder {
   totalSAR: number;
   payment: { transactionId: string; method: string; last4: string; amountSAR: number };
   cancellation: { at: string; refundSAR: number } | null;
+  /** Reward points used and earned (service 10); the card paid `payment.amountSAR`. */
+  loyalty?: OrderLoyalty;
 }
 
 export class EsimError extends Error {
@@ -97,7 +101,10 @@ async function resolveRecipient(user: PublicUser, ref: string): Promise<EsimReci
 /* ---------------------------------------------------------- issue */
 
 /** Issues the eSIMs of an already paid order and stores it (used alone and with a package). */
-async function issueOrder(user: PublicUser, o: { id: string; plan: EsimPlan; recipients: EsimRecipient[]; payment: EsimOrder["payment"]; booking: EsimOrder["booking"] }): Promise<EsimOrder> {
+async function issueOrder(
+  user: PublicUser,
+  o: { id: string; plan: EsimPlan; recipients: EsimRecipient[]; payment: EsimOrder["payment"]; booking: EsimOrder["booking"]; totalSAR?: number; loyalty?: OrderLoyalty },
+): Promise<EsimOrder> {
   const issued = await tygoIssue(o.plan, o.recipients.length);
   const order: EsimOrder = {
     id: o.id,
@@ -109,9 +116,10 @@ async function issueOrder(user: PublicUser, o: { id: string; plan: EsimPlan; rec
     plan: o.plan,
     booking: o.booking,
     lines: o.recipients.map((r, i) => ({ id: randomUUID(), ...r, ...issued.esims[i] })),
-    totalSAR: o.payment.amountSAR,
+    totalSAR: o.totalSAR ?? o.payment.amountSAR,
     payment: o.payment,
     cancellation: null,
+    ...(o.loyalty ? { loyalty: o.loyalty } : {}),
   };
   if (!(await store().insert("esimOrders", order.id, order))) return (await store().get<EsimOrder>("esimOrders", order.id))!;
   for (const line of order.lines) await notifyTravellers([line.email], installEmail(order, line, user.preferredLocale));
@@ -142,6 +150,8 @@ export interface EsimOrderInput {
   expectedTotalSAR: number;
   idempotencyKey: string;
   card: CardInput;
+  /** Reward points used on the order (service 10). */
+  redeemPoints?: number;
 }
 
 /** Standalone purchase (after the package, or without one). */
@@ -157,12 +167,27 @@ export async function placeEsimOrder(user: PublicUser, input: EsimOrderInput, no
   const recipients = await Promise.all(refs.map((r) => resolveRecipient(user, r)));
   const total = esimTotal(plan, recipients.length);
   if (Math.abs(total - Number(input.expectedTotalSAR)) > 0.01) throw new EsimError("priceChanged", 409);
-  const pay = await chargeCard(input.card, total, now);
-  if (!pay.ok) throw new EsimError(`payment_${pay.code}`, 402);
+  let hold: Awaited<ReturnType<typeof holdRedeem>> = null;
   try {
-    return await issueOrder(user, { id, plan, recipients, payment: { transactionId: pay.transactionId, method: pay.method, last4: pay.last4, amountSAR: total }, booking: null });
+    hold = await holdRedeem(user, { points: input.redeemPoints, totalSAR: total, source: { kind: "esim", id } }, now);
   } catch (err) {
-    await refundPayment(pay.transactionId, total);
+    throw err instanceof LoyaltyError ? new EsimError(err.code) : err;
+  }
+  const cardSAR = round2(total - (hold?.discountSAR ?? 0));
+  const pay = await chargeCard(input.card, cardSAR, now);
+  if (!pay.ok) {
+    await releaseRedeem(user.id, hold, now);
+    throw new EsimError(`payment_${pay.code}`, 402);
+  }
+  // Points on the card amount, usable straight away (they are taken back if the order is cancelled).
+  const earned = await quietly("eSIM points", () => awardPurchase(user, { service: "esim", source: { kind: "esim", id }, eligibleSAR: cardSAR, availableAt: now.toISOString() }, now), 0);
+  const loyalty = hold || earned ? { redeemedPoints: hold?.points ?? 0, discountSAR: hold?.discountSAR ?? 0, earnedPoints: earned } : undefined;
+  try {
+    return await issueOrder(user, { id, plan, recipients, payment: { transactionId: pay.transactionId, method: pay.method, last4: pay.last4, amountSAR: cardSAR }, booking: null, totalSAR: total, loyalty });
+  } catch (err) {
+    await refundPayment(pay.transactionId, cardSAR);
+    await quietly("eSIM points return", () => returnRedeemed(user.id, id, now), 0);
+    await quietly("eSIM points reversal", () => reversePurchase(user.id, [id], 1, now), 0);
     throw err;
   }
 }
@@ -193,15 +218,17 @@ export async function cancelEsimOrder(user: PublicUser, id: string, now = new Da
   await store().update<EsimOrder>("esimOrders", id, (cur) => {
     if (cur.status !== "CONFIRMED") return cur;
     claimed = true;
-    return { ...cur, status: "CANCELLED", cancellation: { at: now.toISOString(), refundSAR: cur.totalSAR } };
+    return { ...cur, status: "CANCELLED", cancellation: { at: now.toISOString(), refundSAR: cur.payment.amountSAR } };
   });
   if (!claimed) throw new EsimError("notCancellable");
-  await refundPayment(o.payment.transactionId, o.totalSAR);
+  await refundPayment(o.payment.transactionId, o.payment.amountSAR);
   await tygoCancel(o.orderRef);
+  await quietly("eSIM points return", () => returnRedeemed(user.id, o.id, now), 0);
+  await quietly("eSIM points reversal", () => reversePurchase(user.id, [o.id], 1, now), 0);
   const done = (await getEsimOrder(user.id, id))!;
   await notifyTravellers([user.email], {
     subject: user.preferredLocale === "ar" ? `إلغاء شرائح eSIM — ${o.reference}` : `eSIM order cancelled — ${o.reference}`,
-    text: user.preferredLocale === "ar" ? `تم إلغاء طلب الشرائح ${o.reference} وسيُعاد ${o.totalSAR} ريال إلى بطاقتك.` : `eSIM order ${o.reference} has been cancelled. SAR ${o.totalSAR} will be refunded to your card.`,
+    text: user.preferredLocale === "ar" ? `تم إلغاء طلب الشرائح ${o.reference} وسيُعاد ${o.payment.amountSAR} ريال إلى بطاقتك.${o.loyalty?.redeemedPoints ? ` وأُعيدت ${o.loyalty.redeemedPoints} نقطة إلى رصيدك.` : ""}` : `eSIM order ${o.reference} has been cancelled. SAR ${o.payment.amountSAR} will be refunded to your card.${o.loyalty?.redeemedPoints ? ` ${o.loyalty.redeemedPoints} points are back in your balance.` : ""}`,
   });
   return done;
 }

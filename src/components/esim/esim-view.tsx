@@ -8,6 +8,7 @@ import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import type { EsimKind, EsimPlan } from "@/lib/esim/tygo";
 import { useApp } from "../app-provider";
 import { LockIcon } from "../icons";
+import { afterPoints, loyaltyError, PointsRedeemer } from "../loyalty/points-redeemer";
 import { Alert, Button, Card, cx, Field, Input, Spinner } from "../ui";
 import { EsimPlanPicker } from "./plan-picker";
 
@@ -43,6 +44,7 @@ export function EsimView() {
   }, [plan, chosen]);
 
   const total = plan ? Math.round(plan.priceSAR * chosen.length * 100) / 100 : 0;
+  const [points, setPoints] = useState(0);
 
   async function pay(ev: React.FormEvent) {
     ev.preventDefault();
@@ -58,11 +60,11 @@ export function EsimView() {
       const res = await fetch("/api/esim/orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planId: plan.id, recipients: chosen, expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency, card: { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } }),
+        body: JSON.stringify({ planId: plan.id, recipients: chosen, expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency, redeemPoints: points || undefined, card: { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErr((e.errors as Record<string, string>)[body.error] ?? e.errors.generic);
+        setErr(loyaltyError(t, body.error) ?? (e.errors as Record<string, string>)[body.error] ?? e.errors.generic);
         key.current = newKey();
         return;
       }
@@ -125,6 +127,7 @@ export function EsimView() {
               </div>
             ) : (
               <form onSubmit={pay} className="mt-4 space-y-3">
+                {total > 0 && <PointsRedeemer service="esim" totalSAR={total} value={points} onChange={setPoints} />}
                 <Field label={t.review.cardHolder} required><Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(x) => setCard({ ...card, holder: x.target.value })} required /></Field>
                 <Field label={t.review.cardNumber} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number} onChange={(x) => setCard({ ...card, number: x.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required /></Field>
                 <div className="grid grid-cols-2 gap-3">
@@ -133,7 +136,7 @@ export function EsimView() {
                 </div>
                 <p className="text-xs text-slate-500">{t.review.testCards}</p>
                 <Button type="submit" variant="gold" size="lg" className="w-full" loading={busy} disabled={!plan}>
-                  <LockIcon className="size-5" />{busy ? e.paying : fmt(e.pay, { amount: money(total) })}
+                  <LockIcon className="size-5" />{busy ? e.paying : fmt(e.pay, { amount: money(afterPoints(total, points)) })}
                 </Button>
               </form>
             )}

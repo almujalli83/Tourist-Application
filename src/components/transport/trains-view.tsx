@@ -11,6 +11,7 @@ import type { TrainClass, TrainTrip } from "@/lib/trains/sar";
 import { useApp } from "../app-provider";
 import { CountrySelect } from "../booking/country-select";
 import { LockIcon, TrainIcon } from "../icons";
+import { afterPoints, loyaltyError, PointsRedeemer } from "../loyalty/points-redeemer";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
 
 type Trip = TrainTrip & { seatsLeft: Record<TrainClass, number> };
@@ -158,6 +159,7 @@ export function TrainsView() {
 
   const price = legs.reduce((a, l) => a + adults * l.fares[cls].adult + children * l.fares[cls].child, 0);
   const total = Math.round(price * 100) / 100;
+  const [points, setPoints] = useState(0);
   const seatsReady = legs.length > 0 && legs.every((_, i) => seats[i].length === count);
   const paxReady = pax.every((p) => p.ref || (p.nameEn.trim().includes(" ") && p.nationality && p.passportNo.trim().length >= 5));
   const ready = legs.length === (round ? 2 : 1) && seatsReady && paxReady;
@@ -192,13 +194,13 @@ export function TrainsView() {
         body: JSON.stringify({
           legs: legs.map((l, i) => ({ tripId: l.id, cls, seats: seats[i] })),
           passengers: pax.map((p) => (p.ref ? { type: p.type, ref: p.ref } : { type: p.type, nameEn: p.nameEn, nationality: p.nationality, passportNo: p.passportNo })),
-          expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency,
+          expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency, redeemPoints: points || undefined,
           card: { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc },
         }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErr((tr.errors as Record<string, string>)[body.error] ?? tr.errors.generic);
+        setErr(loyaltyError(t, body.error) ?? (tr.errors as Record<string, string>)[body.error] ?? tr.errors.generic);
         key.current = newKey();
         if (body.error === "seatUnavailable") {
           const [a, b] = await Promise.all([loadTaken(0, outTrip), loadTaken(1, round ? retTrip : null)]);
@@ -398,6 +400,7 @@ export function TrainsView() {
                 <Link href={`/${locale}/login?next=${encodeURIComponent(`/${locale}/trains`)}`} className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800">{tr.login}</Link>
               ) : (
                 <form onSubmit={pay} className="mt-4 space-y-3">
+                  {total > 0 && <PointsRedeemer service="train" totalSAR={total} value={points} onChange={setPoints} />}
                   <Field label={t.review.cardHolder} required><Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required /></Field>
                   <Field label={t.review.cardNumber} required>
                     <Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required />
@@ -416,7 +419,7 @@ export function TrainsView() {
                     </Alert>
                   )}
                   <Button type="submit" variant="gold" size="lg" className="w-full" loading={paying}>
-                    <LockIcon className="size-5" />{paying ? tr.paying : fmt(tr.pay, { amount: money(total) })}
+                    <LockIcon className="size-5" />{paying ? tr.paying : fmt(tr.pay, { amount: money(afterPoints(total, points)) })}
                   </Button>
                 </form>
               )}

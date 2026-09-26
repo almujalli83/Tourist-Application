@@ -8,6 +8,9 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { PublicUser } from "../auth/types";
 import { COUNTRIES } from "../data/countries";
 import { notifyTravellers } from "../notify";
+import { awardPurchase, holdRedeem, LoyaltyError, quietly, releaseRedeem, returnRedeemed, reversePurchase } from "../loyalty/loyalty";
+import { pointsEmailLine } from "../loyalty/rules";
+import type { OrderLoyalty } from "../loyalty/types";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { listBookingsByUser } from "../repo";
 import { getSavedTraveller, listWithKeys, passportKey } from "../saved-travellers-repo";
@@ -58,6 +61,8 @@ export interface TrainOrder {
   payment: { transactionId: string; method: string; last4: string; amountSAR: number; paidAt: string };
   buyerEmail: string;
   cancellation: { at: string; refundSAR: number; feeSAR: number; refundId: string } | null;
+  /** Reward points used and earned (service 10); the card paid `payment.amountSAR`. */
+  loyalty?: OrderLoyalty;
 }
 
 export class TrainOrderError extends Error {
@@ -182,6 +187,8 @@ export interface TrainOrderInput {
   idempotencyKey: string;
   displayCurrency?: string;
   card: CardInput;
+  /** Reward points used on the order (service 10). */
+  redeemPoints?: number;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -227,16 +234,26 @@ export async function placeTrainOrder(user: PublicUser, input: TrainOrderInput, 
     }
     held.push(i);
   }
-  const pay = await chargeCard(input.card, totalSAR, now);
+  const reference = `TR-${randomBytes(4).toString("hex").toUpperCase()}`;
+  let pointsHold: Awaited<ReturnType<typeof holdRedeem>> = null;
+  try {
+    pointsHold = await holdRedeem(user, { points: input.redeemPoints, totalSAR, source: { kind: "train", id, reference } }, now);
+  } catch (err) {
+    for (const j of held) await releaseSeats(legs[j].trip.runId, input.legs[j].seats, id);
+    throw err instanceof LoyaltyError ? new TrainOrderError(err.code) : err;
+  }
+  const cardSAR = round2(totalSAR - (pointsHold?.discountSAR ?? 0));
+  const pay = await chargeCard(input.card, cardSAR, now);
   if (!pay.ok) {
     for (const j of held) await releaseSeats(legs[j].trip.runId, input.legs[j].seats, id);
+    await releaseRedeem(user.id, pointsHold, now);
     throw new TrainOrderError(`payment_${pay.code}`, 402);
   }
   // Passenger names and passports are sent to SAR with the booking (sandbox: issued here).
   const issued = await sarIssue(lines.length);
   const order: TrainOrder = {
     id,
-    reference: `TR-${randomBytes(4).toString("hex").toUpperCase()}`,
+    reference,
     pnr: issued.pnr,
     userId: user.id,
     idempotencyKey: input.idempotencyKey,
@@ -247,13 +264,22 @@ export async function placeTrainOrder(user: PublicUser, input: TrainOrderInput, 
     tickets: lines.map((l, i) => ({ id: randomUUID(), code: issued.codes[i], ...l })),
     totalSAR,
     displayCurrency: input.displayCurrency ?? "SAR",
-    payment: { transactionId: pay.transactionId, method: pay.method, last4: pay.last4, amountSAR: totalSAR, paidAt: now.toISOString() },
+    payment: { transactionId: pay.transactionId, method: pay.method, last4: pay.last4, amountSAR: cardSAR, paidAt: now.toISOString() },
     buyerEmail: user.email,
     cancellation: null,
+    ...(pointsHold ? { loyalty: { redeemedPoints: pointsHold.points, discountSAR: pointsHold.discountSAR, earnedPoints: 0 } } : {}),
   };
   if (!(await store().insert("trainOrders", id, order))) {
-    await refundPayment(pay.transactionId, totalSAR);
+    await refundPayment(pay.transactionId, cardSAR);
+    await releaseRedeem(user.id, pointsHold, now);
     return (await store().get<TrainOrder>("trainOrders", id))!;
+  }
+  // Points on the card amount, usable once the last train has arrived.
+  const arrives = new Date(Date.parse(legs[legs.length - 1].trip.arrive)).toISOString();
+  const earned = await quietly("train points", () => awardPurchase(user, { service: "train", source: { kind: "train", id, reference }, eligibleSAR: cardSAR, availableAt: arrives }, now), 0);
+  if (earned) {
+    order.loyalty = { redeemedPoints: pointsHold?.points ?? 0, discountSAR: pointsHold?.discountSAR ?? 0, earnedPoints: earned };
+    await store().update<TrainOrder>("trainOrders", id, (cur) => ({ ...cur, loyalty: order.loyalty }));
   }
   await notifyTravellers([user.email], trainEmail(order, "confirmed", user.preferredLocale));
   return order;
@@ -276,10 +302,14 @@ export function canCancelTrain(o: TrainOrder, now = new Date()): boolean {
   return o.status === "CONFIRMED" && now.getTime() < Date.parse(cancelDeadline(o));
 }
 
-/** Refund if cancelled now: each ticket by its leg's departure. */
-export function refundQuote(o: TrainOrder, now = new Date()): { refundSAR: number; feeSAR: number } {
-  const refundSAR = round2(o.tickets.reduce((a, t) => a + t.priceSAR * refundShare(o.legs[t.leg].trip.depart, now), 0));
-  return { refundSAR, feeSAR: round2(o.totalSAR - refundSAR) };
+/**
+ * Refund if cancelled now: each ticket by its leg's departure. Points used come back in full, so
+ * the card gets the refund less their value; `share` is the part of the price refunded.
+ */
+export function refundQuote(o: TrainOrder, now = new Date()): { refundSAR: number; feeSAR: number; pointsReturned: number; share: number } {
+  const full = round2(o.tickets.reduce((a, t) => a + t.priceSAR * refundShare(o.legs[t.leg].trip.depart, now), 0));
+  const discount = o.loyalty?.discountSAR ?? 0;
+  return { refundSAR: round2(Math.max(0, full - discount)), feeSAR: round2(o.totalSAR - full), pointsReturned: o.loyalty?.redeemedPoints ?? 0, share: o.totalSAR ? full / o.totalSAR : 0 };
 }
 
 export async function cancelTrainOrder(user: PublicUser, id: string, now = new Date()): Promise<TrainOrder> {
@@ -291,10 +321,12 @@ export async function cancelTrainOrder(user: PublicUser, id: string, now = new D
   await store().update<TrainOrder>("trainOrders", id, (cur) => {
     if (cur.status !== "CONFIRMED") return cur;
     claimed = true;
-    return { ...cur, status: "CANCELLED", cancellation: { at: now.toISOString(), ...q, refundId: "" } };
+    return { ...cur, status: "CANCELLED", cancellation: { at: now.toISOString(), refundSAR: q.refundSAR, feeSAR: q.feeSAR, refundId: "" } };
   });
   if (!claimed) throw new TrainOrderError("notCancellable");
   const refund = q.refundSAR > 0 ? await refundPayment(o.payment.transactionId, q.refundSAR) : null;
+  await quietly("train points return", () => returnRedeemed(user.id, o.id, now), 0);
+  await quietly("train points reversal", () => reversePurchase(user.id, [o.id], q.share, now), 0);
   await sarCancel(o.pnr);
   for (let i = 0; i < o.legs.length; i++) await releaseSeats(o.legs[i].trip.runId, o.tickets.filter((t) => t.leg === i).map((t) => t.seat), o.id);
   const done = await store().update<TrainOrder>("trainOrders", id, (cur) => ({ ...cur, cancellation: { ...cur.cancellation!, refundId: refund?.ok ? refund.refundId : "" } }));
@@ -318,11 +350,11 @@ function trainEmail(o: TrainOrder, kind: "confirmed" | "cancelled", locale: "ar"
   }).join("\n\n");
   if (kind === "confirmed") {
     return ar
-      ? { subject: `تذاكر القطار ${o.reference}`, text: `تم تأكيد حجز القطار ${o.reference} (PNR ${o.pnr}).\n\n${legs}\n\nالمبلغ: ${o.totalSAR} ريال\nتجد التذاكر في «حجوزاتي». أحضر جواز سفر كل راكب عند السفر.` }
-      : { subject: `Train tickets ${o.reference}`, text: `Your train booking ${o.reference} (PNR ${o.pnr}) is confirmed.\n\n${legs}\n\nAmount: SAR ${o.totalSAR}\nYour tickets are in “My bookings”. Each passenger must carry their passport.` };
+      ? { subject: `تذاكر القطار ${o.reference}`, text: `تم تأكيد حجز القطار ${o.reference} (PNR ${o.pnr}).\n\n${legs}\n\nالمبلغ: ${o.payment.amountSAR} ريال${pointsEmailLine(o.loyalty, true)}\nتجد التذاكر في «حجوزاتي». أحضر جواز سفر كل راكب عند السفر.` }
+      : { subject: `Train tickets ${o.reference}`, text: `Your train booking ${o.reference} (PNR ${o.pnr}) is confirmed.\n\n${legs}\n\nAmount: SAR ${o.payment.amountSAR}${pointsEmailLine(o.loyalty, false)}\nYour tickets are in “My bookings”. Each passenger must carry their passport.` };
   }
   const c = o.cancellation!;
   return ar
-    ? { subject: `إلغاء حجز القطار ${o.reference}`, text: `تم إلغاء حجز القطار ${o.reference}.\nالمبلغ المسترد: ${c.refundSAR} ريال (رسوم الإلغاء ${c.feeSAR} ريال) إلى البطاقة المستخدمة.` }
-    : { subject: `Train booking ${o.reference} cancelled`, text: `Your train booking ${o.reference} has been cancelled.\nRefund: SAR ${c.refundSAR} (cancellation fee SAR ${c.feeSAR}) to the card used.` };
+    ? { subject: `إلغاء حجز القطار ${o.reference}`, text: `تم إلغاء حجز القطار ${o.reference}.\nالمبلغ المسترد: ${c.refundSAR} ريال (رسوم الإلغاء ${c.feeSAR} ريال) إلى البطاقة المستخدمة.${o.loyalty?.redeemedPoints ? `\nأُعيدت ${o.loyalty.redeemedPoints} نقطة إلى رصيدك.` : ""}` }
+    : { subject: `Train booking ${o.reference} cancelled`, text: `Your train booking ${o.reference} has been cancelled.\nRefund: SAR ${c.refundSAR} (cancellation fee SAR ${c.feeSAR}) to the card used.${o.loyalty?.redeemedPoints ? `\n${o.loyalty.redeemedPoints} points are back in your balance.` : ""}` };
 }

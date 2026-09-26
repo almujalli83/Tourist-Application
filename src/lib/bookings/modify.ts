@@ -20,6 +20,8 @@ import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildUpdateRequests } from "../mt-evisa/mapper";
 import { adultsOf, legacyRooms } from "../occupancy";
 import { minimumPackagePrice } from "../package-rules";
+import { awardPurchase, packageAvailableAt, quietly, returnRedeemed, reversePurchase } from "../loyalty/loyalty";
+import { LOYALTY } from "../loyalty/rules";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { computePackagePrice, type PriceBreakdown } from "../pricing";
 import { notifyTravellers } from "../notify";
@@ -462,10 +464,16 @@ export async function executeModification(
       if (!p.ok) throw new BookingError(`payment_${p.code}`);
       payment = { transactionId: p.transactionId, method: p.method, last4: p.last4, amountSAR: q.chargeSAR };
     }
+    // A refund goes to the card up to what the card paid; any rest gives back points used on the package.
     let refund: BookingModification["refund"] = null;
+    let pointsBack = 0;
     if (q.refundSAR > 0) {
-      const r = await refundPayment(b.payment.transactionId, q.refundSAR);
-      if (r.ok) refund = { refundId: r.refundId, amountSAR: q.refundSAR };
+      const mods = b.modifications ?? [];
+      const cardPaid = b.payment.amountSAR + mods.reduce((a, m) => a + (m.payment?.amountSAR ?? 0) - (m.refund?.amountSAR ?? 0), 0);
+      const cardRefund = Math.round(Math.max(0, Math.min(q.refundSAR, cardPaid)) * 100) / 100;
+      pointsBack = Math.ceil((q.refundSAR - cardRefund) / LOYALTY.sarPerPoint - 1e-9);
+      const r = cardRefund > 0 ? await refundPayment(b.payment.transactionId, cardRefund) : null;
+      if (r?.ok) refund = { refundId: r.refundId, amountSAR: cardRefund };
     }
     await confirmAgentChanges(approvals);
     committed = true;
@@ -494,6 +502,14 @@ export async function executeModification(
       notified: null,
     };
     modification.notified = await notifyIfUpdated(updated, modification);
+
+    // Reward points: earned on an extra payment, taken back in proportion to a refund.
+    if (q.chargeSAR > 0)
+      await quietly("change points", () => awardPurchase(user, { service: "package", source: { kind: "modification", id: modification.id, reference: b.reference }, eligibleSAR: q.chargeSAR, availableAt: packageAvailableAt(q.newReturnDate), cities: q.next.criteria.stays.map((st) => st.city) }), 0);
+    if (q.refundSAR > 0 && q.previousTotalSAR > 0) {
+      await quietly("change points reversal", () => reversePurchase(user.id, [b.id, ...(b.modifications ?? []).map((m) => m.id)], q.refundSAR / q.previousTotalSAR), 0);
+      if (pointsBack > 0) await quietly("change points return", () => returnRedeemed(user.id, b.id, new Date(), pointsBack), 0);
+    }
 
     const saved = await updateBooking(b.id, (cur) => ({
       ...cur,
