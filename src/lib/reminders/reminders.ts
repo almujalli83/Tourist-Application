@@ -8,6 +8,7 @@
  * Reminders are created by the daily job (`/api/cron/reminders`) and, for the signed-in traveller,
  * whenever the notifications are loaded, so they also appear without the job.
  */
+import { voidStaleIntents } from "../payments/intents";
 import type { StoredBooking } from "../bookings/types";
 import { cityName } from "../data/cities";
 import { addDays } from "../dates";
@@ -255,6 +256,7 @@ export async function runReminders(now = new Date()): Promise<{ bookings: number
   // Licensed guides: daily MoT sync (when configured), then cancel requests of expired licences.
   await syncGuidesFromMt(now).catch((e) => console.error("guides sync failed", e));
   await expireGuideRequests(now);
+  await voidStaleIntents(now);
   return { bookings: bookings.length, created, reviewRequests, pointsReminders: loyalty.reminders };
 }
 

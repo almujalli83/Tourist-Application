@@ -11,7 +11,7 @@ import { useApp } from "../app-provider";
 import { BusIcon, LocateIcon, TicketIcon, TrainIcon } from "../icons";
 import { MetroPanel } from "../metro/metro-panel";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
-import { CardFields, EMPTY_CARD, toCardInput, type CardDraft } from "./card-fields";
+import { Checkout, type PaymentRef } from "../payments/checkout";
 import { useTransitOperators, useTransitStops } from "./use-transit";
 
 type Tab = "plan" | "live" | "tickets" | "map";
@@ -260,8 +260,6 @@ export function TransitTickets({ city, preselect, topUp = true }: { city: string
   const [data, setData] = useState<{ products: TransitProduct[]; operator: { nameAr: string; nameEn: string; sandbox: boolean } } | null>(null);
   const [pick, setPick] = useState<string | null>(preselect ?? null);
   const [qty, setQty] = useState(1);
-  const [card, setCard] = useState<CardDraft>(EMPTY_CARD);
-  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [mine, setMine] = useState<TransitTicket[] | null>(null);
   const loadMine = useCallback(() => {
@@ -277,16 +275,17 @@ export function TransitTickets({ city, preselect, topUp = true }: { city: string
   }, [city, preselect, loadMine]);
   const product = data?.products.find((p) => p.id === pick);
   const total = product ? Math.round(product.priceSAR * qty * 100) / 100 : 0;
-  async function buy() {
-    setBusy(true);
+  async function buy(payment: PaymentRef | undefined): Promise<boolean> {
     setMsg(null);
-    const r = await fetch("/api/transit/tickets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ city, productId: pick, qty, expectedTotalSAR: total, card: toCardInput(card) }) }).catch(() => null);
+    const r = await fetch("/api/transit/tickets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ city, productId: pick, qty, expectedTotalSAR: total, card: payment }) }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
-    setBusy(false);
-    if (!r?.ok) return setMsg({ tone: "error", text: errOf(t, d?.error) });
+    if (!r?.ok) {
+      setMsg({ tone: "error", text: errOf(t, d?.error) });
+      return false;
+    }
     setMsg({ tone: "success", text: fmt(x.bought, { n: d.tickets.length }) });
-    setCard(EMPTY_CARD);
     loadMine();
+    return true;
   }
   if (!data) return <Card className="grid h-32 place-items-center p-5 text-brand-700"><Spinner className="size-6" /></Card>;
   return (
@@ -310,8 +309,7 @@ export function TransitTickets({ city, preselect, topUp = true }: { city: string
               <Field label={x.qty} htmlFor="tt-qty"><Input id="tt-qty" type="number" min={1} max={10} value={qty} onChange={(e) => setQty(Math.max(1, Math.min(10, Number(e.target.value) || 1)))} className="w-24" data-testid="transit-qty" /></Field>
               <p className="pb-2 text-base font-bold">{x.total}: <span className="ltr-nums text-brand-800" data-testid="transit-total">{money(total)}</span></p>
             </div>
-            <CardFields card={card} onChange={setCard} />
-            <Button loading={busy} onClick={() => void buy()} data-testid="transit-buy"><TicketIcon className="size-4" />{x.buy}</Button>
+            <Checkout amountSAR={total} description={`${ar ? product.nameAr : product.nameEn} × ${qty}`} onPay={buy} testId="transit-buy" />
           </>
         )}
         {msg && <Alert tone={msg.tone}><span data-testid="transit-msg">{msg.text}</span></Alert>}
@@ -348,18 +346,17 @@ function TopUpCard({ city }: { city: string }) {
   const x = t.transit;
   const [cardNo, setCardNo] = useState("");
   const [amount, setAmount] = useState<number>(TOPUP_AMOUNTS[1]);
-  const [card, setCard] = useState<CardDraft>(EMPTY_CARD);
-  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  async function go() {
-    setBusy(true);
+  async function go(payment: PaymentRef | undefined): Promise<boolean> {
     setMsg(null);
-    const r = await fetch("/api/transit/topups", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ city, cardNo, amountSAR: amount, card: toCardInput(card) }) }).catch(() => null);
+    const r = await fetch("/api/transit/topups", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ city, cardNo, amountSAR: amount, card: payment }) }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
-    setBusy(false);
-    if (!r?.ok) return setMsg({ tone: "error", text: errOf(t, d?.error) });
+    if (!r?.ok) {
+      setMsg({ tone: "error", text: errOf(t, d?.error) });
+      return false;
+    }
     setMsg({ tone: "success", text: fmt(x.topupDone, { amount: money(d.topup.amountSAR), balance: d.topup.balanceSAR != null ? fmt(x.balance, { amount: money(d.topup.balanceSAR) }) : "" }) });
-    setCard(EMPTY_CARD);
+    return true;
   }
   return (
     <Card className="space-y-3 p-5" data-testid="transit-topup">
@@ -372,8 +369,7 @@ function TopUpCard({ city }: { city: string }) {
           <button key={a} type="button" aria-pressed={amount === a} onClick={() => setAmount(a)} className={cx("h-9 rounded-full border px-3 text-sm font-semibold", amount === a ? "border-brand-700 bg-brand-50 ring-1 ring-brand-700" : "border-slate-300")}>{money(a)}</button>
         ))}
       </div>
-      <CardFields card={card} onChange={setCard} />
-      <Button loading={busy} onClick={() => void go()} data-testid="topup-go">{x.topup}</Button>
+      <Checkout amountSAR={amount} description="darb card top-up" disabled={cardNo.replace(/\D/g, "").length < 8} label={x.topup} onPay={go} testId="topup-go" />
       {msg && <Alert tone={msg.tone}><span data-testid="topup-msg">{msg.text}</span></Alert>}
     </Card>
   );

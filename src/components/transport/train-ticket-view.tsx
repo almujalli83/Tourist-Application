@@ -6,6 +6,7 @@ import { fmt } from "@/i18n";
 import { fmtKsa, ksaDay } from "@/lib/events/format";
 import type { TrainOrder } from "@/lib/trains/orders";
 import { useApp } from "../app-provider";
+import { ReceiptLink } from "../payments/receipt-link";
 import { BackLink } from "../back-link";
 import { TrainIcon } from "../icons";
 import { PrintButton } from "../print-button";
@@ -91,6 +92,7 @@ export function TrainTicketView({ id }: { id: string }) {
           <div><dt className="text-xs text-slate-500">{tk.reference}</dt><dd className="ltr-nums font-bold">{o.reference}</dd></div>
           <div><dt className="text-xs text-slate-500">{tk.pnr}</dt><dd className="ltr-nums font-bold">{o.pnr}</dd></div>
           <div><dt className="text-xs text-slate-500">{tk.paid}</dt><dd className="font-semibold">{o.payment.method === "points" ? t.loyalty.checkout.paidByPoints : <>{money(o.payment.amountSAR)} · {o.payment.method.toUpperCase()} •••{o.payment.last4}</>}</dd></div>
+          <div><ReceiptLink transactionId={o.payment.transactionId} /></div>
         </dl>
         <OrderPoints loyalty={o.loyalty} totalSAR={o.totalSAR} className="mt-4" />
         <ul className="mt-4 space-y-2">
