@@ -5,6 +5,7 @@ import { saveBooking } from "@/lib/repo";
 import { store } from "@/lib/store";
 import { DEFAULT_LICENCE_RULES, getLicenceRules, ruleFor, setLicenceRules } from "@/lib/rentals/licence";
 import { rentalProvidersFor } from "@/lib/rentals/providers";
+import { DEFAULT_COMPANIES, listCompanies, saveCompanies } from "@/lib/rentals/companies";
 import { cancelRental, getRental, listRentals, rentalOptions, rentalPlansFromBooking, rentalReminders, requestRental, validateQuery } from "@/lib/rentals/rentals";
 import { rentalDays, type RentalQuery } from "@/lib/rentals/types";
 
@@ -61,8 +62,15 @@ describe("rental search", () => {
 
   it("returns every class with the one-way fee, extras and the licence rule for the driver", async () => {
     const o = await rentalOptions(q(), now);
-    expect(o.quotes.map((x) => x.carClass)).toEqual(["economy", "sedan", "suv", "4x4", "luxury"]);
-    expect(o.quotes[0]).toMatchObject({ days: 3, totalSAR: 360, oneWayFeeSAR: 0, extras: { fullInsurance: 135 } });
+    // Companies renting in AlUla, each with its own prices; cheapest first.
+    expect(new Set(o.quotes.map((x) => x.providerId))).toEqual(new Set(["theeb", "yelo", "budget", "avis", "hertz"]));
+    expect(o.companies.map((c) => c.id).sort()).toEqual(["avis", "budget", "hertz", "theeb", "yelo"]);
+    expect(o.companies.find((c) => c.id === "theeb")).toMatchObject({ nameAr: "ذيب", logo: null });
+    expect(o.quotes.every((x, i) => i === 0 || x.totalSAR >= o.quotes[i - 1].totalSAR)).toBe(true);
+    expect(new Set(o.quotes.map((x) => x.carClass)).size).toBe(5);
+    expect(o.quotes.find((x) => x.carClass === "economy")).toMatchObject({ days: 3, oneWayFeeSAR: 0, extras: { fullInsurance: 135 } });
+    const ruh = await rentalOptions(q({ city: "RUH", dropoffCity: "RUH" }), now);
+    expect(new Set(ruh.quotes.map((x) => x.providerId)).size).toBe(9);
     expect(o.licence?.id).toBe("general");
     expect(o.reviewed).toBe(false);
     const oneWay = await rentalOptions(q({ dropoffCity: "MED" }), now);
@@ -71,16 +79,18 @@ describe("rental search", () => {
   });
 
   it("links companies by API (quotes mapped and checked)", async () => {
-    process.env.RENTAL_PROVIDERS = JSON.stringify([{ id: "acme", nameAr: "أكمي", nameEn: "Acme", url: "https://api.acme.test/v1", token: "t", cities: ["ULH"] }]);
+    process.env.RENTAL_PROVIDERS = JSON.stringify([{ id: "theeb", nameAr: "x", nameEn: "x", url: "https://api.acme.test/v1", token: "t", cities: ["ULH"] }]);
     const f = vi.fn(async () => new Response(JSON.stringify([
       { quoteId: "A1", carClass: "4x4", model: "Nissan Patrol", pricePerDaySAR: 400, oneWayFeeSAR: 0, depositSAR: 2500, extras: { fullInsurance: 50 }, minAge: 25 },
       { quoteId: "bad", carClass: "boat", pricePerDaySAR: 10 },
     ]), { status: 200 }));
     vi.stubGlobal("fetch", f);
-    expect(rentalProvidersFor("ULH").map((p) => p.id)).toEqual(["acme"]);
+    const ps = await rentalProvidersFor("ULH");
+    expect(ps.find((p) => p.id === "theeb")).toMatchObject({ sandbox: false, nameAr: "ذيب" }); // name from the directory
     const o = await rentalOptions(q(), now);
-    expect(o.quotes).toHaveLength(1);
-    expect(o.quotes[0]).toMatchObject({ providerId: "acme", carClass: "4x4", totalSAR: 1200, extras: { fullInsurance: 150 }, minAge: 25 });
+    const linked = o.quotes.filter((x) => x.providerId === "theeb");
+    expect(linked).toHaveLength(1);
+    expect(linked[0]).toMatchObject({ providerNameEn: "Theeb", carClass: "4x4", totalSAR: 1200, extras: { fullInsurance: 150 }, minAge: 25 });
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.acme.test/v1/quotes");
     expect((init.headers as Record<string, string>).authorization).toBe("Bearer t");
@@ -93,14 +103,15 @@ describe("rental bookings", () => {
     await store().put("users", u.id, { ...u, passwordHash: "x" });
     await saveBooking(booking("rb1", u.id));
     const o = await rentalOptions(q(), now);
-    const suv = o.quotes.find((x) => x.carClass === "suv")!;
-    const base = { ...q(), bookingId: "rb1", providerId: "sandbox", quoteId: suv.quoteId, extras: ["fullInsurance", "boat"], acceptLicence: true };
+    const suv = o.quotes.find((x) => x.carClass === "suv" && x.providerId === "yelo")!;
+    const base = { ...q(), bookingId: "rb1", providerId: "yelo", quoteId: suv.quoteId, extras: ["fullInsurance", "boat"], acceptLicence: true };
     await expect(requestRental(u, { ...base, acceptLicence: false }, now)).rejects.toMatchObject({ code: "licenceNotAccepted" });
     await expect(requestRental(u, { ...base, quoteId: "forged" }, now)).rejects.toMatchObject({ code: "quoteExpired" });
-    const young = (await rentalOptions(q({ driverAge: 21 }), now)).quotes.find((x) => x.carClass === "suv")!;
+    const young = (await rentalOptions(q({ driverAge: 21 }), now)).quotes.find((x) => x.carClass === "suv" && x.providerId === "yelo")!;
     await expect(requestRental(u, { ...base, driverAge: 21, quoteId: young.quoteId }, now)).rejects.toMatchObject({ code: "driverTooYoung" });
+    await expect(requestRental(u, { ...base, providerId: "enterprise" }, now)).rejects.toMatchObject({ code: "noProvider" }); // not in AlUla
     const r = await requestRental(u, base, now);
-    expect(r).toMatchObject({ status: "requested", carClass: "suv", extras: ["fullInsurance"], totalSAR: suv.totalSAR + suv.extras.fullInsurance!, bookingReference: "TA-rb1", driverName: "Sara Ali", sandbox: true });
+    expect(r).toMatchObject({ status: "requested", providerNameAr: "يلو", carClass: "suv", extras: ["fullInsurance"], totalSAR: suv.totalSAR + suv.extras.fullInsurance!, bookingReference: "TA-rb1", driverName: "Sara Ali", sandbox: true });
     expect(JSON.stringify(r)).not.toContain("+966500000000");
     await expect(requestRental(u, { ...base, pickupAt: "2026-10-11T12:00", returnAt: "2026-10-14T10:00" }, now)).rejects.toMatchObject({ code: "overlap" });
 
@@ -126,7 +137,7 @@ describe("rental bookings", () => {
     const b = booking("rb2", u.id);
     await saveBooking(b);
     const o = await rentalOptions(q(), now);
-    const r = await requestRental(u, { ...q(), bookingId: "rb2", providerId: "sandbox", quoteId: o.quotes[0].quoteId, acceptLicence: true }, now);
+    const r = await requestRental(u, { ...q(), bookingId: "rb2", providerId: o.quotes[0].providerId, quoteId: o.quotes[0].quoteId, acceptLicence: true }, now);
     await saveBooking({ ...b, status: "CANCELLED" } as StoredBooking);
     const list = await listRentals(u.id, now);
     expect(list.find((x) => x.id === r.id)).toMatchObject({ status: "cancelled", cancelReason: "packageCancelled" });
@@ -153,5 +164,22 @@ describe("licence rules", () => {
     expect(ruleFor(kept, "DE")?.id).toBe("eu");
     expect((await rentalOptions(q({ licenceCountry: "DE" }), now)).reviewed).toBe(true);
     await store().delete("config", "rentalLicenceRules");
+  });
+});
+
+describe("rental companies", () => {
+  it("operations edit the directory: logos, cities, inactive companies are hidden", async () => {
+    const list = await listCompanies();
+    expect(list.map((c) => c.id)).toContain("avis");
+    const png = `data:image/png;base64,${Buffer.from("logo").toString("base64")}`;
+    await expect(saveCompanies(list.map((c) => ({ ...c, logo: c.id === "avis" ? "data:text/html;base64,PHNjcmlwdD4=" : c.logo })))).rejects.toThrow("invalidLogo");
+    const saved = await saveCompanies(list.map((c) => ({ ...c, logo: c.id === "avis" ? png : c.logo, active: c.id !== "hertz", cities: c.id === "sixt" ? "ruh, ulh" : c.cities })));
+    expect(saved.find((c) => c.id === "avis")).toMatchObject({ logo: png, logoVersion: 1 });
+    const o = await rentalOptions(q(), now);
+    expect(o.quotes.some((x) => x.providerId === "hertz")).toBe(false);
+    expect(o.quotes.some((x) => x.providerId === "sixt")).toBe(true);
+    expect(o.companies.find((c) => c.id === "avis")!.logo).toBe("/api/rentals/logo/avis?v=1");
+    await saveCompanies(DEFAULT_COMPANIES);
+    await store().delete("config", "rentalCompanies");
   });
 });

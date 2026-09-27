@@ -1,7 +1,7 @@
 import { currentUser } from "@/lib/auth/session";
 import { error, handle, json } from "@/lib/http";
 import { getLicenceRules, ruleFor } from "@/lib/rentals/licence";
-import { cancelRental, getRental, RentalError } from "@/lib/rentals/rentals";
+import { cancelRental, companyBrands, getRental, RentalError } from "@/lib/rentals/rentals";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -11,7 +11,8 @@ export const GET = handle(async (_req: Request, { params }: Ctx) => {
   const r = await getRental(user.id, (await params).id);
   if (!r) return error("notFound", 404);
   const rules = await getLicenceRules();
-  return json({ rental: r, licence: ruleFor(rules, r.licenceCountry), reviewed: !!rules.reviewedAt, sourceUrl: rules.sourceUrl });
+  const company = (await companyBrands()).find((c) => c.id === r.providerId) ?? null;
+  return json({ rental: r, company, licence: ruleFor(rules, r.licenceCountry), reviewed: !!rules.reviewedAt, sourceUrl: rules.sourceUrl });
 });
 
 export const DELETE = handle(async (_req: Request, { params }: Ctx) => {

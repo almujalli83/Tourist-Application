@@ -13,12 +13,14 @@
  *                                → { ref, status: "requested" | "confirmed" | "rejected", confirmation?, counter? }
  *   GET    {url}/bookings/{ref}  → { status, confirmation?, counter? }
  *   DELETE {url}/bookings/{ref}
- * Sandbox (no MT credentials): a simulated company with indicative prices; it confirms a request a
- * few minutes after it is made. Off with DEMO_RENTALS=off.
+ * The companies offered come from the directory (companies.ts); the id links a company to its
+ * API entry here. Sandbox (no MT credentials): companies not linked yet are simulated with sample
+ * prices and confirm a request a few minutes after it is made. Off with DEMO_RENTALS=off.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { mtConfig } from "../config";
 import { getStayCity } from "../data/cities";
+import { listCompanies } from "./companies";
 import { CAR_CLASSES, RENTAL_EXTRAS, rentalDays, type CarClass, type RentalCounter, type RentalExtra, type RentalQuery, type RentalQuote, type RentalStatus } from "./types";
 
 export interface RentalBookRequest extends RentalQuery { quoteId: string; extras: RentalExtra[]; driverName: string; phone: string; email: string; reference: string }
@@ -137,55 +139,79 @@ const SANDBOX_EXTRAS: Record<RentalExtra, number> = { fullInsurance: 45, extraDr
 const SANDBOX_ONE_WAY_SAR = 350;
 /** A request is confirmed this long after it is made (simulated). */
 export const SANDBOX_RENTAL_CONFIRM_MINUTES = 2;
-const SANDBOX_NAME = { ar: "تأجير السعودية (تجريبي)", en: "Saudi Car Rental (sample)" };
 
-const sandboxProvider: RentalProvider = {
-  id: "sandbox", nameAr: SANDBOX_NAME.ar, nameEn: SANDBOX_NAME.en, cities: [], sandbox: true,
-  async quote(q) {
-    const days = rentalDays(q.pickupAt, q.returnAt);
-    const oneWay = q.dropoffCity !== q.city ? SANDBOX_ONE_WAY_SAR : 0;
-    return CAR_CLASSES.map((cls) => {
-      const car = SANDBOX_CARS[cls];
-      const extras: Partial<Record<RentalExtra, number>> = {};
-      for (const k of RENTAL_EXTRAS) extras[k] = SANDBOX_EXTRAS[k] * days;
+/** A company simulated with sample prices until its API is linked (each with its own price level). */
+function sandboxProvider(c: { id: string; nameAr: string; nameEn: string; cities: string[] }): RentalProvider {
+  const h = createHash("sha256").update(c.id).digest();
+  const factor = 0.88 + (h[0] % 33) / 100; // 0.88 – 1.20
+  const price = (n: number) => Math.round((n * factor) / 5) * 5;
+  return {
+    id: c.id, nameAr: c.nameAr, nameEn: c.nameEn, cities: c.cities, sandbox: true,
+    async quote(q) {
+      const days = rentalDays(q.pickupAt, q.returnAt);
+      const oneWay = q.dropoffCity !== q.city ? price(SANDBOX_ONE_WAY_SAR) : 0;
+      return CAR_CLASSES.filter((cls, i) => (h[1 + i] % 5 !== 0 || cls === "economy")).map((cls) => {
+        const car = SANDBOX_CARS[cls];
+        const extras: Partial<Record<RentalExtra, number>> = {};
+        for (const k of RENTAL_EXTRAS) extras[k] = SANDBOX_EXTRAS[k] * days;
+        const perDay = price(car.perDay);
+        return {
+          quoteId: `sbx-${c.id}-${cls}-${createHash("sha256").update(JSON.stringify([c.id, q.city, q.pickupSpot, q.dropoffCity, q.dropoffSpot, q.pickupAt, q.returnAt, cls])).digest("hex").slice(0, 12)}`,
+          providerId: c.id, providerNameAr: c.nameAr, providerNameEn: c.nameEn,
+          carClass: cls, model: car.model, seats: car.seats, bags: car.bags, automatic: true,
+          days, pricePerDaySAR: perDay, oneWayFeeSAR: oneWay, totalSAR: perDay * days + oneWay, depositSAR: car.deposit,
+          kmPerDay: cls === "luxury" ? 250 : null, extras, minAge: car.minAge, freeCancelHours: 24, sandbox: true,
+        };
+      });
+    },
+    async book() {
+      return { ref: `SBX-${c.id.toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`, status: "requested", confirmation: null, counter: null };
+    },
+    async status(ref, createdAt, now, q) {
+      if (now.getTime() - Date.parse(createdAt) < SANDBOX_RENTAL_CONFIRM_MINUTES * 60_000) return { status: "requested", confirmation: null, counter: null };
+      const city = getStayCity(q.city);
+      const where = q.pickupSpot === "airport" ? `${city?.airportEn ?? q.city} — arrivals hall` : `${city?.en ?? q.city} — city branch`;
       return {
-        quoteId: `sbx-${cls}-${createHash("sha256").update(JSON.stringify([q.city, q.pickupSpot, q.dropoffCity, q.dropoffSpot, q.pickupAt, q.returnAt, cls])).digest("hex").slice(0, 12)}`,
-        providerId: "sandbox", providerNameAr: SANDBOX_NAME.ar, providerNameEn: SANDBOX_NAME.en,
-        carClass: cls, model: car.model, seats: car.seats, bags: car.bags, automatic: true,
-        days, pricePerDaySAR: car.perDay, oneWayFeeSAR: oneWay, totalSAR: car.perDay * days + oneWay, depositSAR: car.deposit,
-        kmPerDay: cls === "luxury" ? 250 : null, extras, minAge: car.minAge, freeCancelHours: 24, sandbox: true,
+        status: "confirmed",
+        confirmation: `CR${createHash("sha256").update(ref).digest("hex").slice(0, 6).toUpperCase()}`,
+        counter: { name: c.nameEn, phone: "+966500000401", address: where },
       };
-    });
-  },
-  async book() {
-    return { ref: `SBX-CR-${randomBytes(3).toString("hex").toUpperCase()}`, status: "requested", confirmation: null, counter: null };
-  },
-  async status(ref, createdAt, now, q) {
-    if (now.getTime() - Date.parse(createdAt) < SANDBOX_RENTAL_CONFIRM_MINUTES * 60_000) return { status: "requested", confirmation: null, counter: null };
-    const city = getStayCity(q.city);
-    const where = q.pickupSpot === "airport" ? `${city?.airportEn ?? q.city} — arrivals hall` : `${city?.en ?? q.city} — city branch`;
-    return {
-      status: "confirmed",
-      confirmation: `CR${createHash("sha256").update(ref).digest("hex").slice(0, 6).toUpperCase()}`,
-      counter: { name: SANDBOX_NAME.en, phone: "+966500000401", address: where },
-    };
-  },
-  async cancel() {
-    /* nothing to release in the simulation */
-  },
-};
+    },
+    async cancel() {
+      /* nothing to release in the simulation */
+    },
+  };
+}
 
 const sandboxOn = () => mtConfig().mock && process.env.DEMO_RENTALS !== "off";
 
-/** Companies renting in a city: the linked ones, else the sandbox one (sandbox mode). */
-export function rentalProvidersFor(city: string): RentalProvider[] {
-  const linked = readConfig().map(apiProvider).filter((p) => p.cities.includes(city));
-  if (linked.length) return linked;
-  return sandboxOn() && getStayCity(city) ? [sandboxProvider] : [];
+/** Every company that can be offered: linked by API, else simulated in the sandbox. */
+async function allProviders(): Promise<RentalProvider[]> {
+  const linked = readConfig();
+  const all = await listCompanies();
+  const out: RentalProvider[] = [];
+  for (const c of all.filter((x) => x.active)) {
+    const api = linked.find((l) => l.id === c.id);
+    if (api) out.push(apiProvider({ ...api, nameAr: c.nameAr, nameEn: c.nameEn }));
+    else if (sandboxOn()) out.push(sandboxProvider(c));
+  }
+  // Linked companies not (yet) in the directory.
+  for (const l of linked) if (!all.some((c) => c.id === l.id)) out.push(apiProvider(l));
+  return out;
 }
 
-export function rentalProviderById(id: string): RentalProvider | null {
-  if (id === "sandbox") return sandboxProvider;
-  const c = readConfig().find((p) => p.id === id);
-  return c ? apiProvider(c) : null;
+/** Companies renting in a city. */
+export async function rentalProvidersFor(city: string): Promise<RentalProvider[]> {
+  if (!getStayCity(city)) return [];
+  return (await allProviders()).filter((p) => p.cities.includes(city));
+}
+
+export async function rentalProviderById(id: string): Promise<RentalProvider | null> {
+  const found = (await allProviders()).find((p) => p.id === id);
+  if (found) return found;
+  // A company made inactive later still answers for its existing bookings.
+  const api = readConfig().find((p) => p.id === id);
+  if (api) return apiProvider(api);
+  const c = (await listCompanies()).find((x) => x.id === id);
+  return c && sandboxOn() ? sandboxProvider(c) : null;
 }

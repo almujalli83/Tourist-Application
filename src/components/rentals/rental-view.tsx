@@ -5,6 +5,7 @@ import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import type { LicenceRule } from "@/lib/rentals/licence";
+import type { CompanyBrand } from "@/lib/rentals/rentals";
 import type { PublicRental, RentalQuery } from "@/lib/rentals/types";
 import { localWhen } from "../transfers/transfer-request";
 import { useApp } from "../app-provider";
@@ -13,13 +14,14 @@ import { CarIcon, PhoneIcon } from "../icons";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
 import { RENTAL_TONE } from "./rental-panel";
 import { DrivingTips, LicenceBox } from "./rental-search";
+import { CompanyBadge } from "./company-badge";
 
 /** A car rental: status, confirmation and counter, dates, price, what to bring, cancellation. */
 export function RentalView({ id }: { id: string }) {
   const { t, locale, money } = useApp();
   const r = t.rentals;
   const ar = locale === "ar";
-  const [data, setData] = useState<{ rental: PublicRental; licence: LicenceRule | null; reviewed: boolean; sourceUrl: string } | null | "missing">(null);
+  const [data, setData] = useState<{ rental: PublicRental; company: CompanyBrand | null; licence: LicenceRule | null; reviewed: boolean; sourceUrl: string } | null | "missing">(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
@@ -54,7 +56,7 @@ export function RentalView({ id }: { id: string }) {
       <Card className="grid gap-4 p-5 sm:grid-cols-2">
         <div>
           <p className="text-xs font-semibold text-slate-500">{r.company}</p>
-          <p className="font-semibold">{ar ? x.providerNameAr : x.providerNameEn}</p>
+          <p className="mt-1 flex items-center gap-2 font-semibold"><CompanyBadge brand={data.company} fallback={ar ? x.providerNameAr : x.providerNameEn} />{data.company?.logo ? (ar ? x.providerNameAr : x.providerNameEn) : null}</p>
           <p className="mt-1 text-sm">{r.classes[x.carClass]} · <span dir="auto">{fmt(r.orSimilar, { model: x.model })}</span></p>
           <p className="text-xs text-slate-500">{x.automatic ? r.automatic : r.manual} · {x.kmPerDay ? fmt(r.kmPerDay, { n: x.kmPerDay }) : r.unlimitedKm}</p>
         </div>

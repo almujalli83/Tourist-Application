@@ -6,13 +6,15 @@ import { fmt } from "@/i18n";
 import { SAUDI_CITIES } from "@/lib/data/cities";
 import { COUNTRIES } from "@/lib/data/countries";
 import type { LicenceRule } from "@/lib/rentals/licence";
-import { DRIVING_TIPS, RENTAL_EXTRAS, type PublicRental, type RentalExtra, type RentalQuery, type RentalQuote, type RentalSpot } from "@/lib/rentals/types";
+import type { CompanyBrand } from "@/lib/rentals/rentals";
+import { CAR_CLASSES, DRIVING_TIPS, RENTAL_EXTRAS, type CarClass, type PublicRental, type RentalExtra, type RentalQuery, type RentalQuote, type RentalSpot } from "@/lib/rentals/types";
 import { AIRPORTS } from "@/lib/transport/rides";
 import { useApp } from "../app-provider";
 import { CarIcon, CheckIcon, GlobeIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
+import { CompanyBadge } from "./company-badge";
 
-interface Options { query: RentalQuery; quotes: RentalQuote[]; licence: LicenceRule | null; reviewed: boolean; sourceUrl: string }
+interface Options { query: RentalQuery; quotes: RentalQuote[]; companies: CompanyBrand[]; licence: LicenceRule | null; reviewed: boolean; sourceUrl: string }
 
 const pad = (n: number) => String(n).padStart(2, "0");
 /** Saudi local time `days` from now at `h`:00. */
@@ -73,6 +75,9 @@ export function RentalSearch({ initial, bookingId, driverName: initialDriver, on
   const [phone, setPhone] = useState(user?.individual?.phone ?? user?.company?.phone ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [company, setCompany] = useState<string | null>(null);
+  const [cls, setCls] = useState<CarClass | null>(null);
+  const [limit, setLimit] = useState(12);
   const errText = (code: string) => (r.errors as Record<string, string>)[code] ?? r.errors.generic;
   const set = <K extends keyof RentalQuery>(k: K, v: RentalQuery[K]) => {
     setQ((x) => {
@@ -97,6 +102,9 @@ export function RentalSearch({ initial, bookingId, driverName: initialDriver, on
     setData(d);
     setPick((d.quotes as RentalQuote[]).find((x) => x.minAge <= q.driverAge)?.quoteId ?? null);
     setExtras([]);
+    setCompany(null);
+    setCls(null);
+    setLimit(12);
   }
   useEffect(() => {
     if (initial?.city && initial.licenceCountry) void search();
@@ -161,12 +169,36 @@ export function RentalSearch({ initial, bookingId, driverName: initialDriver, on
           {data.quotes.length === 0 ? (
             <p className="text-sm text-slate-500">{r.noOffers}</p>
           ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500">{fmt(r.offersCount, { n: data.quotes.length, c: data.companies.length })} · {r.cheapest}</p>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={r.company} data-testid="rental-companies">
+                <Chip active={!company} onClick={() => { setCompany(null); setLimit(12); }}>{r.allCompanies}</Chip>
+                {data.companies.map((c) => (
+                  <Chip key={c.id} active={company === c.id} onClick={() => { setCompany(company === c.id ? null : c.id); setLimit(12); }} testId={`rental-company-${c.id}`}>
+                    <CompanyBadge brand={c} size="sm" />
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5" role="group">
+                <Chip active={!cls} onClick={() => setCls(null)}>{r.allClasses}</Chip>
+                {CAR_CLASSES.filter((k) => data.quotes.some((x) => x.carClass === k)).map((k) => <Chip key={k} active={cls === k} onClick={() => setCls(cls === k ? null : k)}>{r.classes[k]}</Chip>)}
+              </div>
+            </div>
+          )}
+          {data.quotes.length > 0 && (() => {
+            const list = data.quotes.filter((x) => (!company || x.providerId === company) && (!cls || x.carClass === cls));
+            return (
+            <>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {data.quotes.map((x) => {
+              {list.slice(0, limit).map((x) => {
                 const young = q.driverAge < x.minAge;
                 return (
                   <button key={x.quoteId} type="button" disabled={young} aria-pressed={pick === x.quoteId} onClick={() => setPick(x.quoteId)} data-testid="rental-quote"
                     className={cx("rounded-xl p-3 text-start ring-1", pick === x.quoteId ? "bg-brand-50 ring-2 ring-brand-600" : young ? "cursor-not-allowed bg-slate-50 opacity-60 ring-slate-200" : "bg-white ring-slate-200 hover:ring-brand-600")}>
+                    <span className="mb-2 flex items-center justify-between gap-2">
+                      <CompanyBadge brand={data.companies.find((c) => c.id === x.providerId)} fallback={ar ? x.providerNameAr : x.providerNameEn} />
+                      {x.sandbox && <span className="text-[10px] font-semibold text-amber-700">{t.umrah.sample}</span>}
+                    </span>
                     <span className="flex items-start justify-between gap-2">
                       <span className="font-bold">{r.classes[x.carClass]}</span>
                       <span className="text-end">
@@ -176,13 +208,16 @@ export function RentalSearch({ initial, bookingId, driverName: initialDriver, on
                     </span>
                     <span className="mt-1 block text-xs text-slate-600" dir="auto">{fmt(r.orSimilar, { model: x.model })}</span>
                     <span className="mt-1 block text-xs text-slate-500">{fmt(r.seats, { n: x.seats, bags: x.bags })} · {x.automatic ? r.automatic : r.manual} · {x.kmPerDay ? fmt(r.kmPerDay, { n: x.kmPerDay }) : r.unlimitedKm}</span>
-                    <span className="mt-1 block text-xs text-slate-500">{ar ? x.providerNameAr : x.providerNameEn} · {fmt(r.minAge, { n: x.minAge })}</span>
+                    <span className="mt-1 block text-xs text-slate-500">{fmt(r.minAge, { n: x.minAge })} · {fmt(r.deposit, { amount: money(x.depositSAR) })}</span>
                     {young && <Badge tone="amber" className="mt-1">{fmt(r.tooYoung, { n: x.minAge })}</Badge>}
                   </button>
                 );
               })}
             </div>
-          )}
+            {list.length > limit && <Button variant="secondary" size="sm" onClick={() => setLimit(limit + 12)} data-testid="rental-more">{fmt(r.showMore, { n: list.length - limit })}</Button>}
+            </>
+            );
+          })()}
 
           {chosen && (
             <>
@@ -224,5 +259,14 @@ export function RentalSearch({ initial, bookingId, driverName: initialDriver, on
         </div>
       )}
     </div>
+  );
+}
+
+function Chip({ active, onClick, children, testId }: { active: boolean; onClick: () => void; children: React.ReactNode; testId?: string }) {
+  return (
+    <button type="button" aria-pressed={active} onClick={onClick} data-testid={testId}
+      className={cx("inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors", active ? "border-brand-700 bg-brand-50 ring-1 ring-brand-700" : "border-slate-300 bg-white text-slate-700 hover:border-brand-500")}>
+      {children}
+    </button>
   );
 }
