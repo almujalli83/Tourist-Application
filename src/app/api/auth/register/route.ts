@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
-import { setSessionCookie } from "@/lib/auth/session";
-import { toPublicUser, type CompanyProfile, type IndividualProfile } from "@/lib/auth/types";
+import { afterRegister, passwordProblem } from "@/lib/auth/account";
+import type { CompanyProfile, IndividualProfile } from "@/lib/auth/types";
 import { cleanCompany, cleanIndividual, EMAIL_RE } from "@/lib/auth/validation";
 import { ensureAccount, isEligible, joinWithReferral } from "@/lib/loyalty/loyalty";
 import { createUser } from "@/lib/repo";
-import { body, error, json } from "@/lib/http";
+import { body, error, handle, json } from "@/lib/http";
 import { validatePhone } from "@/lib/phone";
 
 interface RegisterBody {
@@ -19,12 +19,13 @@ interface RegisterBody {
   referralCode?: string;
 }
 
-export async function POST(req: Request) {
+export const POST = handle(async (req: Request) => {
   const b = await body<RegisterBody>(req);
   if (!b) return error("invalidBody");
   const email = b.email?.trim().toLowerCase() ?? "";
   if (!EMAIL_RE.test(email)) return error("email");
-  if ((b.password ?? "").length < 8) return error("weakPassword");
+  const weak = passwordProblem(b.password, email);
+  if (weak) return error(weak);
   if (b.accountType !== "individual" && b.accountType !== "company") return error("required");
   const phone = b.accountType === "company" ? b.company?.phone : b.individual?.phone;
   if (validatePhone(phone?.trim() ?? "")) return error("phone");
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     id: randomUUID(),
     email,
     passwordHash,
+    hasPassword: true,
     accountType: b.accountType,
     ...(individual ? { individual } : {}),
     ...(company ? { company } : {}),
@@ -50,6 +52,5 @@ export async function POST(req: Request) {
     await ensureAccount(user.id);
     if (typeof b.referralCode === "string") await joinWithReferral(user, b.referralCode);
   }
-  await setSessionCookie(user.id);
-  return json({ user: toPublicUser(user) }, 201);
-}
+  return json({ user: await afterRegister(user, b.locale === "en" ? "en" : "ar", req) }, 201);
+});

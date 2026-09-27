@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { fmt } from "@/i18n";
 import type { PublicUser } from "@/lib/auth/types";
 import { useApp } from "./app-provider";
 import { PhoneInput, phoneHint } from "./phone-input";
 import { CountrySelect } from "./booking/country-select";
 import { BuildingIcon, UserIcon } from "./icons";
+import { PasswordInput, PasswordStrength } from "./password-input";
 import { Alert, Button, cx, Field, Input } from "./ui";
 
 export function AuthForm({ initialMode = "login", onSuccess, compact, referralCode = "" }: {
@@ -22,7 +25,10 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
     companyName: "", commercialRegNo: "", tourismLicenseNo: "", vatNo: "", contactPerson: "", city: "", referralCode,
   });
   const [error, setError] = useState<string | null>(null);
+  const [minutes, setMinutes] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [mfa, setMfa] = useState<{ ticket: string; code: string } | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function submit(e: React.FormEvent) {
@@ -30,7 +36,7 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
     setBusy(true);
     setError(null);
     const payload = mode === "login"
-      ? { email: f.email, password: f.password }
+      ? { email: f.email, password: f.password, remember }
       : {
           email: f.email, password: f.password, accountType, locale, ...(accountType === "individual" && f.referralCode.trim() ? { referralCode: f.referralCode.trim() } : {}),
           individual: { fullName: f.fullName, phone: f.phone, nationality: f.nationality },
@@ -39,7 +45,15 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
     try {
       const res = await fetch(`/api/auth/${mode}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        setMinutes(data.minutes ?? 0);
+        throw new Error(data.error);
+      }
+      if (data.mfa) {
+        setMfa({ ticket: data.ticket, code: "" });
+        setBusy(false);
+        return;
+      }
       setUser(data.user);
       onSuccess(data.user);
     } catch (err) {
@@ -48,7 +62,42 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
     }
   }
 
-  const errText = error ? (a.errors as Record<string, string>)[error] ?? t.review.errors.generic : null;
+  async function submitMfa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mfa) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/auth/mfa", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(mfa) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMinutes(data.minutes ?? 0);
+      setError(data.error ?? "generic");
+      setBusy(false);
+      if (data.error === "expired") setMfa(null);
+      return;
+    }
+    setUser(data.user);
+    onSuccess(data.user);
+  }
+
+  const errText = error ? fmt((a.errors as Record<string, string>)[error] ?? a.errors.generic, { minutes }) : null;
+
+  if (mfa) {
+    return (
+      <form onSubmit={submitMfa} className="space-y-4" noValidate data-testid="mfa-form">
+        <div>
+          <h2 className="font-bold text-ink">{a.mfaTitle}</h2>
+          <p className="mt-1 text-sm text-slate-600">{a.mfaIntro}</p>
+        </div>
+        <Field label={a.mfaCode} required>
+          <Input value={mfa.code} onChange={(e) => setMfa({ ...mfa, code: e.target.value })} dir="ltr" inputMode="text" autoComplete="one-time-code" autoFocus maxLength={12} data-testid="mfa-code" />
+        </Field>
+        {errText && <Alert tone="error">{errText}</Alert>}
+        <Button type="submit" className="w-full" loading={busy} disabled={mfa.code.trim().length < 6}>{a.verify}</Button>
+        <button type="button" onClick={() => { setMfa(null); setError(null); }} className="w-full text-sm font-semibold text-brand-700 hover:underline">{a.backToLogin}</button>
+      </form>
+    );
+  }
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
@@ -81,7 +130,8 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
       <div className={cx("grid gap-4", !compact && mode === "register" && "sm:grid-cols-2")}>
         <Field label={a.email} required><Input type="email" dir="ltr" autoComplete="email" value={f.email} onChange={set("email")} /></Field>
         <Field label={a.password} required hint={mode === "register" ? a.passwordHint : undefined}>
-          <Input type="password" dir="ltr" autoComplete={mode === "login" ? "current-password" : "new-password"} value={f.password} onChange={set("password")} />
+          <PasswordInput autoComplete={mode === "login" ? "current-password" : "new-password"} value={f.password} onChange={set("password")} />
+          {mode === "register" && <PasswordStrength value={f.password} />}
         </Field>
         {mode === "register" && accountType === "individual" && (
           <>
@@ -107,6 +157,14 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
           </>
         )}
       </div>
+      {mode === "login" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <label className="flex items-center gap-2 text-slate-700">
+            <input type="checkbox" className="accent-brand-700" checked={remember} onChange={(e) => setRemember(e.target.checked)} />{a.remember}
+          </label>
+          <Link href={`/${locale}/forgot-password`} className="font-semibold text-brand-700 hover:underline" data-testid="forgot-link">{a.forgot}</Link>
+        </div>
+      )}
       {errText && <Alert tone="error">{errText}</Alert>}
       <Button type="submit" className="w-full" loading={busy}>{mode === "login" ? a.submitLogin : a.submitRegister}</Button>
     </form>
