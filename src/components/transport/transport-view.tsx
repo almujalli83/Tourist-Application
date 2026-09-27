@@ -7,6 +7,7 @@ import { CITY_TRANSPORT, DEFAULT_CITY, GENERAL_TIPS, INTERCITY, type ModeInfo, t
 import { useApp } from "../app-provider";
 import { BusIcon, CarIcon, CheckIcon, GlobeIcon, MapPinIcon, PlaneIcon, TicketIcon, TrainIcon } from "../icons";
 import { Card, cx } from "../ui";
+import { RideFinder } from "./ride-finder";
 
 const ICONS: Record<ModeKind, (p: { className?: string }) => React.ReactElement> = {
   train: TrainIcon, metro: TrainIcon, bus: BusIcon, taxi: CarIcon, car: CarIcon, airport: PlaneIcon, flight: PlaneIcon, tour: MapPinIcon,
@@ -29,6 +30,8 @@ export function TransportView() {
         <h1 className="text-2xl font-bold sm:text-3xl">{tr.title}</h1>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">{tr.subtitle}</p>
       </div>
+
+      <RideFinder city={tab === "intercity" ? "RUH" : tab} />
 
       <div className="flex flex-col gap-4 overflow-hidden rounded-2xl bg-gradient-to-l from-brand-900 to-brand-700 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">

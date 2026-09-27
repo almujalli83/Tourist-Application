@@ -11,15 +11,10 @@ import { notifyTravellers } from "../notify";
 import type { AppNotification } from "../reminders/reminders";
 import { getUserById, listBookingsByUser } from "../repo";
 import { store } from "../store";
-import { estimateRide } from "./rides";
+import { AIRPORTS, estimateRide } from "./rides";
 
-/** Airports (IATA) with their location. */
-export const AIRPORTS: Record<string, { lat: number; lng: number }> = {
-  RUH: { lat: 24.9576, lng: 46.6988 }, JED: { lat: 21.6796, lng: 39.1565 }, MED: { lat: 24.5534, lng: 39.7051 },
-  DMM: { lat: 26.4712, lng: 49.7979 }, AHB: { lat: 18.2404, lng: 42.6566 }, ULH: { lat: 26.4834, lng: 38.117 },
-  TIF: { lat: 21.4834, lng: 40.5443 }, TUU: { lat: 28.3654, lng: 36.6189 }, HOF: { lat: 25.2853, lng: 49.4852 },
-  YNB: { lat: 24.1442, lng: 38.0634 }, ELQ: { lat: 26.3028, lng: 43.7744 }, GIZ: { lat: 16.9011, lng: 42.5858 },
-};
+export { AIRPORTS };
+
 /** Be at the airport this long before an international take-off. */
 const AIRPORT_BEFORE_MIN = 180;
 
