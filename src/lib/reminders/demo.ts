@@ -25,7 +25,7 @@ function sampleTrip(userId: string, today: string): StoredBooking {
   return {
     id: "demo", reference: "TA-DEMO2026", userId, status: "COMPLETED",
     mt: { packageStatus: "COMPLETED" },
-    criteria: { departureDate: dep, returnDate: ret },
+    criteria: { departureDate: dep, returnDate: ret, stays: [{ city: "RUH", nights: 3 }, { city: "ULH", nights: 2 }] },
     flights: [
       { kind: "outbound", carrierNameAr: "السعودية", carrierNameEn: "Saudia", flightNo: "SV306", from: "CAI", to: "RUH", departAt: `${dep}T10:40`, arriveAt: `${dep}T13:30` },
       { kind: "return", carrierNameAr: "السعودية", carrierNameEn: "Saudia", flightNo: "SV305", from: "ULH", to: "CAI", departAt: `${ret}T16:10`, arriveAt: `${ret}T18:20` },
@@ -93,4 +93,29 @@ export async function seedDemoNotifications(userId: string, now = new Date()): P
       href: "/account/reviews", readAt: null, deletedAt: null, email: null, demo: true,
     });
   }
+  // Trip alerts (service 15): a heat alert, today's programme and suggested events.
+  const alerts: AppNotification[] = [
+    {
+      id: `demo:${userId}:weather`, userId, kind: "weather", severity: "warning", bookingId: "demo", reference: trip.reference, createdAt: new Date(now.getTime() - 30_000).toISOString(),
+      titleAr: "تنبيه طقس اليوم في الرياض", titleEn: "Weather alert today in Riyadh",
+      linesAr: ["🌡️ حرارة شديدة: العظمى 45°", "اشرب الماء باستمرار، وتجنب الشمس بين 11 صباحًا و4 عصرًا، وانقل الزيارات الخارجية إلى الصباح الباكر أو المساء.", "📍 أنشطة خارجية في برنامجك اليوم: حي الطريف التاريخي — ننصح بنقلها إلى الصباح الباكر أو المساء أو يوم آخر."],
+      linesEn: ["🌡️ Extreme heat: high of 45°C", "Drink water often, avoid the sun from 11 am to 4 pm, and move outdoor visits to the early morning or evening.", "📍 Outdoor activities in today's programme: At-Turaif Historic District — consider moving them to the early morning, the evening or another day."],
+      href: "/account", readAt: null, deletedAt: null, email: null, demo: true,
+    },
+    {
+      id: `demo:${userId}:daily`, userId, kind: "daily", bookingId: "demo", reference: trip.reference, createdAt: new Date(now.getTime() - 20_000).toISOString(),
+      titleAr: "برنامج اليوم — الرياض", titleEn: "Today's programme — Riyadh",
+      linesAr: ["📍 الرياض", "☀️ الطقس: العظمى 45° والصغرى 31°", "• متحف المملكة العربية السعودية الوطني", "• بوليفارد رياض سيتي (20:00)", "• مطعم نجد التراثي"],
+      linesEn: ["📍 Riyadh", "☀️ Weather: high 45°C, low 31°C", "• National Museum of Saudi Arabia", "• Boulevard Riyadh City (20:00)", "• Najd Heritage Restaurant"],
+      href: "/account", readAt: null, deletedAt: null, email: null, demo: true,
+    },
+    {
+      id: `demo:${userId}:events`, userId, kind: "events", bookingId: "demo", reference: trip.reference, createdAt: new Date(now.getTime() - 10_000).toISOString(),
+      titleAr: "فعاليات تناسبك خلال رحلتك", titleEn: "Events for you during your trip",
+      linesAr: ["🎟️ جولة الطريف الليلية — الرياض", "🎟️ ليلة طرب في البوليفارد — الرياض"],
+      linesEn: ["🎟️ At-Turaif Night Tour — Riyadh", "🎟️ Boulevard Arabic Music Night — Riyadh"],
+      href: "/events?city=RUH", readAt: null, deletedAt: null, email: null, demo: true,
+    },
+  ];
+  for (const a of alerts) if (!has.has(a.id)) await store().insert(COL, a.id, a);
 }

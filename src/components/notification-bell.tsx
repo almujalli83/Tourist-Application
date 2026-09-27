@@ -26,8 +26,11 @@ export function NotificationBell({ className }: { className?: string }) {
         .catch(() => undefined);
     load();
     window.addEventListener(NOTIFICATIONS_CHANGED, load);
+    // While the app is open, due alerts (e.g. an event in 2 hours) are picked up every 5 minutes.
+    const timer = setInterval(load, 5 * 60_000);
     return () => {
       alive = false;
+      clearInterval(timer);
       window.removeEventListener(NOTIFICATIONS_CHANGED, load);
     };
   }, [pathname]);

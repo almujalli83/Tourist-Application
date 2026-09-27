@@ -17,12 +17,13 @@ import { notifyTravellers } from "../notify";
 import { planForBooking } from "../planner/plans";
 import { getUserById, listBookingsByUser } from "../repo";
 import { requestReviews } from "../reviews/reviews";
+import { runTripAlerts, tripWeatherLines } from "../alerts/alerts";
 import { store } from "../store";
 
 export type ReminderKind = "arrival" | "departure" | "visa7" | "visa1";
 
 /** Notification kinds: trip reminders, requests to rate experiences (service 9) and points about to expire (service 10). */
-export type NotificationKind = ReminderKind | "review" | "points" | "support";
+export type NotificationKind = ReminderKind | "review" | "points" | "support" | "weather" | "daily" | "events" | "eventReminder" | "eventChange";
 
 export interface AppNotification {
   /** `${bookingId}:${kind}` (for visa reminders also the expiry date). */
@@ -44,6 +45,8 @@ export interface AppNotification {
   email: { to: string[]; status: string } | null;
   /** Sample notification shown in sandbox mode (see demo.ts). */
   demo?: boolean;
+  /** Alerts: how urgent (weather hazards, event changes). */
+  severity?: "warning" | "danger";
 }
 
 /** Be at the airport this long before an international take-off. */
@@ -115,6 +118,10 @@ async function arrivalContent(b: StoredBooking, now: Date): Promise<Content> {
   en.push(issued ? "✅ Your visas are issued and saved in your digital wallet with the insurance documents." : "⏳ Your visa is still being processed by the Ministry of Tourism; we'll let you know once it's issued.");
   ar.push(esim ? "📶 ثبّت شريحة eSIM قبل السفر لتعمل فور الوصول (الرابط في بريد الشريحة)." : "📶 لا توجد شريحة eSIM — احجز واحدة من صفحة «شريحة eSIM» لتتصل بالإنترنت فور الوصول.");
   en.push(esim ? "📶 Install your eSIM before you fly so it works as soon as you land (link in the eSIM email)." : "📶 No eSIM yet — get one on the «Travel eSIM» page to be online as soon as you land.");
+  // The forecast for the trip's cities (within the 7-day forecast range).
+  const weather = await tripWeatherLines(b);
+  ar.push(...weather.ar);
+  en.push(...weather.en);
   const plan = await planForBooking(b.userId, b.id);
   const first = plan?.days.find((d) => d.type !== "arrival" && d.items.length) ?? null;
   if (first) {
@@ -228,7 +235,10 @@ export async function runReminders(now = new Date()): Promise<{ bookings: number
   const bookings = (await store().list<StoredBooking>("bookings", 100_000)).filter(active);
   const created = await remind(bookings, now);
   let reviewRequests = 0;
-  for (const u of await store().list<{ id: string }>("users", 100_000)) if (await requestReviews(u.id, now)) reviewRequests++;
+  for (const u of await store().list<{ id: string }>("users", 100_000)) {
+    if (await requestReviews(u.id, now)) reviewRequests++;
+    await runTripAlerts(u.id, now);
+  }
   const loyalty = await runLoyalty(now);
   return { bookings: bookings.length, created, reviewRequests, pointsReminders: loyalty.reminders };
 }
@@ -238,6 +248,7 @@ export async function listNotifications(userId: string, now = new Date()): Promi
   await remind(await listBookingsByUser(userId), now);
   await requestReviews(userId, now);
   await expiryReminders(userId, now);
+  await runTripAlerts(userId, now);
   const rows = await store().findBy<AppNotification>(COL, "userId", userId);
   return rows.filter((n) => !n.deletedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

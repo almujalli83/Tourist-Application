@@ -144,7 +144,7 @@ export async function createTicket(user: PublicUser, input: NewTicketInput, now 
   const auto = await assistantAnswer(subject, text, lang);
   if (auto) messages.push(await message("assistant", null, auto, lang, "ar", [], new Date(now.getTime() + 1000)));
   const ticket: StoredTicket = {
-    id, number: await nextNumber(), subject, category, status: "open", priority: await priorityFor(user.id, now), lang, booking,
+    id, number: await nextNumber(), subject, category, status: "open", priority: category === "complaint" ? "high" : await priorityFor(user.id, now), lang, booking,
     createdAt: now.toISOString(), updatedAt: now.toISOString(), assignedTo: null, messages,
     userId: user.id, userName: displayName(user), userEmail: user.email, nationality: user.individual?.nationality ?? null, closedAt: null,
   };
