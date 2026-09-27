@@ -6,7 +6,9 @@ import { fmt } from "@/i18n";
 import { COUNTRIES, countryName } from "@/lib/data/countries";
 import type { EmergencyContext } from "@/lib/emergency/context";
 import { EMERGENCY_NUMBERS, PHRASES, SOURCES } from "@/lib/emergency/data";
-import type { NearbyKind, NearbyPlace } from "@/lib/emergency/nearby";
+import type { NearbyKind as AnyKind, NearbyPlace } from "@/lib/emergency/nearby";
+
+type NearbyKind = Extract<AnyKind, "hospital" | "pharmacy" | "police">;
 import { CITY_CENTERS } from "@/lib/guide/centers";
 import { directionsLinks } from "@/lib/guide/geo";
 import { useApp } from "../app-provider";
@@ -48,7 +50,7 @@ function Nearby({ loc }: { loc: Loc }) {
       ) : (
         <ul className="mt-3 divide-y divide-slate-100">
           {places.map((p) => {
-            const name = (locale === "ar" ? p.nameAr ?? p.nameEn : p.nameEn ?? p.nameAr) ?? e.unnamed[p.kind];
+            const name = (locale === "ar" ? p.nameAr ?? p.nameEn : p.nameEn ?? p.nameAr) ?? e.unnamed[p.kind as NearbyKind];
             return (
               <li key={p.id} className="flex items-center justify-between gap-3 py-2.5" data-testid="nearby-place">
                 <div className="min-w-0">

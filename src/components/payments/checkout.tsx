@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmt } from "@/i18n";
 import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
+import { formatIn } from "@/lib/currency";
 import type { IntentView, PayConfig, PayMethod, PaySource, SavedCard } from "@/lib/payments/types";
 import { useApp } from "../app-provider";
 import { LockIcon, XIcon } from "../icons";
@@ -47,7 +48,7 @@ export function Checkout({ amountSAR, description, disabled, onPay, label, guard
   label?: string;
   testId?: string;
 }) {
-  const { t, money, user } = useApp();
+  const { t, money, user, currency, locale } = useApp();
   const p = t.pay;
   const [cfg, setCfg] = useState<PayConfig | null>(null);
   const [method, setMethod] = useState<PayMethod>("card");
@@ -286,6 +287,7 @@ export function Checkout({ amountSAR, description, disabled, onPay, label, guard
       {amountSAR > 0 && (
         <div className="space-y-1 text-[11px] text-slate-500">
           <p className="flex items-center gap-1"><LockIcon className="size-3.5" />{p.secure}</p>
+          {currency !== "SAR" && <p className="font-semibold text-slate-700" data-testid={`${testId}-sar`}>{fmt(t.money.charged, { amount: formatIn(amountSAR, "SAR", locale) })}</p>}
           <p>{p.currency}</p>
           {cfg?.sandbox && <p className="font-semibold text-amber-700">{p.sandbox}</p>}
         </div>

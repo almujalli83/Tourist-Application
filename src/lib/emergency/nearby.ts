@@ -5,7 +5,7 @@
  */
 import { distanceKm } from "../guide/geo";
 
-export type NearbyKind = "hospital" | "pharmacy" | "police";
+export type NearbyKind = "hospital" | "pharmacy" | "police" | "atm" | "exchange";
 
 export interface NearbyPlace {
   id: string;
@@ -20,13 +20,17 @@ export interface NearbyPlace {
   phone?: string;
   /** Pharmacies open around the clock. */
   open24h?: boolean;
+  /** ATMs and exchange offices: the bank or company. */
+  operator?: string;
 }
 
-const RADIUS: Record<NearbyKind, number> = { hospital: 15_000, pharmacy: 4_000, police: 15_000 };
+const RADIUS: Record<NearbyKind, number> = { hospital: 15_000, pharmacy: 4_000, police: 15_000, atm: 3_000, exchange: 10_000 };
 const FILTER: Record<NearbyKind, string> = {
   hospital: `nwr["amenity"="hospital"]`,
   pharmacy: `nwr["amenity"="pharmacy"]`,
   police: `nwr["amenity"="police"]`,
+  atm: `nwr["amenity"="atm"]`,
+  exchange: `nwr["amenity"="bureau_de_change"]`,
 };
 const CACHE_MS = 6 * 3600_000;
 const cache = new Map<string, { at: number; rows: NearbyPlace[] }>();
@@ -55,6 +59,7 @@ async function overpass(kind: NearbyKind, lat: number, lng: number): Promise<Nea
         ...(kind === "hospital" ? { emergency: t.emergency === "yes" } : {}),
         ...(phone ? { phone } : {}),
         ...(t.opening_hours === "24/7" ? { open24h: true } : {}),
+        ...(t.operator || t.brand ? { operator: (t.operator || t.brand).slice(0, 80) } : {}),
       }];
     });
   } catch {
