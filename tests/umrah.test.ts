@@ -117,11 +117,14 @@ describe("Umrah trips, the Hajj-season pause and reminders", () => {
     await setUmrahSeason({ pauseFrom: makkah, pauseTo: addDays(makkah, 40) }, "a@x");
     const [t] = await listUmrahTrips(u.id);
     expect(t).toMatchObject({ bookingId: "umrah-b1", makkahFrom: makkah, makkahTo: addDays(makkah, 2), umrahDate: addDays(makkah, 1), route: "jeddah", fromCity: "JED", pause: { from: makkah, to: addDays(makkah, 2) } });
-    // Not yet: 20 days before the trip.
-    expect(await umrahReminders(u.id)).toBe(0);
+    // Visas issued (20 days before the trip): book now, once.
+    expect(await umrahReminders(u.id)).toBe(1);
+    expect(await umrahReminders(u.id)).toBe(1);
+    expect(await store().get("notifications", "umrah:visas:umrah-b1")).toMatchObject({ kind: "umrah", titleEn: "Your visa is issued — book your Umrah time now", href: "/umrah" });
+    expect((await store().findBy<{ id: string }>("notifications", "userId", u.id)).filter((x) => x.id.startsWith("umrah:visas:"))).toHaveLength(1);
     // Five days before: book in Nusuk (with the pause warning), once.
     const before = new Date(`${addDays(c.departureDate, -5)}T06:00:00Z`);
-    expect(await umrahReminders(u.id, before)).toBe(1);
+    expect(await umrahReminders(u.id, before)).toBe(2);
     await umrahReminders(u.id, before);
     const book = await store().get<{ kind: string; severity?: string; linesAr: string[] }>("notifications", "umrah:book:umrah-b1");
     expect(book).toMatchObject({ kind: "umrah", severity: "warning" });
@@ -209,7 +212,11 @@ describe("Nusuk permits issued automatically", () => {
     const [t] = await listUmrahTrips(u.id);
     const slot = (await availableSlots(u.id, { tripKey: "permit-b2", type: "umrah", date: t.windows.umrah[2], people: 1 })).find((x) => x.remaining >= 1)!;
     await expect(issuePermit(u.id, { tripKey: "permit-b2", type: "umrah", date: t.windows.umrah[2], slotId: slot.id, applicationNos: ["1"] })).rejects.toMatchObject({ code: "visaNotIssued" });
+    await umrahReminders(u.id);
+    expect(await store().get("notifications", "umrah:visas:permit-b2")).toBeNull();
     await saveBooking(umrahBooking("permit-b2", u.id, c));
+    await umrahReminders(u.id);
+    expect(await store().get("notifications", "umrah:visas:permit-b2")).toMatchObject({ kind: "umrah" });
     const p = await issuePermit(u.id, { tripKey: "permit-b2", type: "umrah", date: t.windows.umrah[2], slotId: slot.id, applicationNos: ["1"] });
     expect(await reconcilePermits(u.id)).toBe(0);
     // Makkah shortened to one night: the permit on the third day no longer fits.

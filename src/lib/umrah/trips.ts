@@ -167,6 +167,22 @@ export async function umrahReminders(userId: string, now = new Date()): Promise<
     const base = { userId, kind: "umrah" as const, bookingId: t.bookingId, reference: t.reference ?? "", createdAt: now.toISOString(), href: "/umrah", readAt: null, deletedAt: null, email: null };
     const d = (x: string, ar: boolean) => new Date(`${x}T12:00:00Z`).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { weekday: "long", day: "numeric", month: "long" });
     const allHave = t.travellers.length > 0 && t.travellers.every((x) => t.permits.some((p) => p.type === "umrah" && p.travellers.some((y) => y.applicationNo === x.applicationNo)));
+    // As soon as the visas are issued: book early, while the times are open.
+    if (!allHave && t.travellers.some((x) => x.visa) && today <= t.makkahFrom) {
+      await notify(userId, {
+        ...base, id: `umrah:visas:${t.bookingId}`,
+        titleAr: "صدرت تأشيرتك — احجز موعد العمرة الآن", titleEn: "Your visa is issued — book your Umrah time now",
+        linesAr: [
+          auto ? "اختر يوم العمرة ووقتها (وموعد الروضة الشريفة إن كانت المدينة في رحلتك) قبل امتلاء الأوقات، ويصدر التصريح من «نسك» تلقائيًا." : "احجز موعد العمرة (والروضة الشريفة إن كانت المدينة في رحلتك) في تطبيق «نسك» قبل امتلاء الأوقات.",
+          `يوم العمرة في برنامجك: ${d(t.umrahDate, true)}.`,
+        ],
+        linesEn: [
+          auto ? "Pick your Umrah day and time (and a Rawdah visit if Madinah is in your trip) before the times fill up; Nusuk issues the permit automatically." : "Book your Umrah time (and a Rawdah visit if Madinah is in your trip) in the Nusuk app before the times fill up.",
+          `Your Umrah day: ${d(t.umrahDate, false)}.`,
+        ],
+      });
+      n++;
+    }
     if (!allHave && today >= addDays(t.departureDate, -BOOK_REMINDER_DAYS) && today <= t.makkahFrom) {
       const pauseAr = t.pause ? [`⚠️ رحلتك تقع في فترة إيقاف تصاريح العمرة لموسم الحج (${t.pause.from} – ${t.pause.to}).`] : [];
       const pauseEn = t.pause ? [`⚠️ Your trip falls in the Umrah permit pause for the Hajj season (${t.pause.from} – ${t.pause.to}).`] : [];
