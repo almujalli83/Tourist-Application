@@ -20,6 +20,7 @@ export function SiteFooter() {
           <li><Link href={`/${locale}/ratings`} className="font-semibold text-white hover:underline">{t.reviews.servicesLink}</Link></li>
           <li><Link href={`/${locale}/umrah`} className="font-semibold text-white hover:underline">{t.umrah.nav}</Link></li>
           <li><Link href={`/${locale}/guides`} className="font-semibold text-white hover:underline">{t.guides.nav}</Link></li>
+          <li><Link href={`/${locale}/money`} className="font-semibold text-white hover:underline">{t.money.nav}</Link></li>
           <li><Link href={`/${locale}/emergency`} className="font-semibold text-red-300 hover:underline">{t.emergency.nav}</Link></li>
           <li><Link href={`/${locale}/prayer`} className="font-semibold text-white hover:underline">{t.prayer.nav}</Link></li>
           <li><Link href={`/${locale}/support`} className="font-semibold text-white hover:underline">{t.footer.support}</Link></li>

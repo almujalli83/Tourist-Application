@@ -85,6 +85,7 @@ export function SiteHeader() {
           <option key={c.code} value={c.code}>{c.code}</option>
         ))}
       </select>
+      <Link href={`/${locale}/money`} onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-md text-base hover:bg-white/10" title={t.money.converter} aria-label={t.money.converter} data-testid="money-link">⇄</Link>
     </label>
   );
 
