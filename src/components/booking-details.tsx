@@ -13,6 +13,7 @@ import { ChatIcon, CheckIcon, RefreshIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "./ui";
 import { packageRide, packageRideInfo } from "@/lib/transport/booking-rides";
 import { BookingRide } from "./transport/booking-ride";
+import { TransfersSection } from "./transfers/transfers-section";
 import { OrderPoints } from "./loyalty/points-redeemer";
 
 const FINAL = ["COMPLETED", "REJECTED", "CANCELLED", "VALIDATION_FAILED", "PAYMENT_FAILED"];
@@ -79,6 +80,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
     <div className="space-y-5">
       <BackLink href={`/${locale}/account`} label={t.nav.myBookings} className="-ms-2.5" />
       <BookingRide target={packageRide(packageRideInfo(booking), Date.now(), locale === "ar")} />
+      <TransfersSection bookingId={booking.id} cancelled={booking.status === "CANCELLED" || booking.mt.packageStatus === "CANCELLED" || !booking.mt.packageId} />
       {fresh && (
         <div className={cx("flex items-start gap-4 rounded-2xl p-6 text-white", failed ? "bg-amber-600" : "bg-brand-700")}>
           <span className="grid size-12 shrink-0 place-items-center rounded-full bg-white/20"><CheckIcon className="size-7" /></span>

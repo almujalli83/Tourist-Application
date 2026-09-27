@@ -8,6 +8,7 @@ import { useApp } from "../app-provider";
 import { BusIcon, CarIcon, CheckIcon, GlobeIcon, MapPinIcon, PlaneIcon, TicketIcon, TrainIcon } from "../icons";
 import { Card, cx } from "../ui";
 import { RideFinder } from "./ride-finder";
+import { ManualTransfer } from "../transfers/manual-transfer";
 
 const ICONS: Record<ModeKind, (p: { className?: string }) => React.ReactElement> = {
   train: TrainIcon, metro: TrainIcon, bus: BusIcon, taxi: CarIcon, car: CarIcon, airport: PlaneIcon, flight: PlaneIcon, tour: MapPinIcon,
@@ -32,6 +33,7 @@ export function TransportView() {
       </div>
 
       <RideFinder city={tab === "intercity" ? "RUH" : tab} />
+      <ManualTransfer />
 
       <div className="flex flex-col gap-4 overflow-hidden rounded-2xl bg-gradient-to-l from-brand-900 to-brand-700 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
