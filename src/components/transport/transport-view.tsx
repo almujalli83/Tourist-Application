@@ -9,7 +9,7 @@ import { BusIcon, CarIcon, CheckIcon, GlobeIcon, MapPinIcon, PlaneIcon, TicketIc
 import { Card, cx } from "../ui";
 import { RideFinder } from "./ride-finder";
 import { ManualTransfer } from "../transfers/manual-transfer";
-import { MetroPanel } from "../metro/metro-panel";
+import { TransitPanel } from "../transit/transit-panel";
 import { RentalPanel } from "../rentals/rental-panel";
 
 const ICONS: Record<ModeKind, (p: { className?: string }) => React.ReactElement> = {
@@ -73,7 +73,7 @@ export function TransportView() {
         )}
       </div>
 
-      {tab === "RUH" && <MetroPanel />}
+      {tab === "RUH" && <TransitPanel />}
 
       <div className="grid gap-4 md:grid-cols-2" data-testid="transport-modes">
         {(tab === "RUH" ? modes.filter((m) => m.kind !== "metro" && m.kind !== "bus") : modes).map((m, i) => <ModeCard key={`${tab}-${i}`} m={m} />)}
