@@ -9,8 +9,8 @@ import { deleteNotification, dueReminders, listNotifications, markRead, runRemin
 import { saveBooking } from "@/lib/repo";
 import type { SearchCriteria } from "@/lib/types";
 
-// The digital card notice (visa issued) is covered in card-guides.test.ts.
-const notes = async (userId: string, now?: Date) => (await listNotifications(userId, now)).filter((x) => x.kind !== "card");
+// The digital card notice and the airport pickup offer (visa issued) are covered in card-guides.test.ts and transfers.test.ts.
+const notes = async (userId: string, now?: Date) => (await listNotifications(userId, now)).filter((x) => x.kind !== "card" && !x.id.startsWith("transfer:"));
 
 const rooms = [{ adults: 2, childAges: [] as number[] }];
 const criteria: SearchCriteria = {
