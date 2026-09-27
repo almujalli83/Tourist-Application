@@ -96,7 +96,7 @@ export function SummaryPanel({ summary, type, onFilter, filter }: { summary: Rev
   return (
     <div className="grid gap-5 sm:grid-cols-[180px_1fr_1fr]">
       <div className="text-center sm:text-start">
-        <p className="text-4xl font-bold text-ink">{summary.avg.toFixed(1)}<span className="text-base font-medium text-slate-400"> / 5</span></p>
+        <p className="text-4xl font-bold text-ink">{summary.avg.toFixed(1)}<span className="text-base font-medium text-slate-500"> / 5</span></p>
         <RatingStars value={summary.avg} className="mt-1" />
         <p className="mt-1 text-xs text-slate-500">{fmt(r.basedOn, { n: summary.count })}</p>
       </div>

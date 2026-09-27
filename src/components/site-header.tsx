@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CURRENCIES } from "@/lib/currency";
+import { A11yTools } from "./a11y-tools";
 import { useApp } from "./app-provider";
 import { ChevronIcon, GlobeIcon, Logo, MenuIcon, UserIcon, XIcon } from "./icons";
 import { PointsChip } from "./loyalty/points-chip";
@@ -76,8 +77,7 @@ export function SiteHeader() {
   }
 
   const currencySelect = (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="sr-only">{t.nav.currency}</span>
+    <div className="flex items-center gap-2 text-sm">
       <select
         value={currency}
         onChange={(e) => setCurrency(e.target.value)}
@@ -89,7 +89,7 @@ export function SiteHeader() {
         ))}
       </select>
       <Link href={`/${locale}/money`} onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-md text-base hover:bg-white/10" title={t.money.converter} aria-label={t.money.converter} data-testid="money-link">⇄</Link>
-    </label>
+    </div>
   );
 
   return (
@@ -168,6 +168,7 @@ export function SiteHeader() {
               </Link>
             )}
           </div>
+          <A11yTools />
           <div className="xl:hidden">
             <button className="grid size-10 place-items-center rounded-md hover:bg-white/10" onClick={() => setOpen((o) => !o)} aria-label={t.nav.menu} aria-expanded={open}>
               {open ? <XIcon className="size-6" /> : <MenuIcon className="size-6" />}

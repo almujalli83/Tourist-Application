@@ -222,7 +222,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-slate-800">
                       {t.travellers.insurance[k]}
-                      {(k === "question4" || k === "question5") && <span className="ms-1 text-xs text-slate-400">({t.common.optional})</span>}
+                      {(k === "question4" || k === "question5") && <span className="ms-1 text-xs text-slate-500">({t.common.optional})</span>}
                     </p>
                     <YesNoInput name={`t${index}-${k}`} value={tr.insurance[k] as YesNo | ""} onChange={(v) => setIns(k, v)} labels={yn} invalid={!!e(`insurance.${k}`)} />
                   </div>

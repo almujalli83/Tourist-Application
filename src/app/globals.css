@@ -3,6 +3,9 @@
 @theme {
   --font-sans: "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 
+  /* Secondary text: darker than the default slate-500 to keep 4.5:1 contrast on light backgrounds. */
+  --color-slate-500: #5a6b84;
+
   --color-brand-950: #032920;
   --color-brand-900: #05372b;
   --color-brand-800: #084637;
@@ -13,9 +16,9 @@
   --color-brand-100: #d6ebe4;
   --color-brand-50: #eef6f3;
 
-  --color-gold-700: #8a6a2c;
-  --color-gold-600: #a47f37;
-  --color-gold-500: #b8913f;
+  --color-gold-700: #6d5322;
+  --color-gold-600: #7f6128;
+  --color-gold-500: #93702f;
   --color-gold-100: #f3e9d2;
   --color-gold-50: #fbf7ee;
 
@@ -59,3 +62,61 @@ input[type="date"] {
 @media print {
   header, footer, .no-print { display: none !important; }
 }
+
+/* ------------------------------------------------------------ accessibility */
+
+/* A clear focus ring for keyboard users everywhere. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand-600);
+  outline-offset: 2px;
+}
+
+/* Skip link: visible only when focused. */
+.skip-link {
+  position: absolute;
+  inset-inline-start: 1rem;
+  top: -4rem;
+  z-index: 100;
+  border-radius: 0.5rem;
+  background: var(--color-ink);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Accessibility tools (set on <html> from the viewer's choices). */
+html[data-a11y-text="1"] { font-size: 112.5%; }
+html[data-a11y-text="2"] { font-size: 125%; }
+html[data-a11y-text="3"] { font-size: 137.5%; }
+html[data-a11y-links] a { text-decoration: underline !important; text-underline-offset: 3px; }
+html[data-a11y-spacing] body { letter-spacing: 0.02em; word-spacing: 0.12em; line-height: 1.8; }
+html[data-a11y-motion] *, html[data-a11y-motion] *::before, html[data-a11y-motion] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+html[data-a11y-contrast] {
+  --color-surface: #ffffff;
+  --color-ink: #000000;
+}
+html[data-a11y-contrast] body { background: #fff; color: #000; }
+html[data-a11y-contrast] :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700) { color: #111 !important; }
+html[data-a11y-contrast] :is(.border-slate-100, .border-slate-200, .border-slate-300) { border-color: #333 !important; }
+html[data-a11y-contrast] :is(.bg-slate-50, .bg-slate-100) { background-color: #fff !important; }
+html[data-a11y-contrast] :where(a, button):not(:disabled) { text-decoration-thickness: 2px; }
+html[data-a11y-grayscale] body { filter: grayscale(1); }
+/* With larger text the full header no longer fits: use the compact (menu) header at every width. */
+html[data-a11y-text] header :is(.xl\:flex, .xl\:block, .\32xl\:flex) { display: none !important; }
+html[data-a11y-text] header .xl\:hidden { display: block !important; }

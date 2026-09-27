@@ -100,7 +100,7 @@ export function Composer({ onSend, placeholder, busy, extra, initial = "", testI
           </button>
         )}
         <input ref={ref} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} data-testid="composer-file" />
-        <span className="text-xs text-slate-400">{s.attachHint}</span>
+        <span className="text-xs text-slate-500">{s.attachHint}</span>
       </div>
     </div>
   );

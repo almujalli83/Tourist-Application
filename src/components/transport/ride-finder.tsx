@@ -76,7 +76,7 @@ export function RideFinder({ city: initial }: { city: string }) {
           </Select>
         </div>
         <div className="relative min-w-0 flex-1 basis-56">
-          <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={r.search} aria-label={r.search} className="ps-9" data-testid="ride-search" />
         </div>
         <button type="button" onClick={locate} disabled={locating}
@@ -108,7 +108,7 @@ export function RideFinder({ city: initial }: { city: string }) {
           })}
         </ul>
       )}
-      <p className="text-[11px] text-slate-400">{r.note}</p>
+      <p className="text-[11px] text-slate-500">{r.note}</p>
     </Card>
   );
 }

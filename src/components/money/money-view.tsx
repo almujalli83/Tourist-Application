@@ -116,7 +116,7 @@ function NearbyMoney() {
           ))}
         </ul>
       )}
-      <p className="text-[11px] text-slate-400">{m.osm}</p>
+      <p className="text-[11px] text-slate-500">{m.osm}</p>
     </Card>
   );
 }

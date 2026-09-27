@@ -25,6 +25,7 @@ export function SiteFooter() {
           <li><Link href={`/${locale}/emergency`} className="font-semibold text-red-300 hover:underline">{t.emergency.nav}</Link></li>
           <li><Link href={`/${locale}/prayer`} className="font-semibold text-white hover:underline">{t.prayer.nav}</Link></li>
           <li><Link href={`/${locale}/support`} className="font-semibold text-white hover:underline">{t.footer.support}</Link></li>
+          <li><Link href={`/${locale}/accessibility`} className="font-semibold text-white hover:underline">{t.a11y.statement}</Link></li>
           <li>{t.footer.privacy}</li>
           <li>{t.footer.terms}</li>
         </ul>

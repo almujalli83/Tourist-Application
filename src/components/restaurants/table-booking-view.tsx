@@ -83,7 +83,7 @@ export function TableBookingView({ id }: { id: string }) {
             <Badge tone={cancelled ? "red" : "brand"}>{bk.status[b.status]}</Badge>
           </div>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div><dt className="text-xs text-slate-500">{bk.when}</dt><dd className="flex items-center gap-1 font-semibold" data-testid="booking-when"><CalendarIcon className="size-4 text-slate-400" />{when}</dd></div>
+            <div><dt className="text-xs text-slate-500">{bk.when}</dt><dd className="flex items-center gap-1 font-semibold" data-testid="booking-when"><CalendarIcon className="size-4 text-slate-500" />{when}</dd></div>
             <div><dt className="text-xs text-slate-500">{bk.party}</dt><dd className="font-semibold" data-testid="booking-party">{b.party}</dd></div>
             <div><dt className="text-xs text-slate-500">{bk.guest}</dt><dd className="font-semibold">{b.guestName}</dd></div>
             <div><dt className="text-xs text-slate-500">{bk.reference}</dt><dd className="ltr-nums font-semibold">{b.reference} · {rs.providers[b.restaurant.provider]} {b.providerRef}</dd></div>

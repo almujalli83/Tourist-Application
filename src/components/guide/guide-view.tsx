@@ -354,7 +354,7 @@ export function GuideView() {
         aria-pressed={on}
         aria-label={on ? g.removeFavorite : g.addFavorite}
         title={on ? g.removeFavorite : g.addFavorite}
-        className={cx("grid shrink-0 place-items-center rounded-full transition-colors hover:bg-red-50", big ? "size-10" : "size-8", on ? "text-red-600" : "text-slate-400")}
+        className={cx("grid shrink-0 place-items-center rounded-full transition-colors hover:bg-red-50", big ? "size-10" : "size-8", on ? "text-red-600" : "text-slate-500")}
       >
         <HeartIcon className={big ? "size-6" : "size-5"} fill={on ? "currentColor" : "none"} />
       </button>
@@ -419,7 +419,7 @@ export function GuideView() {
         </div>
       )}
       <div className="relative">
-        <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
         <input
           type="search"
           value={q}
@@ -468,14 +468,9 @@ export function GuideView() {
           <ul className="divide-y divide-slate-100">
             {results.map(({ p, km }) => (
               <li key={p.id}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => select(p.id)}
-                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), select(p.id))}
-                  className="flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-slate-50 focus-visible:bg-brand-50 focus-visible:outline-none"
-                  data-testid="guide-place"
-                >
+                <div className="flex gap-3 px-4 py-3 transition-colors hover:bg-slate-50 has-[button:focus-visible]:bg-brand-50">
+                  {/* The place opens with its own button; the favourite button sits beside it (never nested). */}
+                  <button type="button" onClick={() => select(p.id)} className="flex min-w-0 flex-1 gap-3 text-start focus-visible:outline-none" data-testid="guide-place">
                   <span className="mt-1.5 size-2.5 shrink-0 rounded-full" style={{ background: CATEGORY_COLORS[p.category] }} />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-ink">{name(p)}</p>
@@ -487,6 +482,7 @@ export function GuideView() {
                     </div>
                     {(ar ? p.descriptionAr : p.descriptionEn) && <p className="mt-1 line-clamp-2 text-xs text-slate-600">{ar ? p.descriptionAr : p.descriptionEn}</p>}
                   </div>
+                  </button>
                   {favButton(p)}
                 </div>
               </li>
@@ -672,7 +668,7 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
 
       <dl className="mt-5 space-y-3 text-sm">
         {!p.eventId && !p.transit && <div>
-          <dt className="flex items-center gap-1.5 font-semibold text-ink"><ClockIcon className="size-4 text-slate-400" /> {g.hours}</dt>
+          <dt className="flex items-center gap-1.5 font-semibold text-ink"><ClockIcon className="size-4 text-slate-500" /> {g.hours}</dt>
           <dd className="mt-1 text-slate-700">
             {p.open24h ? g.open24h : p.hours?.length ? (
               <ul className="space-y-0.5">

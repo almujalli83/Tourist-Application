@@ -318,7 +318,7 @@ function SeatMap({ sections, unavailable, selected, onToggle, full }: {
               <div className="space-y-1">
                 {Array.from({ length: sec.rows }, (_, r) => (
                   <div key={r} className="flex items-center justify-center gap-1">
-                    <span className="w-4 text-center text-[10px] font-semibold text-slate-400">{rowLetter(r)}</span>
+                    <span className="w-4 text-center text-[10px] font-semibold text-slate-500">{rowLetter(r)}</span>
                     {Array.from({ length: sec.seatsPerRow }, (_, k) => {
                       const id = `${sec.id}-${rowLetter(r)}${k + 1}`;
                       const isTaken = taken.has(id);
@@ -335,7 +335,7 @@ function SeatMap({ sections, unavailable, selected, onToggle, full }: {
                           data-seat={id}
                           className={cx(
                             "grid size-6 place-items-center rounded-t-md rounded-b-sm text-[9px] font-bold transition-colors sm:size-7",
-                            isTaken ? "cursor-not-allowed bg-slate-300 text-slate-400" : isSel ? "bg-gold-500 text-white" : "border-2 bg-white text-slate-500 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50",
+                            isTaken ? "cursor-not-allowed bg-slate-300 text-slate-500" : isSel ? "bg-gold-500 text-white" : "border-2 bg-white text-slate-500 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50",
                           )}
                           style={!isTaken && !isSel ? { borderColor: tones[si % tones.length] } : undefined}
                         >
@@ -343,7 +343,7 @@ function SeatMap({ sections, unavailable, selected, onToggle, full }: {
                         </button>
                       );
                     })}
-                    <span className="w-4 text-center text-[10px] font-semibold text-slate-400">{rowLetter(r)}</span>
+                    <span className="w-4 text-center text-[10px] font-semibold text-slate-500">{rowLetter(r)}</span>
                   </div>
                 ))}
               </div>

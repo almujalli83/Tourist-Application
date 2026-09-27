@@ -88,7 +88,7 @@ export function NotificationsView() {
                       aria-label={m.delete}
                       title={m.delete}
                       data-testid="notification-delete"
-                      className="grid size-9 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      className="grid size-9 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-red-50 hover:text-red-600"
                     >
                       <TrashIcon className="size-4" />
                     </button>

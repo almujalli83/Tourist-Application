@@ -481,7 +481,7 @@ function CoachMap({ cls, taken, selected, max, onChange, testid }: {
             <div key={letter}>
               {li === coach.aisleAfter && <div className="h-4" />}
               <div className="flex items-center gap-1 py-0.5">
-                <span className="w-4 text-center text-[10px] font-bold text-slate-400">{letter}</span>
+                <span className="w-4 text-center text-[10px] font-bold text-slate-500">{letter}</span>
                 {Array.from({ length: coach.rows }, (_, r) => {
                   const id = `${coach.id}-${r + 1}${letter}`;
                   const isTaken = takenSet.has(id);
@@ -489,7 +489,7 @@ function CoachMap({ cls, taken, selected, max, onChange, testid }: {
                   return (
                     <button key={id} type="button" data-seat={id} disabled={isTaken || (!isSel && selected.length >= max)} onClick={() => toggle(id)} aria-pressed={isSel} aria-label={id}
                       className={cx("grid size-7 place-items-center rounded-md text-[9px] font-bold",
-                        isTaken ? "cursor-not-allowed bg-slate-300 text-slate-400" : isSel ? "bg-gold-500 text-white" : "border-2 border-brand-600 text-slate-500 hover:bg-brand-50 disabled:opacity-40")}>
+                        isTaken ? "cursor-not-allowed bg-slate-300 text-slate-500" : isSel ? "bg-gold-500 text-white" : "border-2 border-brand-600 text-slate-500 hover:bg-brand-50 disabled:opacity-40")}>
                       {r + 1}
                     </button>
                   );

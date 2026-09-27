@@ -85,7 +85,7 @@ export function SearchForm() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Field label={t.search.origin} required error={err("origin")} htmlFor="origin">
             <div className="relative">
-              <PlaneIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <PlaneIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
               <Select id="origin" value={origin} onChange={(e) => setOrigin(e.target.value)} invalid={!!err("origin")} className="ps-9">
                 <option value="">{t.search.originPlaceholder}</option>
                 {ORIGIN_CITIES.map((c) => (
