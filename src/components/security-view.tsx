@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { fmt } from "@/i18n";
 import { fmtDay } from "@/lib/events/format";
 import { useApp } from "./app-provider";
+import { AppleMark, GoogleMark, NafathSignIn } from "./auth-methods";
 import { BackLink } from "./back-link";
 import { CheckIcon, LockIcon, PhoneIcon, ShieldIcon, TrashIcon, UserIcon } from "./icons";
 import { PasswordInput, PasswordStrength } from "./password-input";
@@ -49,7 +50,8 @@ export function SecurityView() {
         <p className="mt-1 text-sm text-slate-600">{s.intro}</p>
       </div>
       <EmailSection err={err} refresh={refresh} />
-      <PasswordSection err={err} day={day} />
+      <MethodsSection err={err} />
+      <PasswordSection err={err} day={day} refresh={refresh} />
       <PhoneSection err={err} refresh={refresh} />
       <MfaSection err={err} day={day} refresh={refresh} />
       <DevicesSection day={day} />
@@ -59,6 +61,68 @@ export function SecurityView() {
 }
 
 type ErrFn = (code?: string, minutes?: number) => string;
+
+interface Methods { password: boolean; identities: { id: string; provider: "google" | "apple" | "nafath" | "phone"; label: string; sandbox: boolean }[] }
+
+function MethodsSection({ err }: { err: ErrFn }) {
+  const { t, locale } = useApp();
+  const s = t.security.methods;
+  const [m, setM] = useState<Methods | null>(null);
+  const [modes, setModes] = useState<Record<string, string | null>>({});
+  const [nafath, setNafath] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+  const load = useCallback(() => fetch("/api/account/identities", { cache: "no-store" }).then((r) => r.json()).then(setM), []);
+  useEffect(() => {
+    void load();
+    fetch("/api/auth/providers").then((r) => r.json()).then(setModes).catch(() => undefined);
+    const q = new URLSearchParams(location.search);
+    if (q.get("linked")) setMsg({ tone: "success", text: s.linked });
+    else if (q.get("error")) setMsg({ tone: "error", text: err(q.get("error") ?? undefined) });
+  }, [load, err, s.linked]);
+  if (!m) return null;
+  const has = (p: string) => m.identities.some((i) => i.provider === p);
+  async function unlink(id: string) {
+    const r = await fetch(`/api/account/identities?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setMsg({ tone: "error", text: err(d.error) });
+    setM(d);
+    setMsg(null);
+  }
+  const next = encodeURIComponent(`/${locale}/account/security`);
+  const linkBtn = "inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-ink ring-1 ring-inset ring-slate-300 hover:bg-slate-50";
+  return (
+    <Section icon={<UserIcon className="size-5" />} title={s.title} testId="sec-methods">
+      <p className="text-sm text-slate-600">{s.intro}</p>
+      <ul className="divide-y divide-slate-100">
+        <li className="flex items-center justify-between gap-2 py-2.5 text-sm">
+          <span className="font-semibold text-ink">{s.password}</span>
+          <span className="text-slate-600">{m.password ? s.passwordSet : s.noPassword}</span>
+        </li>
+        {m.identities.map((i) => (
+          <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm" data-testid="sec-identity">
+            <span className="flex items-center gap-2 font-semibold text-ink">
+              {i.provider === "google" ? <GoogleMark /> : i.provider === "apple" ? <AppleMark /> : i.provider === "phone" ? <PhoneIcon className="size-5 text-brand-700" /> : <ShieldIcon className="size-5 text-brand-700" />}
+              {s.names[i.provider]} <span className="font-normal text-slate-500" dir="ltr">{i.label}</span>
+              {i.sandbox && <Badge tone="amber">{t.auth.sandboxBadge}</Badge>}
+            </span>
+            <button type="button" onClick={() => void unlink(i.id)} className="text-xs font-semibold text-red-700 hover:underline" data-testid="sec-unlink">{s.unlink}</button>
+          </li>
+        ))}
+      </ul>
+      {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+      {nafath ? (
+        <NafathSignIn sandbox={modes.nafath === "sandbox"} mode="link" onBack={() => setNafath(false)} onDone={() => { setNafath(false); setMsg({ tone: "success", text: s.linked }); void load(); }} />
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {modes.google && !has("google") && <a href={`/api/auth/oauth/google/start?locale=${locale}&mode=link&next=${next}`} className={linkBtn} data-testid="sec-link-google"><GoogleMark />{s.link} Google</a>}
+          {modes.apple && !has("apple") && <a href={`/api/auth/oauth/apple/start?locale=${locale}&mode=link&next=${next}`} className={linkBtn} data-testid="sec-link-apple"><AppleMark />{s.link} Apple</a>}
+          {modes.nafath && !has("nafath") && <button type="button" onClick={() => setNafath(true)} className={linkBtn} data-testid="sec-link-nafath"><ShieldIcon className="size-5 text-brand-700" />{s.link} {s.names.nafath}</button>}
+        </div>
+      )}
+      {!has("phone") && <p className="text-xs text-slate-500">{s.phoneHint}</p>}
+    </Section>
+  );
+}
 
 function EmailSection({ err, refresh }: { err: ErrFn; refresh: () => Promise<void> }) {
   const { t, locale, user } = useApp();
@@ -108,7 +172,7 @@ function EmailSection({ err, refresh }: { err: ErrFn; refresh: () => Promise<voi
   );
 }
 
-function PasswordSection({ err, day }: { err: ErrFn; day: (iso: string) => string }) {
+function PasswordSection({ err, day, refresh }: { err: ErrFn; day: (iso: string) => string; refresh: () => Promise<void> }) {
   const { t, user } = useApp();
   const s = t.security.password;
   const [open, setOpen] = useState(false);
@@ -126,6 +190,7 @@ function PasswordSection({ err, day }: { err: ErrFn; day: (iso: string) => strin
     setMsg({ tone: "success", text: s.done });
     setOpen(false);
     setF({ current: "", next: "", confirm: "" });
+    await refresh();
   }
   return (
     <Section icon={<LockIcon className="size-5" />} title={s.title} testId="sec-password">
@@ -142,7 +207,7 @@ function PasswordSection({ err, day }: { err: ErrFn; day: (iso: string) => strin
           </div>
         </form>
       ) : (
-        <button type="button" onClick={() => { setOpen(true); setMsg(null); }} className="text-sm font-semibold text-brand-700 hover:underline" data-testid="sec-change-password">{s.change}</button>
+        <button type="button" onClick={() => { setOpen(true); setMsg(null); }} className="text-sm font-semibold text-brand-700 hover:underline" data-testid="sec-change-password">{user.hasPassword === false ? t.security.methods.setPassword : s.change}</button>
       )}
     </Section>
   );

@@ -12,7 +12,9 @@ import { siteUrl } from "../site";
 import { store } from "../store";
 import type { Collection } from "../store/types";
 import { deleteWalletDocument, getWalletDoc } from "../wallet";
+import { removeUserIdentities } from "./identities";
 import { hashPassword, verifyPassword } from "./password";
+import { linkVerifiedPhone } from "./signin";
 import { knownDevice, deviceKeyOf, revokeAllSessions, type LoginMethod } from "./sessions";
 import { clearSessionCookie, setSessionCookie } from "./session";
 import { checkCode, sendCode, SmsError } from "./sms";
@@ -302,6 +304,7 @@ export async function confirmPhone(userId: string, code: unknown): Promise<void>
     throw new AccountError(r === "expired" ? "expired" : "wrongCode");
   }
   await updateUser(u.id, (x) => ({ ...x, phoneVerifiedAt: new Date().toISOString(), verifiedPhone: phone }));
+  await linkVerifiedPhone(u.id, phone).catch(() => undefined);
 }
 
 /* ---------------------------------------------------------------- two-step verification */
@@ -369,7 +372,7 @@ export async function newRecovery(userId: string, code: unknown): Promise<string
 const USER_COLLECTIONS: Collection[] = [
   "bookings", "travellers", "wallet", "favorites", "eventOrders", "trainOrders", "restaurantBookings", "esimOrders", "chats", "tripPlans",
   "notifications", "reviews", "supportTickets", "alertPrefs", "loyalty", "guideBookings", "umrahPermits", "transfers", "rentals",
-  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions",
+  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions", "userIdentities",
 ];
 const HIDDEN = /^(passwordHash|mfa|hash|secret|token|enc|file|key|deviceKey|providerToken|cardToken|gatewayToken)$/i;
 
@@ -419,6 +422,7 @@ export async function deleteAccount(userId: string, password: unknown, code: unk
     for (const r of await store().findBy<{ id: string; file?: unknown }>(c, "userId", userId)) await store().delete(c, r.id);
   }
   await revokeAllSessions(userId);
+  await removeUserIdentities(userId);
   await store().delete("userEmails", u.email.toLowerCase());
   const email = u.email;
   await store().put<StoredUser>("users", u.id, {
