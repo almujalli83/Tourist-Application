@@ -12,6 +12,8 @@ import { BackLink } from "../back-link";
 import { CalendarIcon, MapPinIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Field, Input, Spinner } from "../ui";
+import { tableRide } from "@/lib/transport/booking-rides";
+import { BookingRide } from "../transport/booking-ride";
 import { SlotPicker } from "./shared";
 
 interface View { booking: RestaurantBooking; qr: string; canCancel: boolean; canChange: boolean; cancelDeadline: string; changeDeadline: string }
@@ -65,6 +67,7 @@ export function TableBookingView({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
+      <div className="print:hidden"><BookingRide target={tableRide(b, Date.now(), ar)} /></div>
       {notice && !cancelled && <Alert tone="success" className="print:hidden">{notice}</Alert>}
       {cancelled && <Alert tone="warning">{bk.cancelled}{b.cancellation?.refundSAR ? ` ${fmt(bk.refunded, { amount: money(b.cancellation.refundSAR) })}` : ""}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}

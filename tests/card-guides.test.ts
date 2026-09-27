@@ -170,8 +170,8 @@ describe("licensed tour guides", () => {
     expect(mail?.text).toContain(b.respondUrl!);
     const token = b.respondUrl!.split("/").pop()!;
     expect((await requestByToken(token))?.id).toBe(b.id);
-    const done = await respondToRequest(token, "confirm", "See you at the gate", now);
-    expect(done).toMatchObject({ status: "confirmed", guideNote: "See you at the gate" });
+    const done = await respondToRequest(token, "confirm", "See you at the gate", now, { text: "At-Turaif main gate", link: "https://maps.google.com/?q=24.7336,46.5753" });
+    expect(done).toMatchObject({ status: "confirmed", guideNote: "See you at the gate", meetingPoint: { text: "At-Turaif main gate", lat: 24.7336, lng: 46.5753 } });
     await expect(respondToRequest(token, "decline", null, now)).rejects.toMatchObject({ code: "alreadyAnswered" });
     const note = await store().get<{ kind: string; titleEn: string }>("notifications", `guide:${b.id}:confirmed`);
     expect(note).toMatchObject({ kind: "guide" });

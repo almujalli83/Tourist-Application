@@ -25,7 +25,11 @@ export interface BookingRow {
   visasIssued: number;
   totalSAR: number;
   status: string;
+  /** Hotels and flights for «Order a car». */
+  ride: PackageRideInfo;
 }
+
+import type { PackageRideInfo } from "@/lib/transport/booking-rides";
 
 function ProfileForm() {
   const { t, user, setUser } = useApp();

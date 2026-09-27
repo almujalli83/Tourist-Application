@@ -10,6 +10,9 @@ import { BackLink } from "../back-link";
 import { TrainIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
+import { trainRide } from "@/lib/transport/booking-rides";
+import { STATIONS } from "@/lib/trains/network";
+import { BookingRide } from "./booking-ride";
 import { OrderPoints } from "../loyalty/points-redeemer";
 
 interface StationLite { code: string; nameAr: string; nameEn: string }
@@ -74,6 +77,7 @@ export function TrainTicketView({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
+      <div className="print:hidden"><BookingRide target={trainRide(o, STATIONS, Date.now(), ar)} /></div>
       {fresh && !cancelled && <Alert tone="success" className="print:hidden">{tk.purchased}</Alert>}
       {cancelled && o.cancellation && <Alert tone="warning">{fmt(tk.cancelled, { refund: money(o.cancellation.refundSAR), fee: money(o.cancellation.feeSAR) })}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}

@@ -8,7 +8,7 @@ export interface Station {
   code: string;
   nameAr: string;
   nameEn: string;
-  /** App city code when the city is one of the destinations (MAK: Makkah, not a destination). */
+  /** App city code when the city is one of the destinations (MKX: Makkah, with the Umrah option). */
   city: string;
   lat: number;
   lng: number;

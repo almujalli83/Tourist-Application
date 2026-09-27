@@ -6,6 +6,7 @@ import {
 } from "./mock-data";
 import type { TravelAgentProvider } from "./provider";
 import { rng } from "./rng";
+import { CITY_CENTERS } from "../guide/centers";
 
 const CABIN_FACTOR: Record<CabinClass, number> = { economy: 1, premium: 1.6, business: 2.8, first: 4.5 };
 
@@ -92,6 +93,10 @@ export function createSandboxAgent(opts: {
         const brand = HOTEL_BRANDS[bi];
         const district = r.pick(city === "MKX" ? MAKKAH_DISTRICTS : DISTRICTS);
         const room = r.pick(ROOM_TYPES);
+        // A stable location per hotel and city: near the Haram in Makkah, within ~4 km of the centre elsewhere.
+        const spot = rng(`hotel-spot|${city}|${bi}`);
+        const c = CITY_CENTERS[city] ?? CITY_CENTERS.RUH;
+        const spread = city === "MKX" ? 0.008 : 0.035;
         const perNight = Math.round((brand.stars * 180 + r.int(40, 380)) * opts.priceFactor) * rooms;
         offers.push({
           ref: `${city}-${i}`,
@@ -103,6 +108,8 @@ export function createSandboxAgent(opts: {
           licenseNo: (r.int(0, 8_999_999), sandboxHotelLicense(city, bi)),
           districtEn: district.en,
           districtAr: district.ar,
+          lat: Math.round((c.lat + (spot.next() - 0.5) * 2 * spread) * 1e5) / 1e5,
+          lng: Math.round((c.lng + (spot.next() - 0.5) * 2 * spread) * 1e5) / 1e5,
           reviewScore: Math.round((7 + r.next() * 2.8) * 10) / 10,
           roomTypeEn: room.en,
           roomTypeAr: room.ar,

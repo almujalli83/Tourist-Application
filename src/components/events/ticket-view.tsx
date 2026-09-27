@@ -12,6 +12,8 @@ import { CalendarIcon, MapPinIcon } from "../icons";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
 import { EVENT_COLORS } from "./events-view";
+import { eventRide } from "@/lib/transport/booking-rides";
+import { BookingRide } from "../transport/booking-ride";
 import { OrderPoints } from "../loyalty/points-redeemer";
 
 interface OrderView { order: EventOrder; qr: Record<string, string>; canCancel: boolean; deadline: string | null }
@@ -67,6 +69,7 @@ export function TicketView({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
+      <div className="print:hidden"><BookingRide target={eventRide(o, Date.now(), ar)} /></div>
       {fresh && !cancelled && <Alert tone="success" className="print:hidden">{tk.purchased}</Alert>}
       {cancelled && o.cancellation && <Alert tone="warning">{fmt(tk.cancelled, { amount: money(o.cancellation.refundSAR) })}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}

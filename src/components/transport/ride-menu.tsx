@@ -15,7 +15,7 @@ export function RideEstimateText({ e, className }: { e: RideEstimate; className?
 }
 
 /** «Order a car»: Uber (destination filled in), Careem and Jeeny (destination copied), and directions. */
-export function RideMenu({ to, estimate, size = "sm", className }: { to: RideDestination; estimate?: RideEstimate | null; size?: "sm" | "md"; className?: string }) {
+export function RideMenu({ to, estimate, size = "sm", light, className }: { to: RideDestination; estimate?: RideEstimate | null; size?: "sm" | "md"; light?: boolean; className?: string }) {
   const { t, locale } = useApp();
   const r = t.rides;
   const [open, setOpen] = useState(false);
@@ -44,11 +44,11 @@ export function RideMenu({ to, estimate, size = "sm", className }: { to: RideDes
   return (
     <div ref={ref} className={cx("relative inline-block", className)} data-testid="ride-menu">
       <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open}
-        className={cx("inline-flex items-center gap-1.5 rounded-lg bg-ink font-semibold text-white hover:bg-ink/90", size === "sm" ? "h-8 px-3 text-xs" : "h-10 px-4 text-sm")} data-testid="ride-open">
+        className={cx("inline-flex items-center gap-1.5 rounded-lg font-semibold", light ? "bg-white text-ink hover:bg-slate-100" : "bg-ink text-white hover:bg-ink/90", size === "sm" ? "h-8 px-3 text-xs" : "h-10 px-4 text-sm")} data-testid="ride-open">
         <CarIcon className="size-4" />{r.order}
       </button>
       {open && (
-        <div className="absolute start-0 top-full z-30 mt-1.5 w-64 rounded-xl bg-white p-2 text-sm shadow-xl ring-1 ring-slate-200" role="menu">
+        <div className="absolute end-0 top-full z-30 mt-1.5 w-64 rounded-xl bg-white p-2 text-sm text-ink shadow-xl ring-1 ring-slate-200" role="menu">
           {estimate && <p className="px-2 pb-2 pt-1 text-xs text-slate-600"><RideEstimateText e={estimate} /></p>}
           {RIDE_APPS.map((app) => {
             const link = rideLink(app, to, platform);

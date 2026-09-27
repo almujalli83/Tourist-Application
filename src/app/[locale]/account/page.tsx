@@ -3,6 +3,7 @@ import { AccountView } from "@/components/account-view";
 import { currentUser } from "@/lib/auth/session";
 import { listBookings } from "@/lib/bookings/service";
 import { listSavedTravellers } from "@/lib/saved-travellers-repo";
+import { packageRideInfo } from "@/lib/transport/booking-rides";
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -26,6 +27,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         visasIssued: b.applicants.filter((a) => a.visaNumber).length,
         totalSAR: b.price.totalSAR,
         status: b.mt.packageStatus ?? b.status,
+        ride: packageRideInfo(b),
       }))}
     />
   );
