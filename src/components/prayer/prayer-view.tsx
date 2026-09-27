@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
-import { cityName, SAUDI_CITIES } from "@/lib/data/cities";
+import { cityName, MAKKAH, SAUDI_CITIES } from "@/lib/data/cities";
 import { fmtDay } from "@/lib/events/format";
 import { CITY_CENTERS } from "@/lib/guide/centers";
 import { directionsLinks } from "@/lib/guide/geo";
@@ -204,7 +204,7 @@ export function PrayerView() {
         {settings.source === "city" && (
           <div className="w-48">
             <Select value={settings.city} onChange={(e) => update({ city: e.target.value })} className="h-9" aria-label={p.city} data-testid="city-select">
-              {SAUDI_CITIES.filter((c) => CITY_CENTERS[c.code]).map((c) => <option key={c.code} value={c.code}>{locale === "ar" ? c.ar : c.en}</option>)}
+              {[MAKKAH, ...SAUDI_CITIES].filter((c) => CITY_CENTERS[c.code]).map((c) => <option key={c.code} value={c.code}>{locale === "ar" ? c.ar : c.en}</option>)}
             </Select>
           </div>
         )}

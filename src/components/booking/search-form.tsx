@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { PACKAGE_LIMITS } from "@/lib/config";
-import { ORIGIN_CITIES, SAUDI_CITIES } from "@/lib/data/cities";
+import { cityName, ORIGIN_CITIES, UMRAH_CITY } from "@/lib/data/cities";
 import { addDays, diffDays, isValidISODate, todayISO } from "@/lib/dates";
 import { splitNights, validateCriteria, type SearchError } from "@/lib/itinerary";
 import { paxFromRooms } from "@/lib/occupancy";
 import type { CabinClass, CityStay, RoomOccupancy, SearchCriteria } from "@/lib/types";
 import { useApp } from "../app-provider";
-import { PlaneIcon, UsersIcon } from "../icons";
+import { KaabaIcon, PlaneIcon, UsersIcon } from "../icons";
 import { Alert, Button, Card, cx, Field, Input, Select } from "../ui";
 import { useBooking } from "./booking-context";
 import { CityMultiSelect } from "./city-multi-select";
@@ -24,7 +24,9 @@ export function SearchForm() {
   const prev = booking.criteria;
 
   const [origin, setOrigin] = useState(prev?.origin ?? "");
-  const [cities, setCities] = useState<string[]>(prev?.stays.map((s) => s.city) ?? []);
+  const [cities, setCities] = useState<string[]>(prev?.stays.map((s) => s.city).filter((c) => c !== UMRAH_CITY) ?? []);
+  const [umrah, setUmrah] = useState(prev?.umrah === true);
+  const [umrahHint, setUmrahHint] = useState(false);
   const [departureDate, setDeparture] = useState(prev?.departureDate ?? addDays(today, 14));
   const [returnDate, setReturn] = useState(prev?.returnDate ?? addDays(today, 21));
   const [stays, setStays] = useState<CityStay[]>(prev?.stays ?? []);
@@ -33,23 +35,36 @@ export function SearchForm() {
   const [nationality, setNationality] = useState(prev?.nationality ?? "");
   const [errors, setErrors] = useState<SearchError[]>([]);
 
+  // From the Umrah page (?umrah=1): point at the option (the traveller ticks it and its declaration).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("umrah") === "1") setUmrahHint(true);
+  }, []);
+  // With Umrah, Makkah follows Jeddah (road transfer) or starts the trip (arriving through Jeddah).
+  const tripCities = useMemo(() => {
+    if (!umrah || !cities.length) return cities;
+    const jed = cities.indexOf("JED");
+    const out = [...cities];
+    out.splice(jed >= 0 ? jed + 1 : 0, 0, UMRAH_CITY);
+    return out;
+  }, [cities, umrah]);
+
   const totalNights = isValidISODate(departureDate) && isValidISODate(returnDate) ? diffDays(departureDate, returnDate) : 0;
 
   // Re-distribute nights whenever the cities or trip length change (keeping manual edits otherwise).
   useEffect(() => {
     setStays((cur) => {
-      const same = cur.length === cities.length && cur.every((s, i) => s.city === cities[i]) && cur.reduce((a, s) => a + s.nights, 0) === totalNights;
-      return same ? cur : splitNights(cities, Math.max(totalNights, cities.length));
+      const same = cur.length === tripCities.length && cur.every((s, i) => s.city === tripCities[i]) && cur.reduce((a, s) => a + s.nights, 0) === totalNights;
+      return same ? cur : splitNights(tripCities, Math.max(totalNights, tripCities.length));
     });
-  }, [cities, totalNights]);
+  }, [tripCities, totalNights]);
 
   function setNights(i: number, n: number) {
     setStays((cur) => cur.map((s, idx) => (idx === i ? { ...s, nights: Math.max(1, n) } : s)));
   }
 
   const criteria: SearchCriteria = useMemo(
-    () => ({ origin, stays, departureDate, returnDate, rooms, pax: paxFromRooms(rooms), cabin, nationality }),
-    [origin, stays, departureDate, returnDate, rooms, cabin, nationality],
+    () => ({ origin, stays, departureDate, returnDate, rooms, pax: paxFromRooms(rooms), cabin, nationality, ...(umrah ? { umrah: true } : {}) }),
+    [origin, stays, departureDate, returnDate, rooms, cabin, nationality, umrah],
   );
 
   function submit(e: React.FormEvent) {
@@ -88,6 +103,14 @@ export function SearchForm() {
             <Field label={t.search.destinations} required error={err("cities")} hint={t.search.destinationsHint} htmlFor="destinations">
               <CityMultiSelect id="destinations" value={cities} onChange={setCities} invalid={!!err("cities")} />
             </Field>
+            <label htmlFor="umrah" className={cx("mt-3 flex cursor-pointer items-start gap-3 rounded-xl border p-3.5", umrah ? "border-brand-600 bg-brand-50/60" : umrahHint ? "border-gold-500 bg-gold-50" : "border-slate-200 bg-white")} data-testid="search-umrah">
+              <input id="umrah" type="checkbox" checked={umrah} onChange={(e) => setUmrah(e.target.checked)} className="mt-1 size-4 accent-brand-700" />
+              <span>
+                <span className="flex items-center gap-1.5 text-sm font-semibold"><KaabaIcon className="size-4 text-brand-700" />{t.umrah.option.label}</span>
+                <span className="block text-xs text-slate-500">{t.umrah.option.declare}</span>
+                {umrah && <span className="mt-1 block text-xs font-medium text-brand-700">{t.umrah.option.ground}</span>}
+              </span>
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
@@ -105,7 +128,7 @@ export function SearchForm() {
                 <div className="flex flex-wrap items-center gap-2">
                   {stays.map((s, i) => (
                     <div key={s.city} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-                      <span className="text-sm font-semibold">{SAUDI_CITIES.find((c) => c.code === s.city)?.[locale]}</span>
+                      <span className="text-sm font-semibold">{cityName(s.city, locale)}</span>
                       <Input id={`nights-${s.city}`} type="number" min={1} max={21} value={s.nights} onChange={(e) => setNights(i, Number(e.target.value))} className="h-8 w-16 text-center" aria-label={`${t.common.nights} ${s.city}`} />
                       <span className="text-xs text-slate-500">{t.common.nights}</span>
                     </div>

@@ -3,6 +3,7 @@
  * person per day, the tickets suggested in the plan and the visa + insurance fee. Real prices come
  * from the package search after the plan is approved.
  */
+import { airportOf } from "../data/cities";
 import { PACKAGE_LIMITS } from "../config";
 import type { CabinClass, RoomOccupancy } from "../types";
 import type { BudgetTier, PlanBudget, PlanDay, PlanRequest } from "./types";
@@ -33,7 +34,8 @@ export function estimateBudget(req: Pick<PlanRequest, "rooms" | "cabin" | "budge
   const p = partyOf(req.rooms);
   // Fares: 12+ pay the adult fare, 2–11 about 75 %, infants about 10 %.
   const fareUnits = p.adults + p.minorsAsAdults + (p.children - p.minorsAsAdults) * 0.75 + p.infants * 0.1;
-  const legs = Math.max(0, stays.length - 1);
+  // Domestic flights between cities with different airports (Makkah ↔ Jeddah is by road or rail).
+  const legs = stays.slice(1).filter((s, i) => airportOf(s.city) !== airportOf(stays[i].city)).length;
   const flightsSAR = round10(fareUnits * (INTL_FARE[req.cabin] + legs * DOMESTIC_FARE[req.cabin]));
   const hotelsSAR = round10(stays.reduce((a, s) => a + s.nights * req.rooms.length * ROOM_NIGHT[req.budgetTier] * (CITY_FACTOR[s.city] ?? 1), 0));
   const nights = stays.reduce((a, s) => a + s.nights, 0);

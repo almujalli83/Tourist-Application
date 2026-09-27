@@ -10,7 +10,7 @@ const KEY = "ta_plan_handoff";
 
 export function planCriteria(plan: Pick<TripPlan, "request" | "stays" | "returnDate">): SearchCriteria {
   const r = plan.request;
-  return { origin: r.origin, stays: plan.stays.map((s) => ({ ...s })), departureDate: r.departureDate, returnDate: plan.returnDate, rooms: r.rooms, pax: paxFromRooms(r.rooms), cabin: r.cabin, nationality: r.nationality };
+  return { origin: r.origin, stays: plan.stays.map((s) => ({ ...s })), departureDate: r.departureDate, returnDate: plan.returnDate, rooms: r.rooms, pax: paxFromRooms(r.rooms), cabin: r.cabin, nationality: r.nationality, ...(r.umrah ? { umrah: true } : {}) };
 }
 
 export function writeHandoff(planId: string, criteria: SearchCriteria) {

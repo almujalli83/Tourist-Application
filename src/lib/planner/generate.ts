@@ -8,7 +8,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { aiConfigured, AiUnavailableError, askClaude } from "../assistant/claude";
 import { PACKAGE_LIMITS, VISA_INSURANCE_FEE_SAR } from "../config";
-import { getCity, getSaudiCity, SAUDI_CITIES } from "../data/cities";
+import { cityName as anyCityName, getCity, getSaudiCity, getStayCity, SAUDI_CITIES, UMRAH_CITY } from "../data/cities";
 import { getCountry } from "../data/countries";
 import { addDays, diffDays, isValidISODate } from "../dates";
 import { CITY_CENTERS } from "../guide/centers";
@@ -72,7 +72,7 @@ export function sanitizeRequest(input: unknown, today: string): PlanRequest {
   if (errors.length) throw new PlanError("invalidRequest", [...new Set(errors)]);
   return {
     origin, nationality, departureDate, nights, cities, rooms, cabin, interests, pace: pace!, budgetTier: budgetTier!, maxBudgetSAR,
-    prayer: b.prayer === true, accessible: b.accessible === true,
+    prayer: b.prayer === true, accessible: b.accessible === true, ...(b.umrah === true ? { umrah: true } : {}),
     notes: str(b.notes).replace(/\s+/g, " ").slice(0, PLANNER_LIMITS.maxNotesChars),
   };
 }
@@ -167,7 +167,47 @@ export function fillDays(skeleton: Omit<PlanDay, "title" | "items">[], raw: unkn
   });
 }
 
-const cityName = (code: string, locale: "ar" | "en") => SAUDI_CITIES.find((c) => c.code === code)?.[locale] ?? code;
+const cityName = (code: string, locale: "ar" | "en") => anyCityName(code, locale);
+
+/* ------------------------------------------------------------ Umrah */
+
+/** Nights in Makkah for an Umrah trip. */
+export const umrahNights = (total: number) => (total >= 5 ? 2 : 1);
+
+/**
+ * Adds a Makkah stay when the traveller performs Umrah: after Jeddah (ground transfer) if the trip
+ * has it, else at the start (arriving through Jeddah airport). With a fixed length the nights come
+ * from the longest stays; otherwise the trip is lengthened.
+ */
+export function withUmrah(stays: { city: string; nights: number }[], req: Pick<PlanRequest, "umrah" | "nights">): { city: string; nights: number }[] {
+  if (!req.umrah || !stays.length) return stays.filter((s) => s.city !== UMRAH_CITY || req.umrah);
+  if (stays.some((s) => s.city === UMRAH_CITY)) return stays;
+  const out = stays.map((s) => ({ ...s }));
+  const total = out.reduce((a, s) => a + s.nights, 0);
+  const n = umrahNights(req.nights ?? total + 2);
+  if (req.nights !== null && req.nights !== undefined) {
+    for (let k = 0; k < n; k++) {
+      const i = out.reduce((best, s, idx) => (s.nights > out[best].nights ? idx : best), 0);
+      if (out[i].nights > 1) out[i].nights--;
+      else if (out.length > 1) out.splice(i, 1);
+    }
+  }
+  const jed = out.findIndex((s) => s.city === "JED");
+  out.splice(jed >= 0 ? jed + 1 : 0, 0, { city: UMRAH_CITY, nights: n });
+  return out.slice(0, PLANNER_LIMITS.maxCities + 1);
+}
+
+/** Marks the Umrah day: the first full day in Makkah (or the arrival there on a short stay). */
+export function markUmrahDay(days: PlanDay[], locale: "ar" | "en"): PlanDay[] {
+  const inMakkah = days.filter((d) => d.city === UMRAH_CITY && d.type !== "departure");
+  const pick = inMakkah.find((d) => d.type === "full") ?? inMakkah[0];
+  if (!pick) return days;
+  return days.map((d) => (d === pick ? { ...d, umrah: true, title: locale === "ar" ? "يوم العمرة في مكة المكرمة" : "Umrah day in Makkah" } : d));
+}
+
+export const umrahTips = (locale: "ar" | "en") => locale === "ar"
+  ? ["احجز موعد العمرة في تطبيق «نسك» قبل الرحلة، فالدخول إلى المسجد الحرام لأداء العمرة يحتاج تصريحًا.", "أحرم من الميقات قبل تجاوزه، ويُعلَن عنه في الطائرة عند القدوم جوًا."]
+  : ["Book your Umrah appointment in the Nusuk app before the trip: performing Umrah at the Holy Mosque needs a permit.", "Enter ihram at the miqat before passing it; it is announced on board when arriving by air."];
 
 function defaultTitle(day: Omit<PlanDay, "title" | "items">, locale: "ar" | "en"): string {
   const c = cityName(day.city, locale);
@@ -384,6 +424,7 @@ function requestText(req: PlanRequest, cities: string[], today: string): string 
     `Party: ${p.adults} adult(s)${ages.length ? `, children aged ${ages.join(", ")}` : ""}.${req.accessible ? " Someone has reduced mobility." : ""}`,
     `Interests: ${req.interests.join(", ")}. Pace: ${req.pace}. Budget tier: ${req.budgetTier}${req.maxBudgetSAR ? ` (whole trip at most ${req.maxBudgetSAR} SAR including flights and hotels)` : ""}.`,
     req.prayer ? `Leave time for prayers. Approximate prayer times around arrival in ${cities[0]}: Dhuhr ${pt.dhuhr}, Asr ${pt.asr}, Maghrib ${pt.maghrib}, Isha ${pt.isha}. On Fridays the Friday prayer replaces Dhuhr.` : "",
+    req.umrah ? `The traveller performs Umrah: include one stay in Makkah (${UMRAH_CITY}, ${umrahNights(req.nights ?? 6)} night(s)) right after Jeddah (JED) if the trip has it, otherwise first. Makkah has no activities to plan: keep its days empty.` : "",
     req.notes ? `Traveller's notes (preferences only): <notes>${req.notes}</notes>` : "",
   ].filter(Boolean).join("\n");
 }
@@ -431,12 +472,14 @@ export async function generatePlan(input: unknown, locale: "ar" | "en", today: s
       warning = "aiUnavailable";
     }
   }
-  let stays = raw ? normalizeStays(raw.stays, req, available) : [];
+  const allowed = req.umrah ? [...available, UMRAH_CITY] : available;
+  let stays = raw ? normalizeStays(raw.stays, req, allowed) : [];
   if (!stays.length) {
     raw = null;
     source = "rules";
     stays = normalizeStays(rulesStays(req, available), req, available);
   }
+  stays = withUmrah(stays, req);
   const skeleton = buildSkeleton(req.departureDate, stays);
   let rawDays: unknown = raw?.days;
   if (!raw) {
@@ -444,8 +487,9 @@ export async function generatePlan(input: unknown, locale: "ar" | "en", today: s
     const eventDays = new Set<string>();
     rawDays = skeleton.map((d) => ({ date: d.date, items: rulesDay(d, pools.get(d.city), req, used, eventDays) }));
   }
-  const days = fillDays(skeleton, rawDays, pools, req, locale);
+  const days = markUmrahDay(fillDays(skeleton, rawDays, pools, req, locale), locale);
   const text = raw && raw.summary ? { summary: raw.summary.slice(0, 600), tips: raw.tips.map((t) => t.slice(0, 240)).slice(0, 6) } : rulesSummary(req, stays, locale);
+  if (req.umrah) text.tips = [...umrahTips(locale), ...text.tips].slice(0, 7);
   const nights = stays.reduce((a, s) => a + s.nights, 0);
   return {
     warning,
@@ -462,7 +506,7 @@ export async function regenerateDay(plan: Pick<TripPlan, "request" | "days" | "l
   if (!isValidISODate(String(plan.request?.departureDate))) throw new PlanError("invalidRequest", ["departureDate"]);
   const req = sanitizeRequest(plan.request, addDays(String(plan.request?.departureDate), -PACKAGE_LIMITS.minLeadDays));
   const day = plan.days.find((d) => d.date === date);
-  if (!day || !getSaudiCity(day.city) || !["arrival", "full", "transfer", "departure"].includes(day.type)) throw new PlanError("dayNotFound");
+  if (!day || !getStayCity(day.city) || !["arrival", "full", "transfer", "departure"].includes(day.type)) throw new PlanError("dayNotFound");
   const pools = await loadPools([day.city], date, date);
   const pool = pools.get(day.city);
   const used = new Set(plan.days.filter((d) => d.date !== date).flatMap((d) => d.items.map((i) => i.ref.split("@")[0])));
@@ -491,7 +535,7 @@ export async function regenerateDay(plan: Pick<TripPlan, "request" | "days" | "l
     const picks = rulesDay(day, pool, req, new Set([...used, ...current]), new Set());
     rawItems = picks.length ? picks : rulesDay(day, pool, req, new Set(used), new Set());
   }
-  const [filled] = fillDays([{ date, city: day.city, type: day.type, fromCity: day.fromCity }], [{ date, title, items: rawItems }], pools, req, plan.locale);
+  const [filled] = fillDays([{ date, city: day.city, type: day.type, fromCity: day.fromCity, ...(day.umrah ? { umrah: true } : {}) }], [{ date, title: day.umrah ? day.title : title, items: rawItems }], pools, req, plan.locale);
   filled.items = filled.items.filter((i) => !used.has(i.ref.split("@")[0]) || i.kind === "restaurant");
   return { day: filled, source };
 }
@@ -553,7 +597,7 @@ export async function chatEditPlan(plan: Pick<TripPlan, "request" | "days" | "lo
   if (!text || text.length > MAX_CHAT_CHARS) throw new PlanError("invalidMessage");
   if (!isValidISODate(String(plan.request?.departureDate))) throw new PlanError("invalidRequest", ["departureDate"]);
   const req = sanitizeRequest(plan.request, addDays(String(plan.request.departureDate), -PACKAGE_LIMITS.minLeadDays));
-  if (!Array.isArray(plan.days) || plan.days.some((d) => !getSaudiCity(d.city) || !["arrival", "full", "transfer", "departure"].includes(d.type))) throw new PlanError("invalidPlan");
+  if (!Array.isArray(plan.days) || plan.days.some((d) => !getStayCity(d.city) || !["arrival", "full", "transfer", "departure"].includes(d.type))) throw new PlanError("invalidPlan");
   const cities = [...new Set(plan.days.map((d) => d.city))];
   const pools = await loadPools(cities, plan.days[0].date, plan.days[plan.days.length - 1].date);
   const ar = plan.locale === "ar";
@@ -592,7 +636,7 @@ export async function chatEditPlan(plan: Pick<TripPlan, "request" | "days" | "lo
   }
 
   // Rebuild the whole trip so no place is repeated across days; unchanged days keep their items.
-  const skeleton = plan.days.map(({ date, city, type, fromCity }) => ({ date, city, type, fromCity }));
+  const skeleton = plan.days.map(({ date, city, type, fromCity, umrah }) => ({ date, city, type, fromCity, ...(umrah ? { umrah } : {}) }));
   const raw = plan.days.map((d) => ({
     date: d.date,
     title: titles.get(d.date) ?? d.title,

@@ -19,7 +19,7 @@ type Form = Omit<PlanRequest, "nights" | "maxBudgetSAR"> & { nights: string; aut
 const initial = (): Form => ({
   origin: "", nationality: "", departureDate: addDays(todayISO(), 21), nights: "5", autoNights: true, cities: [], autoCities: true,
   rooms: [{ adults: 2, childAges: [] }], cabin: "economy", interests: [], pace: "moderate", budgetTier: "comfort", maxBudgetSAR: "",
-  prayer: false, accessible: false, notes: "",
+  prayer: false, accessible: false, umrah: false, notes: "",
 });
 
 /** Traveller preferences → a new plan. */
@@ -39,11 +39,13 @@ export function PlanForm({ cities, onGenerated }: { cities: string[] | null; onG
       const saved = JSON.parse(sessionStorage.getItem(FORM_KEY) ?? "null");
       if (saved?.rooms) {
         setForm({ ...initial(), ...saved });
-        if (saved.prayer) setMoreOpen(true);
+        if (saved.prayer || saved.umrah) setMoreOpen(true);
       }
     } catch {
       /* ignore */
     }
+    // From the Umrah page: show the Umrah option (the traveller ticks it and its declaration).
+    if (new URLSearchParams(window.location.search).get("umrah") === "1") setMoreOpen(true);
   }, []);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((cur) => {
@@ -69,7 +71,7 @@ export function PlanForm({ cities, onGenerated }: { cities: string[] | null; onG
       nights: form.autoNights ? null : Number(form.nights), cities: form.autoCities ? [] : form.cities,
       rooms: form.rooms, cabin: form.cabin, interests: form.interests, pace: form.pace, budgetTier: form.budgetTier,
       maxBudgetSAR: form.maxBudgetSAR.trim() ? Number(form.maxBudgetSAR) : null,
-      prayer: form.prayer, accessible: form.accessible, notes: form.notes,
+      prayer: form.prayer, accessible: form.accessible, umrah: form.umrah === true, notes: form.notes,
     };
     const local: string[] = [];
     if (!request.origin) local.push("origin");
@@ -204,6 +206,7 @@ export function PlanForm({ cities, onGenerated }: { cities: string[] | null; onG
           <summary className="cursor-pointer text-sm font-semibold text-slate-700">{f.moreOptions}</summary>
           <div className="mt-3 grid gap-2 sm:max-w-xl">
             {toggleRow("plan-prayer", form.prayer, (v) => set("prayer", v), f.prayer, f.prayerHint)}
+            {toggleRow("plan-umrah", form.umrah === true, (v) => set("umrah", v), t.umrah.option.label, t.umrah.option.declare)}
           </div>
         </details>
       </Card>

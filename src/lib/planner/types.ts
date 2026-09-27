@@ -30,6 +30,8 @@ export interface PlanRequest {
   prayer: boolean;
   /** Someone with reduced mobility: prefer accessible places. */
   accessible: boolean;
+  /** Performs Umrah (declared Muslim): a stay in Makkah with an Umrah day. */
+  umrah?: boolean;
   notes: string;
 }
 
@@ -71,6 +73,8 @@ export interface PlanDay {
   type: DayType;
   /** City left on a transfer day. */
   fromCity?: string;
+  /** The day set aside for Umrah (Makkah). */
+  umrah?: boolean;
   title: string;
   items: PlanItem[];
 }
