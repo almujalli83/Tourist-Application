@@ -5,16 +5,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
 import { fmtDay } from "@/lib/events/format";
 import { CITY_CENTERS } from "@/lib/guide/centers";
-import { DAILY_PRAYERS, prayerTimes } from "@/lib/prayer/times";
+import { DAILY_PRAYERS, KAABA, prayerTimes } from "@/lib/prayer/times";
 import {
   IHRAM_DONTS, MIQATS, miqatMapUrl, RITE_LANG_NAMES, RITE_LANGS, RITES, ROUTE_MIQAT, ROUTES, TALBIYAH_AR, TALBIYAH_LATIN, type RiteLang, type Route,
 } from "@/lib/umrah/content";
 import type { UmrahSeason } from "@/lib/umrah/season";
 import type { UmrahTrip } from "@/lib/umrah/trips";
 import { useApp } from "../app-provider";
-import { ChevronIcon, ClockIcon, KaabaIcon, MapPinIcon, PassportIcon, PhoneIcon, UsersIcon } from "../icons";
+import { ChevronIcon, ClockIcon, KaabaIcon, MapPinIcon, PassportIcon, PhoneIcon, TrainIcon, UsersIcon } from "../icons";
 import { Alert, Badge, Card, cx, Spinner } from "../ui";
 import { PermitsPanel, type PermitView } from "./permits-panel";
+import { RideMenu } from "../transport/ride-menu";
 
 interface Data { season: UmrahSeason; links: { web: string; ios: string; android: string }; nusuk: "api" | "sandbox" | null; trips: (UmrahTrip & { permits: PermitView[] })[] | null }
 
@@ -54,6 +55,13 @@ function TripCard({ trip, links, nusuk, onChange }: { trip: UmrahTrip & { permit
       </p>
       {trip.pause && <Alert tone="warning"><span data-testid="umrah-pause-trip">{fmt(t.umrah.pause.trip, { from: trip.pause.from, to: trip.pause.to })}</span></Alert>}
       <p className="text-sm leading-6 text-slate-700">{trip.route === "jeddah" ? u.viaJeddah : u.viaAir}</p>
+      <div className="flex flex-wrap items-center gap-2" data-testid="umrah-transfer">
+        <Link href={`/${locale}/trains?from=${trip.route === "jeddah" ? "JSL" : "JAP"}&to=MKK&date=${trip.makkahFrom}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-50 px-3 text-xs font-semibold text-brand-800 ring-1 ring-brand-700/15 hover:bg-brand-100" data-testid="umrah-train">
+          <TrainIcon className="size-4" />{t.rides.haramain}
+        </Link>
+        <RideMenu to={{ lat: KAABA.lat, lng: KAABA.lng, name: locale === "ar" ? "المسجد الحرام، مكة المكرمة" : "Masjid al-Haram, Makkah" }} />
+      </div>
       <div className="border-t border-slate-100 pt-3">
         <PermitsPanel trip={trip} nusuk={nusuk} links={<NusukButtons links={links} />} onChange={onChange} />
       </div>

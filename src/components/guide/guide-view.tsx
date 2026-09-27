@@ -15,6 +15,8 @@ import { useApp } from "../app-provider";
 import { ChevronIcon, ClockIcon, DirectionsIcon, GlobeIcon, HeartIcon, LocateIcon, MapPinIcon, PhoneIcon, SearchIcon, ShareIcon, TicketIcon, XIcon } from "../icons";
 import { Alert, Badge, Button, cx, Spinner } from "../ui";
 import { CATEGORY_COLORS, GuideMap, type GuideCategory } from "./guide-map";
+import { estimateFromKm } from "@/lib/transport/rides";
+import { RideEstimateText, RideMenu } from "../transport/ride-menu";
 import { ReviewsSection } from "../reviews/shared";
 
 /** A guide place, or an event on sale shown on the map (category "event"). */
@@ -610,6 +612,10 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
         <a href={links.apple} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-white text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
           <DirectionsIcon className="size-4" /> {g.appleMaps}
         </a>
+        <div className="col-span-2 flex flex-wrap items-center gap-2">
+          <RideMenu to={{ lat: p.lat, lng: p.lng, name: ar ? p.nameAr : p.nameEn }} estimate={km !== null ? estimateFromKm(km) : null} size="md" />
+          {km !== null && <RideEstimateText e={estimateFromKm(km)} className="text-xs text-slate-500" />}
+        </div>
         <Button variant="secondary" size="sm" onClick={onShare} className="md:col-span-2">
           <ShareIcon className="size-4" /> {copied ? g.copied : g.share}
         </Button>

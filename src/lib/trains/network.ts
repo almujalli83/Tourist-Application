@@ -29,7 +29,7 @@ export interface Line {
 }
 
 export const STATIONS: Station[] = [
-  { code: "MKK", nameAr: "محطة مكة المكرمة", nameEn: "Makkah Station", city: "MAK", lat: 21.4127, lng: 39.7947, line: "haramain", muslimsOnly: true },
+  { code: "MKK", nameAr: "محطة مكة المكرمة", nameEn: "Makkah Station", city: "MKX", lat: 21.4127, lng: 39.7947, line: "haramain", muslimsOnly: true },
   { code: "JSL", nameAr: "محطة جدة — السليمانية", nameEn: "Jeddah Al-Sulaimaniyah Station", city: "JED", lat: 21.5176, lng: 39.2194, line: "haramain" },
   { code: "JAP", nameAr: "محطة مطار الملك عبدالعزيز", nameEn: "King Abdulaziz Airport Station", city: "JED", lat: 21.6787, lng: 39.1612, line: "haramain" },
   { code: "KEC", nameAr: "محطة مدينة الملك عبدالله الاقتصادية", nameEn: "King Abdullah Economic City Station", city: "KEC", lat: 22.3747, lng: 39.1219, line: "haramain" },
