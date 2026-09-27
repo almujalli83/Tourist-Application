@@ -5,15 +5,10 @@ import { fmt } from "@/i18n";
 import { METRO_LINE_IDS, METRO_LINES, nearestStation, type MetroLineId, type MetroStation } from "@/lib/metro/types";
 import { useApp } from "../app-provider";
 import { GuideMap, type MapPoint } from "../guide/guide-map";
-import { BusIcon, CheckIcon, GlobeIcon, LocateIcon, TrainIcon } from "../icons";
+import { LocateIcon, TrainIcon } from "../icons";
 import { Card, cx, Spinner } from "../ui";
 import { useMetro } from "./use-metro";
 
-const APP_LINKS = {
-  ios: "https://apps.apple.com/sa/app/id1549817739",
-  android: "https://play.google.com/store/apps/details?id=com.rcrc.riyadhjourneyplanner",
-  rcrc: "https://www.rcrc.gov.sa",
-};
 const RIYADH = { lat: 24.7136, lng: 46.6753, zoom: 11 };
 
 export const lineName = (id: MetroLineId, ar: boolean) => (ar ? METRO_LINES[id].nameAr : METRO_LINES[id].nameEn);
@@ -113,25 +108,6 @@ export function MetroPanel() {
         )}
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-5" data-testid="metro-tickets">
-          <h3 className="font-bold">{m.ticketsTitle}</h3>
-          <ul className="mt-3 space-y-2 text-sm text-slate-700">
-            {m.tickets.map((x, i) => <li key={i} className="flex gap-2"><CheckIcon className="mt-0.5 size-4 shrink-0 text-brand-600" />{x}</li>)}
-          </ul>
-          <p className="mt-3 text-xs text-slate-500">{m.ticketsNote}</p>
-          <p className="mt-3 text-sm font-semibold">{m.app}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <a href={APP_LINKS.ios} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-700">{m.appStore}</a>
-            <a href={APP_LINKS.android} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-700">{m.googlePlay}</a>
-            <a href={APP_LINKS.rcrc} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1 px-2 text-xs font-semibold text-brand-700 hover:underline"><GlobeIcon className="size-4" />{m.rcrc}</a>
-          </div>
-        </Card>
-        <Card className="p-5" data-testid="metro-bus">
-          <h3 className="flex items-center gap-2 font-bold"><BusIcon className="size-5 text-brand-700" />{m.busTitle}</h3>
-          <p className="mt-3 text-sm leading-7 text-slate-700">{m.bus}</p>
-        </Card>
-      </div>
     </section>
   );
 }
