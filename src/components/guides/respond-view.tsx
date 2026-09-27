@@ -6,7 +6,7 @@ import { cityName } from "@/lib/data/cities";
 import { fmtDay } from "@/lib/events/format";
 import type { GuideBooking } from "@/lib/guides/bookings";
 import { useApp } from "../app-provider";
-import { Alert, Badge, Button, Card, Field, Textarea } from "../ui";
+import { Alert, Badge, Button, Card, Field, Input, Textarea } from "../ui";
 import { langLabel } from "./guide-card";
 import { GUIDE_STATUS_TONE } from "./guide-booking-view";
 
@@ -16,6 +16,8 @@ export function RespondView({ token, booking }: { token: string; booking: GuideB
   const s = t.guides;
   const [b, setB] = useState(booking);
   const [note, setNote] = useState("");
+  const [meetingText, setMeetingText] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
   const [busy, setBusy] = useState<"confirm" | "decline" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<"confirmed" | "declined" | null>(null);
@@ -23,7 +25,7 @@ export function RespondView({ token, booking }: { token: string; booking: GuideB
   async function act(action: "confirm" | "decline") {
     setBusy(action);
     setErr(null);
-    const r = await fetch("/api/guides/respond", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, action, note }) });
+    const r = await fetch("/api/guides/respond", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, action, note, meetingText, meetingLink }) });
     const d = await r.json().catch(() => ({}));
     setBusy(null);
     if (!r.ok) return setErr((s.errors as Record<string, string>)[d.error] ?? s.errors.generic);
@@ -46,6 +48,10 @@ export function RespondView({ token, booking }: { token: string; booking: GuideB
       {err && <Alert tone="error">{err}</Alert>}
       {b.status === "pending" && (
         <Card className="space-y-3 p-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={s.respond.meeting} hint={s.respond.meetingHint}><Input value={meetingText} maxLength={200} onChange={(e) => setMeetingText(e.target.value)} dir="auto" data-testid="guide-meeting" /></Field>
+            <Field label={s.respond.meetingLink} hint={s.respond.meetingLinkHint}><Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} dir="ltr" placeholder="https://maps.google.com/…" data-testid="guide-meeting-link" /></Field>
+          </div>
           <Field label={s.respond.note}><Textarea rows={2} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} dir="auto" /></Field>
           <div className="flex flex-wrap gap-2">
             <Button loading={busy === "confirm"} disabled={!!busy} onClick={() => act("confirm")} data-testid="guide-confirm">{s.respond.confirm}</Button>

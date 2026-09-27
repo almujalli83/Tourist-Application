@@ -30,7 +30,7 @@ export const isLicensed = (g: Pick<StoredGuide, "licenseExpiry" | "removed">, to
 const demoEnabled = () => mtConfig().mock && process.env.DEMO_GUIDES !== "off";
 
 /** Seeds the sample guides once (sandbox). */
-async function ensureDemo() {
+export async function ensureDemo() {
   if (!demoEnabled()) return;
   if (!(await store().insert("config", "guidesDemo:v1", { id: "guidesDemo:v1" }))) return;
   const now = new Date().toISOString();

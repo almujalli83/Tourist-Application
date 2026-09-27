@@ -85,6 +85,9 @@ export interface HotelOffer extends TravelAgentRef {
   licenseNo: string;
   districtEn: string;
   districtAr: string;
+  /** Location of the hotel (for directions and ride-hailing); absent on older offers. */
+  lat?: number;
+  lng?: number;
   reviewScore: number;
   roomTypeEn: string;
   roomTypeAr: string;

@@ -1177,6 +1177,7 @@ const en: Dictionary = {
     },
   },
   rides: {
+    purpose: { hotel: "To your hotel: {place}", airport: "To the airport: {place}", venue: "To the event: {place}", restaurant: "To the restaurant: {place}", station: "To the station: {place}", meeting: "To the guide's meeting point: {place}" },
     finderTitle: "Order a car",
     finderIntro: "Pick where you're going in the city and order a car with Uber, Careem or Jeeny, with an estimated fare and time. The same button is in your day plan and on landmark, restaurant and event pages.",
     search: "Search a destination (landmark, mall, museum…)",
@@ -1345,6 +1346,7 @@ const en: Dictionary = {
       title: "Guide request {ref}",
       status: { pending: "Awaiting the guide", confirmed: "Confirmed", declined: "Declined by the guide", cancelled: "Cancelled" },
       cancelReason: { traveller: "You cancelled the request.", licenseExpired: "Cancelled automatically: the guide's licence expired." },
+      meetingPoint: "Meeting point",
       guideNote: "Guide's note",
       cancel: "Cancel request",
       cancelConfirm: "Cancel this request?",
@@ -1354,6 +1356,10 @@ const en: Dictionary = {
       another: "Choose another guide",
     },
     respond: {
+      meeting: "Meeting point",
+      meetingHint: "e.g. At-Turaif main gate",
+      meetingLink: "Map link of the place (optional)",
+      meetingLinkHint: "Paste a Google Maps link so the traveller gets an «Order a car» button to it.",
       title: "Tour guide request",
       traveller: "Traveller",
       confirm: "Confirm",

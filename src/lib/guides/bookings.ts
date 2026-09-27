@@ -12,7 +12,7 @@ import { isValidISODate } from "../dates";
 import { notifyTravellers } from "../notify";
 import type { AppNotification } from "../reminders/reminders";
 import { store } from "../store";
-import { isLicensed, ksaToday, type StoredGuide } from "./guides";
+import { ensureDemo, isLicensed, ksaToday, type StoredGuide } from "./guides";
 import { GUIDE_LANGUAGES } from "./types";
 
 const COL = "guideBookings" as const;
@@ -38,6 +38,8 @@ export interface GuideBooking {
   status: GuideBookingStatus;
   cancelReason: CancelReason | null;
   guideNote: string | null;
+  /** Where to meet, set by the guide when confirming (coordinates when a map link was given). */
+  meetingPoint?: { text: string; lat: number | null; lng: number | null } | null;
   createdAt: string;
   updatedAt: string;
   respondedAt: string | null;
@@ -66,6 +68,7 @@ const strip = ({ token: _t, ...b }: Stored): GuideBooking => b; // eslint-disabl
 const langName = (code: string, i: 0 | 1) => GUIDE_LANGUAGES[code]?.[i] ?? code;
 
 export async function requestGuide(user: PublicUser, input: GuideRequestInput, origin: string, now = new Date()): Promise<GuideBooking & { respondUrl?: string }> {
+  await ensureDemo();
   const g = await store().get<StoredGuide>("guides", String(input.licenseNo ?? ""));
   const today = ksaToday(now);
   if (!g || !isLicensed(g, today)) throw new GuideBookingError("guideUnavailable", 404);
@@ -118,8 +121,9 @@ async function tellTraveller(b: GuideBooking, kind: "confirmed" | "declined" | "
     declined: [`اعتذر المرشد ${who.ar} عن طلبك`, `${who.en} declined your tour request`, "يمكنك اختيار مرشد آخر من دليل المرشدين.", "You can choose another guide from the directory."],
     licenseExpired: [`أُلغي طلب المرشد ${who.ar}`, `Tour request with ${who.en} cancelled`, "انتهى ترخيص المرشد لدى وزارة السياحة، لذا أُلغي الطلب. اختر مرشدًا مرخّصًا آخر من الدليل.", "The guide's Ministry of Tourism licence has expired, so the request was cancelled. Please choose another licensed guide."],
   }[kind];
-  const lineAr = `${b.reference} · ${b.date} ${b.startTime}${b.guideNote ? ` · ${b.guideNote}` : ""}`;
-  const lineEn = `${b.reference} · ${b.date} ${b.startTime}${b.guideNote ? ` · ${b.guideNote}` : ""}`;
+  const meet = b.meetingPoint?.text ? ` · 📍 ${b.meetingPoint.text}` : "";
+  const lineAr = `${b.reference} · ${b.date} ${b.startTime}${meet}${b.guideNote ? ` · ${b.guideNote}` : ""}`;
+  const lineEn = `${b.reference} · ${b.date} ${b.startTime}${meet}${b.guideNote ? ` · ${b.guideNote}` : ""}`;
   const id = `guide:${b.id}:${kind}`;
   const doc: AppNotification = {
     id, userId: b.userId, kind: "guide", bookingId: b.id, reference: b.reference, createdAt: now.toISOString(),
@@ -139,14 +143,36 @@ export async function requestByToken(token: string): Promise<GuideBooking | null
   return b ? strip(b) : null;
 }
 
-export async function respondToRequest(token: string, action: "confirm" | "decline", note: string | null, now = new Date()): Promise<GuideBooking> {
+/** Coordinates from a map link or "lat,lng" text (Google Maps @lat,lng / q= / ll=, Apple Maps ll=). */
+export function parseCoords(input: string | null | undefined): { lat: number; lng: number } | null {
+  let s = String(input ?? "").trim();
+  try {
+    s = decodeURIComponent(s);
+  } catch {
+    /* keep as typed */
+  }
+  const m = s.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
+    ?? s.match(/[?&](?:q|query|ll|daddr|destination)=(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
+    ?? s.match(/^(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)$/);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+}
+
+export async function respondToRequest(token: string, action: "confirm" | "decline", note: string | null, now = new Date(), meeting?: { text?: string | null; link?: string | null }): Promise<GuideBooking> {
   await expireGuideRequests(now);
   const [found] = /^[\w-]{20,64}$/.test(token) ? await store().findBy<Stored>(COL, "token", token) : [];
   if (!found) throw new GuideBookingError("notFound", 404);
   if (found.status !== "pending") throw new GuideBookingError("alreadyAnswered", 409);
   const status: GuideBookingStatus = action === "confirm" ? "confirmed" : "declined";
   const b = (await store().update<Stored>(COL, found.id, (x) => (x.status === "pending"
-    ? { ...x, status, guideNote: note?.trim().slice(0, 300) || null, respondedAt: now.toISOString(), updatedAt: now.toISOString() }
+    ? {
+        ...x, status, guideNote: note?.trim().slice(0, 300) || null, respondedAt: now.toISOString(), updatedAt: now.toISOString(),
+        meetingPoint: status === "confirmed" && (meeting?.text?.trim() || parseCoords(meeting?.link))
+          ? { text: (meeting?.text ?? "").trim().slice(0, 200), lat: parseCoords(meeting?.link)?.lat ?? null, lng: parseCoords(meeting?.link)?.lng ?? null }
+          : null,
+      }
     : x)))!;
   if (b.status !== status) throw new GuideBookingError("alreadyAnswered", 409);
   await tellTraveller(b, status === "confirmed" ? "confirmed" : "declined", now);

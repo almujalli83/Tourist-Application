@@ -1175,6 +1175,7 @@ const ar = {
     },
   },
   rides: {
+    purpose: { hotel: "إلى فندقك: {place}", airport: "إلى المطار: {place}", venue: "إلى الفعالية: {place}", restaurant: "إلى المطعم: {place}", station: "إلى المحطة: {place}", meeting: "إلى مكان لقاء المرشد: {place}" },
     finderTitle: "اطلب سيارة",
     finderIntro: "اختر وجهتك في المدينة واطلب سيارة من أوبر أو كريم أو جيني، مع تكلفة ومدة تقديرية. تجد الزر نفسه في برنامجك اليومي وصفحات المعالم والمطاعم والفعاليات.",
     search: "ابحث عن وجهة (معلم، مول، متحف…)",
@@ -1343,6 +1344,7 @@ const ar = {
       title: "طلب مرشد {ref}",
       status: { pending: "بانتظار تأكيد المرشد", confirmed: "مؤكد", declined: "اعتذر المرشد", cancelled: "ملغي" },
       cancelReason: { traveller: "ألغيتَ الطلب.", licenseExpired: "أُلغي تلقائيًا لانتهاء ترخيص المرشد." },
+      meetingPoint: "مكان اللقاء",
       guideNote: "ملاحظة المرشد",
       cancel: "إلغاء الطلب",
       cancelConfirm: "هل تريد إلغاء هذا الطلب؟",
@@ -1352,6 +1354,10 @@ const ar = {
       another: "اختر مرشدًا آخر",
     },
     respond: {
+      meeting: "مكان اللقاء",
+      meetingHint: "مثال: بوابة حي الطريف الرئيسية",
+      meetingLink: "رابط الموقع على الخريطة (اختياري)",
+      meetingLinkHint: "الصق رابط Google Maps ليظهر للمسافر زر «اطلب سيارة» إليه.",
       title: "طلب إرشاد سياحي",
       traveller: "المسافر",
       confirm: "تأكيد الطلب",

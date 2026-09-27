@@ -11,6 +11,10 @@ import type { EventOrder } from "@/lib/events/types";
 import type { RestaurantBooking } from "@/lib/restaurants/bookings";
 import type { TrainOrder } from "@/lib/trains/orders";
 import { groupByTrip } from "@/lib/account/trips";
+import { eventRide, guideRide, packageRide, tableRide, trainRide, type RideTarget } from "@/lib/transport/booking-rides";
+import { estimateRide } from "@/lib/transport/rides";
+import { STATIONS } from "@/lib/trains/network";
+import { RideMenu } from "./transport/ride-menu";
 import type { BookingRow } from "./account-view";
 import { useApp } from "./app-provider";
 import { StatusBadge } from "./booking-details";
@@ -47,6 +51,8 @@ interface Item {
   /** Packages: trip dates and whether it is cancelled; eSIMs: the package they were bought with. */
   trip?: { from: string; to: string; cancelled: boolean };
   packageId?: string;
+  /** «Order a car» while the booking is current (from the day before until it ends). */
+  ride?: RideTarget | null;
 }
 
 type Entry = { item: Item; children: Item[] };
@@ -98,6 +104,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         upcoming: !cancelled && b.returnDate >= today, today: !cancelled && b.departureDate <= today && b.returnDate >= today,
         status: <StatusBadge status={b.status} />, amount: money(b.totalSAR),
         trip: { from: b.departureDate, to: b.returnDate, cancelled },
+        ride: b.ride ? packageRide(b.ride, now, ar) : null,
       });
     }
     for (const o of events ?? []) {
@@ -110,6 +117,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(o.session.start), day: ksaDay(o.session.start),
         upcoming: live && end > now, today: live && end > now && ksaDay(o.session.start) === today,
         status: badge(t.events.ticket.status[o.status], !live), amount: money(o.totalSAR),
+        ride: eventRide(o, now, ar),
       });
     }
     for (const o of trains ?? []) {
@@ -123,6 +131,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(first.depart), day: ksaDay(first.depart),
         upcoming: live && Date.parse(last.depart) > now, today: live && Date.parse(last.depart) > now && o.legs.some((l) => ksaDay(l.trip.depart) === today),
         status: badge(t.trains.ticket.status[o.status], !live), amount: money(o.totalSAR),
+        ride: trainRide(o, STATIONS, now, ar),
       });
     }
     for (const b of tables ?? []) {
@@ -134,6 +143,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(b.start), day: b.day,
         upcoming: live && Date.parse(b.start) > now - 2 * 3_600_000, today: live && b.day === today && Date.parse(b.start) > now - 2 * 3_600_000,
         status: badge(t.restaurants.booking.status[b.status], !live), amount: b.fee.paidSAR ? money(b.fee.paidSAR) : undefined,
+        ride: tableRide(b, now, ar),
       });
     }
     for (const o of esims ?? []) {
@@ -161,6 +171,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: start, day: b.date,
         upcoming: live && end > now, today: live && end > now && b.date === today,
         status: <Badge tone={b.status === "confirmed" ? "brand" : b.status === "pending" ? "amber" : "red"}>{t.guides.booking.status[b.status]}</Badge>,
+        ride: guideRide(b, now, ar),
       });
     }
     return out;
@@ -176,20 +187,23 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
   const isCo = user?.accountType === "company";
 
   const row = (i: Item, child = false) => (
-    <Link href={i.href} className={cx("flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50", child ? "rounded-lg px-3 py-2.5" : "px-5 py-4")} data-testid={`my-booking-${i.kind}`}>
-      <div className="flex min-w-0 items-start gap-3">
-        <span className={cx("mt-0.5 grid shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700", child ? "size-7 [&_svg]:size-4" : "size-9")}>{ICONS[i.kind]}</span>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-slate-500">{m.kinds[i.kind]}</p>
-          <p className={cx("font-semibold", child && "text-sm")}>{i.title}</p>
-          <p className="text-xs text-slate-500">{i.subtitle}</p>
+    <div className={cx("flex items-center gap-2 hover:bg-slate-50", child ? "rounded-lg pe-3" : "pe-5")}>
+      <Link href={i.href} className={cx("flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3", child ? "px-3 py-2.5" : "py-4 ps-5")} data-testid={`my-booking-${i.kind}`}>
+        <div className="flex min-w-0 items-start gap-3">
+          <span className={cx("mt-0.5 grid shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700", child ? "size-7 [&_svg]:size-4" : "size-9")}>{ICONS[i.kind]}</span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-500">{m.kinds[i.kind]}</p>
+            <p className={cx("font-semibold", child && "text-sm")}>{i.title}</p>
+            <p className="text-xs text-slate-500">{i.subtitle}</p>
+          </div>
         </div>
-      </div>
-      <div className="flex items-center gap-3">
-        {i.status}
-        {i.amount && <span className="ltr-nums text-sm font-semibold">{i.amount}</span>}
-      </div>
-    </Link>
+        <div className="flex items-center gap-3">
+          {i.status}
+          {i.amount && <span className="ltr-nums text-sm font-semibold">{i.amount}</span>}
+        </div>
+      </Link>
+      {i.ride && <RideMenu to={i.ride.to} estimate={i.ride.from ? estimateRide(i.ride.from, i.ride.to) : null} className="shrink-0" />}
+    </div>
   );
 
   const list = (rows: Entry[]) => (
