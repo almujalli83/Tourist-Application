@@ -9,7 +9,7 @@ import { cityName } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import { useApp } from "./app-provider";
 import { BackLink } from "./back-link";
-import { CheckIcon, RefreshIcon } from "./icons";
+import { ChatIcon, CheckIcon, RefreshIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "./ui";
 import { OrderPoints } from "./loyalty/points-redeemer";
 
@@ -136,6 +136,11 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
           </Link>
         </Card>
       )}
+
+      <Link href={`/${locale}/support?booking=${booking.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm hover:bg-slate-50" data-testid="booking-support">
+        <span className="flex items-center gap-2 font-semibold text-brand-800"><ChatIcon className="size-5" />{t.support.aboutBooking}</span>
+        <span className="text-xs text-slate-500">{t.support.aboutBookingHint}</span>
+      </Link>
 
       <Card className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
         <div>

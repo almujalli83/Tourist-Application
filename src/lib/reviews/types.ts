@@ -4,7 +4,7 @@ export const REVIEW_TARGETS = ["package", "hotel", "airline", "event", "restaura
 export type ReviewTarget = (typeof REVIEW_TARGETS)[number];
 
 /** Saudi Trip services that travellers rate once they've used them. */
-export const SERVICES = ["packageVisa", "planner", "events", "restaurants", "trains", "esim", "assistant"] as const;
+export const SERVICES = ["packageVisa", "planner", "events", "restaurants", "trains", "esim", "assistant", "support"] as const;
 export type ServiceId = (typeof SERVICES)[number];
 
 /** Detailed criteria rated (1–5, optional) for each kind of review. */
