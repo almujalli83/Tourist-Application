@@ -7,12 +7,13 @@ import { SAUDI_CITIES } from "@/lib/data/cities";
 import { directionsLinks, distanceKm } from "@/lib/guide/geo";
 import { isOpenNow, ksaClock } from "@/lib/guide/hours";
 import type { PublicPlace } from "@/lib/guide/repo";
+import type { TourSummary } from "@/lib/audio/types";
 import { matchesQuery } from "@/lib/guide/search";
 import { fmtKsa } from "@/lib/events/format";
 import { CITY_CENTERS } from "@/lib/guide/centers";
 import { PLACE_CATEGORIES, type OpeningSlot, type PlaceTag } from "@/lib/guide/types";
 import { useApp } from "../app-provider";
-import { ChevronIcon, ClockIcon, DirectionsIcon, GlobeIcon, HeartIcon, LocateIcon, MapPinIcon, PhoneIcon, SearchIcon, ShareIcon, TicketIcon, XIcon } from "../icons";
+import { ChevronIcon, ClockIcon, DirectionsIcon, GlobeIcon, HeadphonesIcon, HeartIcon, LocateIcon, MapPinIcon, PhoneIcon, SearchIcon, ShareIcon, TicketIcon, XIcon } from "../icons";
 import { Alert, Badge, Button, cx, Spinner } from "../ui";
 import { CATEGORY_COLORS, GuideMap, type GuideCategory } from "./guide-map";
 import { estimateFromKm } from "@/lib/transport/rides";
@@ -178,6 +179,20 @@ export function GuideView() {
         setLoadError(true);
         setPlaces([]);
       });
+  }, [city]);
+
+  // Audio guide stops of the city's places (place id → tour and stop).
+  const [audioStops, setAudioStops] = useState<Record<string, { tour: string; stop: string }>>({});
+  useEffect(() => {
+    if (!city) return;
+    fetch(`/api/audio/tours?city=${city}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { tours: TourSummary[] }) => {
+        const map: Record<string, { tour: string; stop: string }> = {};
+        for (const x of d.tours) for (const [place, stop] of Object.entries(x.placeStops)) map[place] ??= { tour: x.id, stop };
+        setAudioStops(map);
+      })
+      .catch(() => setAudioStops({}));
   }, [city]);
 
   // Favourites: in the account when signed in (device favourites are moved there), else on the device.
@@ -353,6 +368,9 @@ export function GuideView() {
       <div>
         <h1 className="text-lg font-bold text-ink">{g.title}</h1>
         <p className="mt-0.5 text-xs text-slate-500">{g.subtitle}</p>
+        <Link href={`/${locale}/audio${city ? `?city=${city}` : ""}`} className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline" data-testid="guide-audio-link">
+          <HeadphonesIcon className="size-4" /> {t.audio.nav}
+        </Link>
       </div>
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1" role="tablist">
         {(["explore", "favorites"] as const).map((k) => (
@@ -490,6 +508,7 @@ export function GuideView() {
       openBadge={openBadge(selected)}
       favButton={favButton(selected, true)}
       now={now}
+      audio={audioStops[selected.id]}
     />
   );
 
@@ -563,9 +582,9 @@ function Chip({ active, onClick, color, children }: { active: boolean; onClick: 
   );
 }
 
-function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBadge, favButton, now }: {
+function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBadge, favButton, now, audio }: {
   place: GuidePlace; km: number | null; onBack: () => void; onShowMap: () => void; onShare: () => void; copied: boolean;
-  openBadge: React.ReactNode; favButton: React.ReactNode; now: Date;
+  openBadge: React.ReactNode; favButton: React.ReactNode; now: Date; audio?: { tour: string; stop: string };
 }) {
   const { t, locale, money } = useApp();
   const g = t.guide;
@@ -604,6 +623,11 @@ function PlaceDetail({ place: p, km, onBack, onShowMap, onShare, copied, openBad
         {!p.eventId && !p.transit && !p.restaurantId && <Badge>{g.source[p.source]}</Badge>}
       </div>
       {description && <p className="mt-4 text-sm leading-7 text-slate-700">{description}</p>}
+      {audio && (
+        <Link href={`/${locale}/audio/${audio.tour}?stop=${encodeURIComponent(audio.stop)}`} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:underline" data-testid="guide-audio">
+          <HeadphonesIcon className="size-4" /> {t.audio.listenPlace}
+        </Link>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <a href={links.google} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800">

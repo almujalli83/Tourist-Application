@@ -12,7 +12,7 @@ import {
 import type { UmrahSeason } from "@/lib/umrah/season";
 import type { UmrahTrip } from "@/lib/umrah/trips";
 import { useApp } from "../app-provider";
-import { ChevronIcon, ClockIcon, KaabaIcon, MapPinIcon, PassportIcon, PhoneIcon, TrainIcon, UsersIcon } from "../icons";
+import { ChevronIcon, ClockIcon, HeadphonesIcon, KaabaIcon, MapPinIcon, PassportIcon, PhoneIcon, TrainIcon, UsersIcon } from "../icons";
 import { Alert, Badge, Card, cx, Spinner } from "../ui";
 import { PermitsPanel, type PermitView } from "./permits-panel";
 import { RideMenu } from "../transport/ride-menu";
@@ -96,6 +96,10 @@ export function UmrahView() {
         <h1 className="flex items-center gap-2 text-2xl font-bold"><KaabaIcon className="size-7 text-brand-700" />{u.title}</h1>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">{u.intro}</p>
         <p className="mt-1 text-xs font-semibold text-slate-500">{u.muslimsOnly}</p>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold" data-testid="umrah-audio">
+          <Link href={`/${locale}/audio/mkx-history`} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline"><HeadphonesIcon className="size-4" />{u.audioMakkah}</Link>
+          <Link href={`/${locale}/audio/med-history`} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline"><HeadphonesIcon className="size-4" />{u.audioMadinah}</Link>
+        </div>
       </div>
 
       {data && (
