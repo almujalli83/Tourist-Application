@@ -5,7 +5,7 @@ import { fmt } from "@/i18n";
 import { cityName, SAUDI_CITIES } from "@/lib/data/cities";
 import { CITY_CENTERS } from "@/lib/guide/centers";
 import type { Place } from "@/lib/guide/types";
-import { AIRPORTS, estimateRide, platformOf, RIDE_APP_NAMES, RIDE_APPS, rideLink, type Platform } from "@/lib/transport/rides";
+import { AIRPORTS, estimateRide } from "@/lib/transport/rides";
 import { useApp } from "../app-provider";
 import { CarIcon, LocateIcon, MapPinIcon, PlaneIcon, SearchIcon } from "../icons";
 import { Card, cx, Input, Select, Spinner } from "../ui";
@@ -23,8 +23,6 @@ export function RideFinder({ city: initial }: { city: string }) {
   const [q, setQ] = useState("");
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
-  const [platform, setPlatform] = useState<Platform>("other");
-  useEffect(() => setPlatform(platformOf(navigator.userAgent)), []);
   useEffect(() => {
     if (CITY_CENTERS[initial]) setCity(initial);
   }, [initial]);
@@ -69,14 +67,6 @@ export function RideFinder({ city: initial }: { city: string }) {
           <h2 className="flex items-center gap-2 text-lg font-bold"><CarIcon className="size-5 text-brand-700" />{r.finderTitle}</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">{r.finderIntro}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {RIDE_APPS.map((app) => (
-            <a key={app} href={app === "uber" ? "https://m.uber.com/ul/" : rideLink(app, { lat: 0, lng: 0, name: "" }, platform).href} target="_blank" rel="noopener noreferrer"
-              className="inline-flex h-9 items-center rounded-lg bg-white px-3 text-sm font-semibold text-ink ring-1 ring-slate-200 hover:bg-slate-50" data-testid={`ride-app-${app}`}>
-              {RIDE_APP_NAMES[app][ar ? 0 : 1]} ↗
-            </a>
-          ))}
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -112,7 +102,7 @@ export function RideFinder({ city: initial }: { city: string }) {
                   <p className="truncate text-sm font-semibold">{d.name}</p>
                   <RideEstimateText e={e} className="text-xs text-slate-500" />
                 </div>
-                <RideMenu to={{ lat: d.lat, lng: d.lng, name: d.name }} estimate={e} />
+                <RideMenu to={{ lat: d.lat, lng: d.lng, name: d.name }} from={me} estimate={e} />
               </li>
             );
           })}

@@ -1,51 +1,11 @@
 /**
- * Ride-hailing (client-safe): open Uber, Careem or Jeeny for a destination, with an approximate
- * fare and time. Uber supports a universal link with the destination filled in; Careem and Jeeny
- * publish no such link, so their app (store page) opens and the destination is copied to paste.
- * The estimate is indicative only — the final price is the one shown in the app.
+ * Getting around (client-safe): indicative fare and time for a trip, walking or driving between
+ * the places of a day, and airport locations. Cars are ordered inside the platform (lib/rides);
+ * the estimate here is shown before the companies' own prices load.
  */
 import { distanceKm } from "../guide/geo";
 
-export type RideApp = "uber" | "careem" | "jeeny";
-export const RIDE_APPS: RideApp[] = ["uber", "careem", "jeeny"];
-export const RIDE_APP_NAMES: Record<RideApp, [string, string]> = { uber: ["أوبر", "Uber"], careem: ["كريم", "Careem"], jeeny: ["جيني", "Jeeny"] };
-
 export interface RideDestination { lat: number; lng: number; name: string }
-export type Platform = "ios" | "android" | "other";
-
-const STORE: Record<Exclude<RideApp, "uber">, Record<Platform, string>> = {
-  careem: {
-    ios: "https://apps.apple.com/app/careem/id592978487",
-    android: "https://play.google.com/store/apps/details?id=com.careem.acma",
-    other: "https://www.careem.com/",
-  },
-  jeeny: {
-    ios: "https://apps.apple.com/app/jeeny/id1178701124",
-    android: "https://play.google.com/store/apps/details?id=me.com.easytaxi",
-    other: "https://www.jeeny.me/",
-  },
-};
-
-export function platformOf(userAgent: string): Platform {
-  if (/iPhone|iPad|iPod/i.test(userAgent)) return "ios";
-  if (/Android/i.test(userAgent)) return "android";
-  return "other";
-}
-
-/** The link that opens the app; `direct` = the destination is already filled in. */
-export function rideLink(app: RideApp, to: RideDestination, platform: Platform): { href: string; direct: boolean } {
-  if (app === "uber") {
-    const q = new URLSearchParams({
-      action: "setPickup", "pickup": "my_location",
-      "dropoff[latitude]": String(to.lat), "dropoff[longitude]": String(to.lng), "dropoff[nickname]": to.name,
-    });
-    return { href: `https://m.uber.com/ul/?${q}`, direct: true };
-  }
-  return { href: STORE[app][platform], direct: false };
-}
-
-/** Text copied for apps without a destination link: the name and a map link of the place. */
-export const destinationText = (to: RideDestination) => `${to.name} — https://maps.google.com/?q=${to.lat},${to.lng}`;
 
 /** Indicative city tariff (SAR): flag fall, per km, per minute, minimum fare. */
 export const TARIFF = { base: 8, perKm: 1.8, perMin: 0.4, minimum: 15 } as const;
