@@ -59,6 +59,11 @@ const GOOD: Record<ReviewTarget, Pair[]> = {
     ["خدمة احترافية ودعم سريع باللغتين.", "Professional service and quick support in both languages."],
     ["كل التفاصيل واضحة قبل الدفع، ولا توجد رسوم مفاجئة.", "Every detail is clear before paying, with no surprise fees."],
   ],
+  guide: [
+    ["مرشد متمكن يعرف تاريخ المكان بالتفصيل، وشرحه ممتع للعائلة.", "A knowledgeable guide who knows every detail of the site's history; great with the family."],
+    ["لغته ممتازة وملتزم بالموعد، وجعل الجولة ممتعة جدًا.", "Excellent language skills and on time; he made the tour really enjoyable."],
+    ["أنصح به بشدة، اقترح أماكن لم نكن لنعرفها بدونه.", "Highly recommended — suggested places we'd never have found alone."],
+  ],
 };
 const MIXED: Pair[] = [
   ["التجربة جيدة بشكل عام لكن الانتظار كان أطول من المتوقع.", "Good overall, but the wait was longer than expected."],
@@ -88,7 +93,7 @@ export function demoReviewsFor(type: ReviewTarget, id: string): PublicReview[] {
       authorName: name, authorCountry: country, rating, criteria,
       comment: withText ? (lang === "ar" ? ar : en) : "", lang, translation: withText ? { ar, en } : {},
       photos: [],
-      reply: withText && r.next() < 0.3 ? { text: lang === "ar" ? REPLY[0] : REPLY[1], at: new Date(Date.parse(at) + 86_400_000).toISOString(), byAr: type === "service" ? "فريق سعودي تريب" : "إدارة المنشأة", byEn: type === "service" ? "Saudi Trip team" : "Management" } : null,
+      reply: withText && r.next() < 0.3 ? { text: lang === "ar" ? REPLY[0] : REPLY[1], at: new Date(Date.parse(at) + 86_400_000).toISOString(), byAr: type === "service" ? "فريق سعودي تريب" : type === "guide" ? "رد المرشد" : "إدارة المنشأة", byEn: type === "service" ? "Saudi Trip team" : type === "guide" ? "The guide" : "Management" } : null,
       createdAt: at, demo: true,
     });
   }
@@ -110,6 +115,7 @@ export async function demoReviewableItems(): Promise<ReviewableItem[]> {
   if (event) items.push(item("event", event.id, event.titleAr, event.titleEn));
   const place = (await publishedPlaces("RUH"))[0];
   if (place) items.push(item("place", place.id, place.nameAr, place.nameEn));
+  items.push(item("guide", "TG-DEMO-1001", "المرشد عبدالله الحربي", "Guide Abdullah Alharbi"));
   items.push(item("service", "packageVisa", "خدمة الباقات السياحية والتأشيرة", "Tourism package & visa service"));
   items.push(item("service", "planner", "مخطط الرحلة الذكي", "Smart trip planner"));
   return items;

@@ -221,3 +221,13 @@ export function expiryState(expiryDate: string | undefined | null, today: string
   const soon = new Date(Date.parse(today) + 30 * 86_400_000).toISOString().slice(0, 10);
   return expiryDate <= soon ? "expiring" : "valid";
 }
+
+/** The latest personal photo uploaded for a traveller (digital tourist card). */
+export async function personPhoto(userId: string, personKey: string): Promise<{ data: Buffer; contentType: string } | null> {
+  const doc = (await listDocs(userId))
+    .filter((d) => d.type === "photo" && d.personKey === personKey && d.file && !d.deleted)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (!doc?.file) return null;
+  const data = await readFile(doc.file);
+  return data ? { data, contentType: doc.file.contentType } : null;
+}

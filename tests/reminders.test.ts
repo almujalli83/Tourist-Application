@@ -9,6 +9,9 @@ import { deleteNotification, dueReminders, listNotifications, markRead, runRemin
 import { saveBooking } from "@/lib/repo";
 import type { SearchCriteria } from "@/lib/types";
 
+// The digital card notice (visa issued) is covered in card-guides.test.ts.
+const notes = async (userId: string, now?: Date) => (await listNotifications(userId, now)).filter((x) => x.kind !== "card");
+
 const rooms = [{ adults: 2, childAges: [] as number[] }];
 const criteria: SearchCriteria = {
   origin: "CAI", stays: [{ city: "RUH", nights: 3 }, { city: "JED", nights: 3 }],
@@ -65,7 +68,7 @@ describe("trip reminders", () => {
     expect(first.created).toBeGreaterThanOrEqual(1);
     expect((await runReminders(now)).created).toBe(0);
 
-    const list = await listNotifications(b.userId, now);
+    const list = await notes(b.userId, now);
     expect(list).toHaveLength(1);
     const n = list[0];
     expect(n).toMatchObject({ kind: "arrival", readAt: null, href: "/account/bookings/r1" });
@@ -79,15 +82,15 @@ describe("trip reminders", () => {
     expect(mail.text).toContain("رحلتك إلى السعودية");
 
     await markRead(b.userId, now);
-    expect((await listNotifications(b.userId, now))[0].readAt).not.toBeNull();
+    expect((await notes(b.userId, now))[0].readAt).not.toBeNull();
     expect(await deleteNotification("someone-else", n.id)).toBe(false);
     expect(await deleteNotification(b.userId, n.id)).toBe(true);
-    expect(await listNotifications(b.userId, now)).toEqual([]);
+    expect(await notes(b.userId, now)).toEqual([]);
     expect((await runReminders(now)).created).toBe(0);
-    expect(await listNotifications(b.userId, at("2026-10-09T09:00:00"))).toEqual([]);
+    expect(await notes(b.userId, at("2026-10-09T09:00:00"))).toEqual([]);
 
     // The departure reminder comes the day before the return flight.
-    const dep = await listNotifications(b.userId, at("2026-10-15T09:00:00"));
+    const dep = await notes(b.userId, at("2026-10-15T09:00:00"));
     expect(dep.map((x) => x.kind)).toEqual(["departure"]);
     expect(dep[0].titleAr).toContain("موعد مغادرتك غدًا");
     expect(dep[0].linesAr.join("\n")).toMatch(/كن في المطار قبل الساعة \d\d:\d\d/);
@@ -96,7 +99,7 @@ describe("trip reminders", () => {
   it("warns travellers still in the country to leave before the visa expires", async () => {
     const b = await makeBooking("v1", { applicants: (await makeBooking("v1")).applicants.map((a) => ({ ...a, visaExpiryDate: "2026-10-20" })) });
     await saveBooking(b);
-    const n = await listNotifications(b.userId, at("2026-10-14T09:00:00"));
+    const n = await notes(b.userId, at("2026-10-14T09:00:00"));
     const visa = n.find((x) => x.kind === "visa7")!;
     expect(visa.titleEn).toContain("Your visa expires in 6 days");
     expect(visa.linesAr.join("\n")).toContain("يجب مغادرة المملكة");
@@ -109,7 +112,7 @@ describe("sample reminders (sandbox)", () => {
     const { seedDemoNotifications } = await import("@/lib/reminders/demo");
     const now = at("2026-09-26T09:00:00");
     await seedDemoNotifications("demo-user", now);
-    const list = await listNotifications("demo-user", now);
+    const list = await notes("demo-user", now);
     // Sample trip alerts (service 15): heat, today's programme and suggested events.
     const alerts = list.filter((n) => ["weather", "daily", "events"].includes(n.kind));
     expect(alerts.map((n) => n.kind).sort()).toEqual(["daily", "events", "weather"]);
@@ -127,6 +130,6 @@ describe("sample reminders (sandbox)", () => {
     expect(list[2].titleEn).toContain("Your visa expires in 7 days");
     for (const n of list) await deleteNotification("demo-user", n.id, now);
     await seedDemoNotifications("demo-user", now);
-    expect(await listNotifications("demo-user", now)).toEqual([]);
+    expect(await notes("demo-user", now)).toEqual([]);
   });
 });

@@ -24,6 +24,7 @@ import { listBookingsByUser, getUserById } from "../repo";
 import { listTableBookings } from "../restaurants/bookings";
 import { store } from "../store";
 import { listTrainOrders } from "../trains/orders";
+import { confirmedGuideTours } from "../guides/bookings";
 import { aiConfigured, askClaude } from "../assistant/claude";
 import type { AppNotification } from "../reminders/reminders";
 import { demoReviewableItems, demoReviewsEnabled } from "./demo";
@@ -122,6 +123,12 @@ async function experiences(user: Pick<StoredUser, "id">): Promise<ReviewableItem
     out.push({
       key: `restaurant:${r.restaurant.id}:${r.id}`, targetType: "restaurant", targetId: r.restaurant.id, nameAr: r.restaurant.nameAr, nameEn: r.restaurant.nameEn,
       sourceAr: `حجز طاولة ${r.reference}`, sourceEn: `Table ${r.reference}`, eligibleAt: addMinutes(r.start, 180),
+    });
+  }
+  for (const g of await confirmedGuideTours(user.id)) {
+    out.push({
+      key: `guide:${g.guide.licenseNo}:${g.id}`, targetType: "guide", targetId: g.guide.licenseNo, nameAr: g.guide.nameAr, nameEn: g.guide.nameEn,
+      sourceAr: `جولة ${g.reference}`, sourceEn: `Tour ${g.reference}`, eligibleAt: addMinutes(ksa(`${g.date}T${g.startTime}:00`), g.hours * 60),
     });
   }
   for (const o of await listTrainOrders(user.id)) if (o.status === "CONFIRMED") used("trains", o.createdAt);
@@ -364,7 +371,7 @@ export async function adminReply(id: string, text: string, now = new Date()) {
   return store().update<StoredReview>(COL, id, (r) => ({
     ...r,
     reply: clean
-      ? { text: clean, at: now.toISOString(), byAr: r.targetType === "service" ? "فريق سعودي تريب" : `إدارة ${r.targetNameAr}`, byEn: r.targetType === "service" ? "Saudi Trip team" : `${r.targetNameEn} management` }
+      ? { text: clean, at: now.toISOString(), byAr: r.targetType === "service" ? "فريق سعودي تريب" : r.targetType === "guide" ? r.targetNameAr : `إدارة ${r.targetNameAr}`, byEn: r.targetType === "service" ? "Saudi Trip team" : r.targetType === "guide" ? r.targetNameEn : `${r.targetNameEn} management` }
       : null,
   }));
 }
