@@ -15,6 +15,8 @@ export interface ModeInfo {
   link?: { url: string; labelAr: string; labelEn: string };
   /** Shows the "book train tickets" button. */
   trainBooking?: boolean;
+  /** Shows the "book bus tickets" button. */
+  busBooking?: boolean;
 }
 
 const RIDE_APPS: ModeInfo = {
@@ -61,9 +63,9 @@ export const INTERCITY: ModeInfo[] = [
     kind: "bus",
     titleAr: "الحافلات بين المدن",
     titleEn: "Intercity buses",
-    bodyAr: "تشغّل سابتكو وغيرها من الشركات المرخّصة رحلات حافلات منتظمة بين المدن.",
-    bodyEn: "SAPTCO and other licensed operators run scheduled bus services between cities.",
-    link: { url: "https://www.saptco.com.sa", labelAr: "موقع سابتكو", labelEn: "SAPTCO website" },
+    bodyAr: "تشغّل سابتكو وغيرها من الشركات المرخّصة رحلات حافلات منتظمة بين المدن، واحجز تذاكرها من هنا مع اختيار المقعد.",
+    bodyEn: "SAPTCO and other licensed operators run scheduled bus services between cities; book tickets and choose your seat right here.",
+    busBooking: true,
   },
   CAR_RENTAL,
 ];
