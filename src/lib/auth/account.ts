@@ -12,6 +12,8 @@ import { siteUrl } from "../site";
 import { store } from "../store";
 import type { Collection } from "../store/types";
 import { deleteWalletDocument, getWalletDoc } from "../wallet";
+import { onAccountDeleted } from "../family/family";
+import { revokeAllTripShares } from "../family/share";
 import { removeUserIdentities } from "./identities";
 import { hashPassword, verifyPassword } from "./password";
 import { linkVerifiedPhone } from "./signin";
@@ -372,7 +374,7 @@ export async function newRecovery(userId: string, code: unknown): Promise<string
 const USER_COLLECTIONS: Collection[] = [
   "bookings", "travellers", "wallet", "favorites", "eventOrders", "trainOrders", "restaurantBookings", "esimOrders", "chats", "tripPlans",
   "notifications", "reviews", "supportTickets", "alertPrefs", "loyalty", "guideBookings", "umrahPermits", "transfers", "rentals",
-  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions", "userIdentities",
+  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions", "userIdentities", "tripShares",
 ];
 const HIDDEN = /^(passwordHash|mfa|hash|secret|token|enc|file|key|deviceKey|providerToken|cardToken|gatewayToken)$/i;
 
@@ -423,6 +425,8 @@ export async function deleteAccount(userId: string, password: unknown, code: unk
   }
   await revokeAllSessions(userId);
   await removeUserIdentities(userId);
+  await onAccountDeleted(userId);
+  await revokeAllTripShares(userId);
   await store().delete("userEmails", u.email.toLowerCase());
   const email = u.email;
   await store().put<StoredUser>("users", u.id, {

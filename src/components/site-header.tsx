@@ -39,6 +39,7 @@ export function SiteHeader() {
         { href: `/${locale}/account/notifications`, label: t.account.notifications.nav },
         ...(user.accountType === "individual" ? [{ href: `/${locale}/account/loyalty`, label: t.loyalty.nav }] : []),
         { href: `/${locale}/account/reviews`, label: t.reviews.nav },
+        { href: `/${locale}/account/family`, label: t.family.nav },
         { href: `/${locale}/account/security`, label: t.security.nav },
         ...(user.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
       ]

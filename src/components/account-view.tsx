@@ -150,6 +150,13 @@ export function AccountView({ bookings, savedTravellers }: { bookings: BookingRo
             </Link>
           </Card>
           <Card className="p-5 sm:p-6">
+            <h2 className="flex items-center gap-2 font-bold"><UsersIcon className="size-5 text-brand-700" />{t.family.title}</h2>
+            <p className="mt-2 text-sm text-slate-500">{t.family.intro}</p>
+            <Link href={`/${locale}/account/family`} className="mt-4 inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50" data-testid="family-link">
+              {t.family.nav}
+            </Link>
+          </Card>
+          <Card className="p-5 sm:p-6">
             <h2 className="flex items-center gap-2 font-bold"><ShieldIcon className="size-5 text-brand-700" />{t.security.title}</h2>
             <p className="mt-2 text-sm text-slate-500">{t.security.intro}</p>
             <Link href={`/${locale}/account/security`} className="mt-4 inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50" data-testid="security-link">

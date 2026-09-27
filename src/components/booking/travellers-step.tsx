@@ -82,7 +82,8 @@ const CONTACT_FIELDS = new Set<string>(["email", "mobileNo", "zipCode"]);
  */
 function fromSaved(tr: Traveller, saved: SavedTraveller): Partial<Traveller> {
   const defaults = pickSavedData(emptyTraveller(tr.paxType, saved.nationality || tr.nationality));
-  const patch: Partial<Traveller> = { savedId: saved.id, saveToAccount: true };
+  // A family member's traveller is used as is; it is copied to the user's list only if they choose.
+  const patch: Partial<Traveller> = { savedId: saved.id, saveToAccount: !saved.id.startsWith("fam:") };
   for (const k of SAVED_FIELDS) (patch as Record<string, string>)[k] = saved[k] || (CONTACT_FIELDS.has(k) ? tr[k] : defaults[k]);
   return patch;
 }
@@ -107,7 +108,7 @@ function TravellersForms() {
   const [saveFailed, setSaveFailed] = useState(false);
   const { errors, composition, valid } = useTravellerValidation();
   const arrivalDate = useArrivalDate();
-  const saved = useSavedTravellers(true);
+  const saved = useSavedTravellers(true, true);
 
   // Images are not kept across page reloads; restore those of travellers picked from the account.
   const restored = useRef(false);
@@ -143,7 +144,7 @@ function TravellersForms() {
     for (const [i, tr] of booking.travellers.entries()) {
       if (!tr.saveToAccount) continue;
       try {
-        const res = await saveTraveller(pickSavedData(tr), tr.savedId);
+        const res = await saveTraveller(pickSavedData(tr), tr.savedId?.startsWith("fam:") ? null : tr.savedId);
         booking.updateTraveller(i, { savedId: res.id });
       } catch {
         ok = false;
@@ -256,7 +257,7 @@ function TravellersForms() {
               onChange={(e) => booking.updateTraveller(active, { saveToAccount: e.target.checked })}
             />
             <span>
-              {tr.savedId ? t.travellers.saved.saveUpdate : t.travellers.saved.saveNew}
+              {tr.savedId && !tr.savedId.startsWith("fam:") ? t.travellers.saved.saveUpdate : t.travellers.saved.saveNew}
               <span className="mt-1 block text-xs font-normal text-slate-500">{t.travellers.saved.saveNote}</span>
             </span>
           </label>
