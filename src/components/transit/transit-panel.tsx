@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
+import { cityName } from "@/lib/data/cities";
 import type { Place } from "@/lib/guide/types";
 import { METRO_LINES, type MetroLineId } from "@/lib/metro/types";
 import { TOPUP_AMOUNTS, type Arrival, type Journey, type TransitProduct, type TransitTicket } from "@/lib/transit/types";
 import { useApp } from "../app-provider";
 import { BusIcon, LocateIcon, TicketIcon, TrainIcon } from "../icons";
 import { MetroPanel } from "../metro/metro-panel";
-import { useMetro } from "../metro/use-metro";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
 import { CardFields, EMPTY_CARD, toCardInput, type CardDraft } from "./card-fields";
+import { useTransitOperators, useTransitStops } from "./use-transit";
 
 type Tab = "plan" | "live" | "tickets" | "map";
 type Pt = { name: string; nameAr?: string; lat: number; lng: number };
@@ -37,18 +38,23 @@ function useHere() {
 
 /** Riyadh public transport inside the platform: journeys, live departures, tickets, top-ups, map. */
 export function TransitPanel({ city = "RUH" }: { city?: string }) {
-  const { t } = useApp();
+  const { t, locale } = useApp();
   const x = t.transit;
+  const ops = useTransitOperators();
+  const op = ops?.find((o) => o.city === city);
   const [tab, setTab] = useState<Tab>("plan");
   const [product, setProduct] = useState<string | null>(null);
+  useEffect(() => setTab("plan"), [city]);
+  if (!op) return null;
+  const Icon = op.metro ? TrainIcon : BusIcon;
   return (
     <section className="space-y-3" data-testid="transit-panel">
       <div className="flex items-center gap-2">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><TrainIcon className="size-5" /></span>
-        <h2 className="text-lg font-bold">{x.title}</h2>
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><Icon className="size-5" /></span>
+        <h2 className="text-lg font-bold">{fmt(op.metro ? x.titleMetro : x.titleBus, { city: cityName(city, locale) })}</h2>
       </div>
       <div className="flex flex-wrap gap-2" role="tablist">
-        {TABS.map((k) => (
+        {TABS.filter((k) => k !== "map" || op.metro).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} data-testid={`transit-tab-${k}`}
             className={cx("h-9 rounded-full border px-4 text-sm font-semibold", tab === k ? "border-brand-700 bg-brand-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-brand-500")}>
             {x.tabs[k]}
@@ -57,13 +63,15 @@ export function TransitPanel({ city = "RUH" }: { city?: string }) {
       </div>
       {tab === "plan" && <JourneyPlanner city={city} onBuy={(p) => { setProduct(p); setTab("tickets"); }} />}
       {tab === "live" && <LiveDepartures city={city} />}
-      {tab === "tickets" && <TransitTickets city={city} preselect={product} />}
-      {tab === "map" && <MetroPanel />}
+      {tab === "tickets" && <TransitTickets city={city} preselect={product} topUp={op.topUp} />}
+      {tab === "map" && op.metro && <MetroPanel />}
     </section>
   );
 }
 
-function PlacePicker({ id, label, value, onChange, places, me }: { id: string; label: string; value: Pt | null; onChange: (p: Pt | null) => void; places: Place[]; me: ReturnType<typeof useHere> }) {
+type Choice = Pick<Place, "id" | "nameAr" | "nameEn" | "lat" | "lng">;
+
+function PlacePicker({ id, label, value, onChange, places, me }: { id: string; label: string; value: Pt | null; onChange: (p: Pt | null) => void; places: Choice[]; me: ReturnType<typeof useHere> }) {
   const { t, locale } = useApp();
   const x = t.transit;
   const ar = locale === "ar";
@@ -113,7 +121,9 @@ const errOf = (t: ReturnType<typeof useApp>["t"], code: string | undefined) => (
 export function JourneyPlanner({ city, onBuy }: { city: string; onBuy?: (productId: string) => void }) {
   const { t, locale } = useApp();
   const x = t.transit;
-  const places = usePlaces(city);
+  const guide = usePlaces(city);
+  const stops = useTransitStops(city);
+  const places = useMemo<Choice[]>(() => [...(stops ?? []).map((st) => ({ ...st, id: `stop:${st.id}` })), ...guide], [stops, guide]);
   const me = useHere();
   const [from, setFrom] = useState<Pt | null>(null);
   const [to, setTo] = useState<Pt | null>(null);
@@ -168,25 +178,22 @@ export function JourneyPlanner({ city, onBuy }: { city: string; onBuy?: (product
           ))}
         </ol>
       ))}
-      <SampleNote />
+      <SampleNote city={city} />
     </Card>
   );
 }
 
-function SampleNote() {
+function SampleNote({ city }: { city: string }) {
   const { t } = useApp();
-  const [sample, setSample] = useState(false);
-  useEffect(() => {
-    fetch("/api/transit/products?city=RUH").then((r) => (r.ok ? r.json() : null)).then((d) => setSample(!!d?.operator?.sandbox)).catch(() => undefined);
-  }, []);
-  return sample ? <p className="text-xs font-semibold text-amber-700" data-testid="transit-sample">{t.transit.sample}</p> : null;
+  const op = useTransitOperators()?.find((o) => o.city === city);
+  return op?.sandbox ? <p className="text-xs font-semibold text-amber-700" data-testid="transit-sample">{t.transit.sample}</p> : null;
 }
 
 export function LiveDepartures({ city }: { city: string }) {
   const { t, locale } = useApp();
   const x = t.transit;
   const ar = locale === "ar";
-  const net = useMetro();
+  const stops = useTransitStops(city);
   const me = useHere();
   const [at, setAt] = useState<Pt | null>(null);
   const [list, setList] = useState<Arrival[] | null>(null);
@@ -213,11 +220,11 @@ export function LiveDepartures({ city }: { city: string }) {
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" size="sm" onClick={() => me.locate(x.myLocation)} loading={me.busy} data-testid="live-locate"><LocateIcon className="size-4" />{x.myLocation}</Button>
         <Select aria-label={x.chooseStation} className="max-w-xs" value="" data-testid="live-station" onChange={(e) => {
-          const s = net?.stations.find((st) => st.id === e.target.value);
+          const s = stops?.find((st) => st.id === e.target.value);
           if (s) setAt({ name: s.nameEn, nameAr: s.nameAr, lat: s.lat, lng: s.lng });
         }}>
           <option value="">{x.chooseStation}</option>
-          {net?.stations.map((s) => <option key={s.id} value={s.id}>{ar ? s.nameAr : s.nameEn}</option>)}
+          {stops?.map((s) => <option key={s.id} value={s.id}>{ar ? s.nameAr : s.nameEn}</option>)}
         </Select>
         {at && <span className="text-sm font-semibold">{x.liveNear}: {nm(at, locale)}</span>}
         {at && <button type="button" className="text-xs font-semibold text-brand-700 hover:underline" onClick={() => void load(at)}>{x.refresh}</button>}
@@ -228,7 +235,7 @@ export function LiveDepartures({ city }: { city: string }) {
           {list.map((a, i) => (
             <li key={i} className="flex items-center gap-3 py-2.5" data-testid="arrival">
               <span className="inline-flex min-w-16 items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-bold text-white" style={{ background: a.color }}>
-                {a.mode === "metro" ? <TrainIcon className="size-3.5" /> : <BusIcon className="size-3.5" />}{a.mode === "metro" ? METRO_LINES[Number(a.line) as MetroLineId]?.[ar ? "nameAr" : "nameEn"] ?? a.line : a.line}
+                {a.mode === "metro" ? <TrainIcon className="size-3.5" /> : <BusIcon className="size-3.5" />}{a.mode === "metro" ? METRO_LINES[Number(a.line) as MetroLineId]?.[ar ? "nameAr" : "nameEn"] ?? a.line : (ar ? a.lineNameAr : a.lineNameEn)}
               </span>
               <div className="min-w-0 flex-1 text-sm">
                 <p className="font-semibold">{fmt(x.towards, { headsign: (ar ? a.headsignAr : null) ?? a.headsign })}</p>
@@ -239,14 +246,14 @@ export function LiveDepartures({ city }: { city: string }) {
           ))}
         </ul>
       ))}
-      <SampleNote />
+      <SampleNote city={city} />
     </Card>
   );
 }
 
 const validityText = (t: ReturnType<typeof useApp>["t"], mins: number) => (mins >= 1440 ? fmt(t.transit.days, { n: Math.round(mins / 1440) }) : fmt(t.transit.hours, { n: Math.round(mins / 60) }));
 
-export function TransitTickets({ city, preselect }: { city: string; preselect?: string | null }) {
+export function TransitTickets({ city, preselect, topUp = true }: { city: string; preselect?: string | null; topUp?: boolean }) {
   const { t, locale, money, user } = useApp();
   const x = t.transit;
   const ar = locale === "ar";
@@ -296,7 +303,7 @@ export function TransitTickets({ city, preselect }: { city: string; preselect?: 
           ))}
         </div>
         {!user ? (
-          <Link href={`/${locale}/login?next=/${locale}/transport?city=RUH`} className="inline-flex h-11 items-center rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white">{x.signIn}</Link>
+          <Link href={`/${locale}/login?next=/${locale}/transport?city=${city}`} className="inline-flex h-11 items-center rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white">{x.signIn}</Link>
         ) : product && (
           <>
             <div className="flex flex-wrap items-end gap-4">
@@ -330,7 +337,7 @@ export function TransitTickets({ city, preselect }: { city: string; preselect?: 
             )}
           </Card>
         )}
-        {user && <TopUpCard city={city} />}
+        {user && topUp && <TopUpCard city={city} />}
       </div>
     </div>
   );

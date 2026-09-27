@@ -1,6 +1,9 @@
 /** Public transport (metro & buses): shared types (client-safe). */
 export type TransitMode = "walk" | "metro" | "bus";
 
+export interface TransitStop { id: string; nameAr: string; nameEn: string; lat: number; lng: number }
+export interface TransitLine { id: string; nameAr: string; nameEn: string; color: string; stops: TransitStop[] }
+
 export interface TransitPlace { name: string; nameAr?: string; lat: number; lng: number }
 
 export interface JourneyLeg {

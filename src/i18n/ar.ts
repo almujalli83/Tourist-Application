@@ -1385,6 +1385,13 @@ const ar = {
     },
   },
   transit: {
+    titleMetro: "المترو والحافلات في {city}",
+    titleBus: "الحافلات في {city}",
+    busLeg: "بالحافلة {line} نحو {mins} دقيقة: من {from} إلى {to}",
+    umrahBus: "الحافلة إلى المسجد الحرام",
+    umrahBusIntro: "الحافلات القادمة من أقرب موقف إلى {place}",
+    umrahBuy: "اشترِ تذكرة حافلة",
+    umrahPlan: "عرض رحلات الحافلات",
     title: "المترو والحافلات في الرياض",
     tabs: { plan: "خطط رحلتك", live: "المواعيد المباشرة", tickets: "التذاكر", map: "الخريطة" },
     from: "من",

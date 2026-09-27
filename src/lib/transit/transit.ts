@@ -8,7 +8,7 @@ import type { PublicUser } from "../auth/types";
 import { notifyTravellers } from "../notify";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import { store } from "../store";
-import { TransitProviderError, transitProvider, type TransitProvider } from "./provider";
+import { transitCities, TransitProviderError, transitProvider, type TransitLine, type TransitProvider, type TransitStop } from "./provider";
 import { TOPUP_AMOUNTS, type Arrival, type Journey, type TopUp, type TransitPlace, type TransitProduct, type TransitTicket } from "./types";
 
 export class TransitError extends Error {
@@ -64,10 +64,34 @@ export async function liveArrivals(city: string, at: { lat?: unknown; lng?: unkn
   }
 }
 
-export async function listProducts(city: string): Promise<{ products: TransitProduct[]; operator: { nameAr: string; nameEn: string; sandbox: boolean } }> {
+export interface OperatorInfo { city: string; nameAr: string; nameEn: string; sandbox: boolean; metro: boolean; topUp: boolean }
+const info = (p: TransitProvider): OperatorInfo => ({ city: p.city, nameAr: p.nameAr, nameEn: p.nameEn, sandbox: p.sandbox, ...p.features });
+
+/** Cities with public transport in the platform. */
+export const transitOperators = (): OperatorInfo[] => transitCities().map((c) => transitProvider(c)).filter((p): p is TransitProvider => !!p).map(info);
+
+export async function transitStops(city: string): Promise<TransitStop[]> {
+  try {
+    return await operator(city).stops();
+  } catch (e) {
+    if (e instanceof TransitError) throw e;
+    throw new TransitError("operatorUnavailable", 502);
+  }
+}
+
+export async function transitLines(city: string): Promise<TransitLine[]> {
+  try {
+    return (await operator(city).lines()) ?? [];
+  } catch (e) {
+    if (e instanceof TransitError) throw e;
+    return [];
+  }
+}
+
+export async function listProducts(city: string): Promise<{ products: TransitProduct[]; operator: OperatorInfo }> {
   const p = operator(city);
   try {
-    return { products: await p.products(), operator: { nameAr: p.nameAr, nameEn: p.nameEn, sandbox: p.sandbox } };
+    return { products: await p.products(), operator: info(p) };
   } catch {
     throw new TransitError("operatorUnavailable", 502);
   }
@@ -150,6 +174,7 @@ export async function activateTicket(userId: string, id: string, now = new Date(
 export async function topUpCard(user: PublicUser, input: { city?: string; cardNo?: string; amountSAR?: number; card?: CardInput }, now = new Date()): Promise<TopUp> {
   const city = String(input.city ?? "").toUpperCase();
   const p = operator(city);
+  if (!p.features.topUp) throw new TransitError("noTopUp", 409);
   const cardNo = String(input.cardNo ?? "").replace(/\s/g, "");
   if (!/^\d{8,20}$/.test(cardNo)) throw new TransitError("invalidCardNo");
   const amount = Number(input.amountSAR);
