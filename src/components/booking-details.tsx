@@ -13,6 +13,7 @@ import { ChatIcon, CheckIcon, RefreshIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "./ui";
 import { packageRide, packageRideInfo } from "@/lib/transport/booking-rides";
 import { BookingRide } from "./transport/booking-ride";
+import { HotelMetro } from "./metro/metro-panel";
 import { TransfersSection } from "./transfers/transfers-section";
 import { OrderPoints } from "./loyalty/points-redeemer";
 
@@ -227,6 +228,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
             <li key={h.id} className="flex flex-wrap justify-between gap-2">
               <span>🏨 {locale === "ar" ? h.nameAr : h.nameEn} — {cityName(h.city, locale)} <span className="ltr-nums text-slate-500">({h.checkIn} → {h.checkOut})</span></span>
               <span className="text-xs text-gold-700">{locale === "ar" ? h.agentNameAr : h.agentNameEn}</span>
+              <HotelMetro hotel={h} />
             </li>
           ))}
         </ul>

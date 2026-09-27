@@ -32,6 +32,8 @@ export interface MapPoint {
   label: string;
   /** Short text shown on the pin (e.g. the order of a visit in a day plan). */
   badge?: string;
+  /** Pin colour instead of the category's (e.g. a metro line). */
+  color?: string;
 }
 
 const TILE_URL = process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -108,7 +110,7 @@ export function GuideMap({ points, selectedId, onSelect, center, fitKey, userLoc
     for (const p of points) {
       const selected = p.id === selectedId;
       const size = selected ? 30 : 22;
-      const icon = Lf.divIcon({ className: "guide-pin", html: pin(CATEGORY_COLORS[p.category], selected, p.badge), iconSize: [size, size], iconAnchor: [size / 2, size] });
+      const icon = Lf.divIcon({ className: "guide-pin", html: pin(p.color ?? CATEGORY_COLORS[p.category], selected, p.badge), iconSize: [size, size], iconAnchor: [size / 2, size] });
       const mk = Lf.marker([p.lat, p.lng], { icon, title: p.label, alt: p.label, keyboard: true, zIndexOffset: selected ? 1000 : 0 });
       mk.bindTooltip(p.label, { direction: "top", offset: [0, -size] });
       mk.on("click", () => handlers.current.onSelect?.(p.id));
