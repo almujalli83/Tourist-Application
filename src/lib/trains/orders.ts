@@ -110,7 +110,7 @@ export interface PassengerInput {
 
 const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.iso2));
 
-async function resolvePassenger(userId: string, p: PassengerInput): Promise<{ nameEn: string; nationality: string; passportNo: string; type: PassengerType }> {
+export async function resolvePassenger(userId: string, p: PassengerInput): Promise<{ nameEn: string; nationality: string; passportNo: string; type: PassengerType }> {
   if (p.type !== "adult" && p.type !== "child") throw new TrainOrderError("invalidPassenger");
   if (p.ref?.startsWith("saved:")) {
     const s = await getSavedTraveller(userId, p.ref.slice(6));

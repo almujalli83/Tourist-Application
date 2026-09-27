@@ -2,7 +2,7 @@
  * Minimal document store used by the repositories. Two implementations:
  * PostgreSQL (production, e.g. Vercel + Neon) and a local JSON file (development).
  */
-export type Collection = "users" | "userEmails" | "bookings" | "sandboxPackages" | "config" | "travellers" | "outbox" | "wallet" | "files" | "places" | "favorites" | "seasons" | "eventOrders" | "eventSeats" | "trainOrders" | "trainSeats" | "restaurantBookings" | "restaurantSlots" | "esimOrders" | "chats" | "aiUsage" | "tripPlans" | "notifications" | "reviews" | "supportTickets" | "alertPrefs" | "loyalty" | "loyaltyCampaigns" | "guides" | "guideBookings" | "umrahPermits" | "transfers" | "rentals" | "transitOrders" | "transitTickets" | "transitTopups" | "rides";
+export type Collection = "users" | "userEmails" | "bookings" | "sandboxPackages" | "config" | "travellers" | "outbox" | "wallet" | "files" | "places" | "favorites" | "seasons" | "eventOrders" | "eventSeats" | "trainOrders" | "trainSeats" | "restaurantBookings" | "restaurantSlots" | "esimOrders" | "chats" | "aiUsage" | "tripPlans" | "notifications" | "reviews" | "supportTickets" | "alertPrefs" | "loyalty" | "loyaltyCampaigns" | "guides" | "guideBookings" | "umrahPermits" | "transfers" | "rentals" | "transitOrders" | "transitTickets" | "transitTopups" | "rides" | "busOrders" | "busSeats";
 
 export interface DocStore {
   get<T>(col: Collection, id: string): Promise<T | null>;

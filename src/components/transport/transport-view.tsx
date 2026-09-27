@@ -112,11 +112,16 @@ function ModeCard({ m }: { m: ModeInfo }) {
           {tips.map((tip, i) => <li key={i} className="flex gap-2"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-gold-500" />{tip}</li>)}
         </ul>
       )}
-      {(m.link || m.trainBooking) && (
+      {(m.link || m.trainBooking || m.busBooking) && (
         <div className="mt-auto flex flex-wrap items-center gap-3 pt-4">
           {m.trainBooking && (
             <Link href={`/${locale}/trains`} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800">
               <TicketIcon className="size-4" />{tr.bookTrain}
+            </Link>
+          )}
+          {m.busBooking && (
+            <Link href={`/${locale}/buses`} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800" data-testid="book-bus">
+              <BusIcon className="size-4" />{t.buses.book}
             </Link>
           )}
           {m.link && (
