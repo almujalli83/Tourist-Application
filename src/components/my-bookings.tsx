@@ -254,6 +254,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
           {upcoming.length > 0 && (
             <section>
               <p className="px-5 pt-4 text-sm font-bold text-slate-700">{m.upcoming}</p>
+              {upcoming.some((e) => !e.item.ride) && <p className="px-5 pt-1 text-xs text-slate-500" data-testid="ride-hint">{m.rideHint}</p>}
               {list(upcoming)}
             </section>
           )}
