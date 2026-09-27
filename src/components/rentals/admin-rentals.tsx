@@ -5,6 +5,7 @@ import { fmt } from "@/i18n";
 import type { LicenceRule, LicenceRules } from "@/lib/rentals/licence";
 import { useApp } from "../app-provider";
 import { Alert, Button, Card, Field, Input, Spinner, Textarea } from "../ui";
+import { AdminCompanies } from "./admin-companies";
 
 type Draft = { id: string; countries: string; titleAr: string; titleEn: string; reqAr: string; reqEn: string };
 const toDraft = (r: LicenceRule): Draft => ({ id: r.id, countries: r.countries.join(", "), titleAr: r.titleAr, titleEn: r.titleEn, reqAr: r.requirementsAr.join("\n"), reqEn: r.requirementsEn.join("\n") });
@@ -48,8 +49,11 @@ export function AdminRentals() {
   }
   return (
     <div className="space-y-5" data-testid="admin-rentals">
+      <h1 className="text-2xl font-bold">{a.nav}</h1>
+      <AdminCompanies />
+      <hr className="border-slate-200" />
       <div>
-        <h1 className="text-2xl font-bold">{a.title}</h1>
+        <h2 className="text-xl font-bold">{a.title}</h2>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">{a.intro}</p>
         <p className="mt-2 text-sm font-semibold" data-testid="admin-rentals-reviewed">
           {data.reviewedAt ? fmt(a.reviewedAt, { date: new Date(data.reviewedAt).toLocaleDateString(locale), by: data.reviewedBy ?? "" }) : <span className="text-amber-700">{a.notReviewed}</span>}

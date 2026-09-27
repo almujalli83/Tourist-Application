@@ -14,6 +14,7 @@ import type { AppNotification } from "../reminders/reminders";
 import { getUserById, listBookingsByUser } from "../repo";
 import { store } from "../store";
 import { AIRPORTS } from "../transport/rides";
+import { listCompanies } from "./companies";
 import { getLicenceRules, ruleFor, type LicenceRule } from "./licence";
 import { RentalProviderError, rentalProviderById, rentalProvidersFor } from "./providers";
 import { CAR_CLASSES, RENTAL_EXTRAS, rentalDays, type PublicRental, type RentalExtra, type RentalQuery, type RentalQuote } from "./types";
@@ -77,19 +78,26 @@ export function rentalPlansFromBooking(b: StoredBooking): RentalQuery[] {
 }
 
 async function collectQuotes(q: RentalQuery): Promise<RentalQuote[]> {
-  const providers = rentalProvidersFor(q.city);
+  const providers = await rentalProvidersFor(q.city);
   if (!providers.length) throw new RentalError("noProvider", 409);
   const all = await Promise.all(providers.map((p) => p.quote(q).catch(() => [] as RentalQuote[])));
-  return all.flat().sort((a, b) => CAR_CLASSES.indexOf(a.carClass) - CAR_CLASSES.indexOf(b.carClass) || a.totalSAR - b.totalSAR);
+  return all.flat().sort((a, b) => a.totalSAR - b.totalSAR || CAR_CLASSES.indexOf(a.carClass) - CAR_CLASSES.indexOf(b.carClass));
 }
 
-export interface RentalOptions { query: RentalQuery; quotes: RentalQuote[]; licence: LicenceRule | null; reviewed: boolean; sourceUrl: string }
+/** How a company is shown: its name, colour and logo (when uploaded). */
+export interface CompanyBrand { id: string; nameAr: string; nameEn: string; color: string; logo: string | null }
+
+export async function companyBrands(): Promise<CompanyBrand[]> {
+  return (await listCompanies()).map((c) => ({ id: c.id, nameAr: c.nameAr, nameEn: c.nameEn, color: c.color, logo: c.logo ? `/api/rentals/logo/${c.id}?v=${c.logoVersion}` : null }));
+}
+
+export interface RentalOptions { query: RentalQuery; quotes: RentalQuote[]; companies: CompanyBrand[]; licence: LicenceRule | null; reviewed: boolean; sourceUrl: string }
 
 /** Cars and prices from the companies, with the licence requirements for the driver. */
 export async function rentalOptions(input: Partial<RentalQuery>, now = new Date()): Promise<RentalOptions> {
   const query = validateQuery(input, now);
-  const [quotes, rules] = await Promise.all([collectQuotes(query), getLicenceRules()]);
-  return { query, quotes, licence: ruleFor(rules, query.licenceCountry), reviewed: !!rules.reviewedAt, sourceUrl: rules.sourceUrl };
+  const [quotes, rules, brands] = await Promise.all([collectQuotes(query), getLicenceRules(), companyBrands()]);
+  return { query, quotes, companies: brands.filter((b) => quotes.some((q) => q.providerId === b.id)), licence: ruleFor(rules, query.licenceCountry), reviewed: !!rules.reviewedAt, sourceUrl: rules.sourceUrl };
 }
 
 export interface RentalRequestInput extends Partial<RentalQuery> { bookingId?: string; providerId: string; quoteId: string; extras?: string[]; driverName?: string; phone?: string; acceptLicence?: boolean }
@@ -116,8 +124,8 @@ export async function requestRental(user: PublicUser, input: RentalRequestInput,
   const from = ksaMs(query.pickupAt);
   const to = ksaMs(query.returnAt);
   if (mine.some((r) => (r.status === "requested" || r.status === "confirmed") && ksaMs(r.pickupAt) < to && ksaMs(r.returnAt) > from)) throw new RentalError("overlap", 409);
-  const provider = rentalProviderById(String(input.providerId ?? ""));
-  if (!provider || !(provider.sandbox ? rentalProvidersFor(query.city).some((p) => p.id === provider.id) : provider.cities.includes(query.city))) throw new RentalError("noProvider", 409);
+  const provider = (await rentalProvidersFor(query.city)).find((p) => p.id === String(input.providerId ?? ""));
+  if (!provider) throw new RentalError("noProvider", 409);
   let quote: RentalQuote | undefined;
   try {
     quote = (await provider.quote(query)).find((q) => q.quoteId === input.quoteId);
@@ -169,7 +177,7 @@ async function refresh(r: Stored, now: Date): Promise<Stored> {
   if (ksaMs(r.returnAt) + 6 * 3_600_000 < now.getTime()) {
     return (await store().update<Stored>(COL, r.id, (x) => ({ ...x, status: "completed", updatedAt: now.toISOString() })))!;
   }
-  const provider = rentalProviderById(r.providerId);
+  const provider = await rentalProviderById(r.providerId);
   if (!provider) return r;
   let s;
   try {
@@ -221,7 +229,7 @@ export async function cancelRental(userId: string, id: string, now = new Date(),
   if (r.status !== "requested" && r.status !== "confirmed") throw new RentalError("notCancellable", 409);
   if (reason === "traveller" && now.getTime() > ksaMs(r.pickupAt) - r.freeCancelHours * 3_600_000) throw new RentalError("tooLateToCancel", 409);
   try {
-    await rentalProviderById(r.providerId)?.cancel(r.providerRef);
+    await (await rentalProviderById(r.providerId))?.cancel(r.providerRef);
   } catch (e) {
     if (!(e instanceof RentalProviderError && e.code === "rejected")) throw new RentalError("providerUnavailable", 502);
   }
