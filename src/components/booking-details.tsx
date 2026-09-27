@@ -8,6 +8,7 @@ import type { BookingModification, StoredBooking } from "@/lib/bookings/types";
 import { cityName } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import { useApp } from "./app-provider";
+import { ReceiptLink } from "./payments/receipt-link";
 import { BackLink } from "./back-link";
 import { ChatIcon, CheckIcon, RefreshIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "./ui";
@@ -174,6 +175,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
           <p className="text-xs text-slate-500">{t.confirmation.paid}</p>
           <p className="ltr-nums text-lg font-bold">{money(booking.payment.amountSAR)}</p>
           <p className="ltr-nums text-xs text-slate-500">{booking.payment.method.toUpperCase()} •••• {booking.payment.last4}</p>
+          <ReceiptLink transactionId={booking.payment.transactionId} className="mt-1" />
         </div>
         {booking.loyalty && <OrderPoints loyalty={booking.loyalty} totalSAR={booking.price.totalSAR} className="sm:col-span-full" />}
       </Card>

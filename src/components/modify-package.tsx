@@ -4,15 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
-import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import type { Eligibility, ModificationQuote } from "@/lib/bookings/modify";
 import type { StoredBooking, TransportMode } from "@/lib/bookings/types";
 import { cityName, SAUDI_CITIES } from "@/lib/data/cities";
 import { addDays } from "@/lib/dates";
 import type { FlightOffer, HotelOffer } from "@/lib/types";
 import { useApp } from "./app-provider";
+import { Checkout, type PaymentRef } from "./payments/checkout";
 import { BackLink } from "./back-link";
-import { CardIcon, HotelIcon, LockIcon, PlaneIcon } from "./icons";
+import { CardIcon, HotelIcon, PlaneIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Field, Input, SectionTitle, Select, Spinner, Stars } from "./ui";
 
 type Kind = "extend" | "shorten";
@@ -64,7 +64,6 @@ export function ModifyPackage({ id }: { id: string }) {
   const [domesticId, setDomesticId] = useState<string | null>(null);
   const [returnId, setReturnId] = useState<string | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [submitting, setSubmitting] = useState(false);
   // One key per priced change: resending the same request (double click, network retry) applies it once.
   const idempotencyKey = useMemo(() => (quote ? crypto.randomUUID() : ""), [quote]);
@@ -155,12 +154,10 @@ export function ModifyPackage({ id }: { id: string }) {
     };
   }, [plan, id]);
 
-  async function apply(e: React.FormEvent) {
-    e.preventDefault();
-    if (!plan || !quote) return;
+  async function apply(payment: PaymentRef | undefined): Promise<boolean> {
+    if (!plan || !quote) return false;
     setSubmitting(true);
     setError(null);
-    const { expMonth, expYear } = parseExpiry(card.exp);
     try {
       const res = await fetch(`/api/bookings/${id}/modify`, {
         method: "POST",
@@ -171,15 +168,17 @@ export function ModifyPackage({ id }: { id: string }) {
           expectedRefundSAR: quote.refundSAR,
           bookingVersion: quote.bookingVersion,
           idempotencyKey,
-          card: quote.chargeSAR > 0 ? { holder: card.holder, number: card.number, expMonth, expYear, cvc: card.cvc } : undefined,
+          card: quote.chargeSAR > 0 ? payment : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "generic");
       router.push(`/${locale}/account/bookings/${id}?updated=1`);
+      return true;
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);
+      return false;
     }
   }
 
@@ -337,7 +336,7 @@ export function ModifyPackage({ id }: { id: string }) {
           {plan && !quote && !error && <div className="flex items-center gap-3 text-brand-700"><Spinner className="size-5" />{t.common.loading}</div>}
 
           {quote && (
-            <form onSubmit={apply}>
+            <div>
               <Card className="p-5 sm:p-6">
                 <SectionTitle title={m.summary} icon={<CardIcon className="size-5" />} subtitle={fmt(m.newDuration, { n: quote.newDurationDays })} />
                 <ul className="mt-4 divide-y divide-slate-100 text-sm">
@@ -367,31 +366,12 @@ export function ModifyPackage({ id }: { id: string }) {
                 </div>
                 {quote.refundSAR > 0 && <p className="mt-2 text-xs text-slate-500">{m.refundNote}</p>}
 
-                {quote.chargeSAR > 0 && (
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <Field label={t.review.cardHolder} required className="sm:col-span-2">
-                      <Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required />
-                    </Field>
-                    <Field label={t.review.cardNumber} required className="sm:col-span-2">
-                      <Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number}
-                        onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required />
-                    </Field>
-                    <Field label={t.review.expiry} required>
-                      <Input dir="ltr" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={card.exp}
-                        onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required />
-                    </Field>
-                    <Field label={t.review.cvc} required>
-                      <Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc}
-                        onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required />
-                    </Field>
-                  </div>
-                )}
-                <Button type="submit" size="lg" variant="gold" className="mt-5 w-full" loading={submitting}>
-                  <LockIcon className="size-5" />
-                  {submitting ? m.applying : quote.chargeSAR > 0 ? fmt(m.confirmPay, { amount: money(quote.chargeSAR) }) : m.confirm}
-                </Button>
+                <div className="mt-5">
+                  <Checkout amountSAR={quote.chargeSAR} description={`Package change ${booking.reference}`} disabled={submitting}
+                    label={submitting ? m.applying : quote.chargeSAR > 0 ? fmt(m.confirmPay, { amount: money(quote.chargeSAR) }) : m.confirm} onPay={apply} testId="modify-checkout" />
+                </div>
               </Card>
-            </form>
+            </div>
           )}
         </div>
       )}

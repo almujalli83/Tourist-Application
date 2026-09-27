@@ -4,16 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmt } from "@/i18n";
-import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import { SAUDI_CITIES } from "@/lib/data/cities";
 import { fmtKsa, ksaDay } from "@/lib/events/format";
 import type { SeatSection } from "@/lib/events/types";
 import { useApp } from "../app-provider";
+import { Checkout, type PaymentRef } from "../payments/checkout";
 import { RatingBadge, ReviewsSection, useSummaries } from "../reviews/shared";
 import { BackLink } from "../back-link";
-import { CalendarIcon, ClockIcon, LockIcon, MapPinIcon, TicketIcon } from "../icons";
+import { CalendarIcon, ClockIcon, MapPinIcon, TicketIcon } from "../icons";
 import { afterPoints, loyaltyError, PointsRedeemer } from "../loyalty/points-redeemer";
-import { Alert, Badge, Button, Card, cx, Field, Input, Spinner } from "../ui";
+import { Alert, Badge, Card, cx, Spinner } from "../ui";
 import { RideMenu } from "../transport/ride-menu";
 import { EVENT_COLORS, type EventSummary } from "./events-view";
 
@@ -36,7 +36,6 @@ export function EventDetail({ id }: { id: string }) {
   const [avail, setAvail] = useState<Availability | null>(null);
   const [seats, setSeats] = useState<string[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
-  const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [paying, setPaying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const verified = useSummaries("event", [id])[id];
@@ -120,19 +119,17 @@ export function EventDetail({ id }: { id: string }) {
     });
   }
 
-  async function pay(e: React.FormEvent) {
-    e.preventDefault();
-    if (!session || !count) return;
+  async function pay(payment: PaymentRef | undefined): Promise<boolean> {
+    if (!session || !count) return false;
     setPaying(true);
     setErr(null);
     try {
-      const { expMonth, expYear } = parseExpiry(card.exp);
       const res = await fetch("/api/events/orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           eventId: event!.id, sessionId: session.id, seats, quantities: qty, expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency, redeemPoints: points || undefined,
-          card: restSAR > 0 ? { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } : undefined,
+          card: restSAR > 0 ? payment : undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -143,9 +140,10 @@ export function EventDetail({ id }: { id: string }) {
           const a = await loadAvailability(session.id);
           if (a) setSeats((cur) => cur.filter((s) => !a.unavailable.includes(s)));
         }
-        return;
+        return false;
       }
       router.push(`/${locale}/account/tickets/${body.order.id}?new=1`);
+      return true;
     } finally {
       setPaying(false);
     }
@@ -278,33 +276,12 @@ export function EventDetail({ id }: { id: string }) {
                 <Link href={`/${locale}/login?next=${encodeURIComponent(`/${locale}/events/${event.id}`)}`} className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800">{d.login}</Link>
               </div>
             ) : (
-              <form onSubmit={pay} className="mt-4 space-y-3">
+              <div className="mt-4 space-y-3">
                 {total > 0 && <PointsRedeemer service="event" totalSAR={total} cities={[event.city]} value={points} onChange={setPoints} />}
-                {restSAR > 0 && (
-                  <>
-                <Field label={t.review.cardHolder} required>
-                  <Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required />
-                </Field>
-                <Field label={t.review.cardNumber} required>
-                  <Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number}
-                    onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required />
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label={t.review.expiry} required>
-                    <Input dir="ltr" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={card.exp} onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required />
-                  </Field>
-                  <Field label={t.review.cvc} required>
-                    <Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required />
-                  </Field>
-                </div>
-                <p className="text-xs text-slate-500">{t.review.testCards}</p>
-                  </>
-                )}
-                <Button type="submit" variant="gold" size="lg" className="w-full" loading={paying} disabled={!count || !session}>
-                  <LockIcon className="size-5" />{paying ? d.paying : (restSAR > 0 ? fmt(d.pay, { amount: money(restSAR) }) : t.loyalty.checkout.payWithPoints)}
-                </Button>
+                <Checkout amountSAR={restSAR} description={`${event.titleEn} × ${count}`} disabled={!count || !session || paying}
+                  label={paying ? d.paying : (restSAR > 0 ? fmt(d.pay, { amount: money(restSAR) }) : t.loyalty.checkout.payWithPoints)} onPay={pay} testId="event-checkout" />
                 <p className="text-xs text-slate-500">{d.holderNote}</p>
-              </form>
+              </div>
             )}
           </Card>
         </div>

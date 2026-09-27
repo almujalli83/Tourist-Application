@@ -6,6 +6,7 @@ import { cityName } from "@/lib/data/cities";
 import { fmtKsa } from "@/lib/events/format";
 import type { BusOrder } from "@/lib/buses/types";
 import { useApp } from "../app-provider";
+import { ReceiptLink } from "../payments/receipt-link";
 import { BackLink } from "../back-link";
 import { BusIcon } from "../icons";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
@@ -45,6 +46,7 @@ export function BusTicketView({ id }: { id: string }) {
         <p className="font-semibold">{locale === "ar" ? o.providerNameAr : o.providerNameEn} · {o.trip.tripNo} · {b.classes[o.trip.cls]}</p>
         <p className="mt-1">{cityName(o.trip.from, locale)} <span dir="ltr">{when(o.trip.depart)}</span> {locale === "ar" ? "←" : "→"} {cityName(o.trip.to, locale)} <span dir="ltr">{when(o.trip.arrive)}</span></p>
         <p className="mt-1 text-slate-600">{b.total}: <span className="ltr-nums font-bold">{money(o.totalSAR)}</span></p>
+        <ReceiptLink transactionId={o.payment.transactionId} className="mt-1" />
         {o.cancellation && <p className="mt-2 font-semibold text-red-700" data-testid="bus-refund">{fmt(b.cancelled, { amount: money(o.cancellation.refundSAR) })}</p>}
       </Card>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

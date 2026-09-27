@@ -1,17 +1,23 @@
 /**
- * Payment gateway adapter. The sandbox gateway validates card data and approves
- * test cards; a live PSP (e.g. mada / Visa / Mastercard / Apple Pay acquirer) plugs in here.
+ * Charging and refunding orders. Orders pay with a payment intent authorized in the browser
+ * (lib/payments: card with 3-D Secure, saved card, Apple Pay, Google Pay, STC Pay) — `{ paymentId }` —
+ * settled here for exactly the order's amount. A raw card is accepted by the sandbox only (tests
+ * and older clients); with a live gateway, cards are tokenized in the browser.
  * Card data is never stored — only the last 4 digits and the transaction id.
  */
 import { randomUUID } from "node:crypto";
 
-export interface CardInput {
+export interface RawCard {
   holder: string;
   number: string;
   expMonth: string;
   expYear: string;
   cvc: string;
 }
+/** An authorized payment intent (see lib/payments/intents). */
+export interface IntentRef { paymentId: string }
+export type CardInput = RawCard | IntentRef;
+const isIntent = (c: CardInput): c is IntentRef => typeof (c as IntentRef).paymentId === "string";
 
 export type PaymentResult =
   | { ok: true; transactionId: string; method: string; last4: string }
@@ -39,7 +45,15 @@ export function cardBrand(num: string): string {
   return "card";
 }
 
-export async function chargeCard(card: CardInput, amountSAR: number, now = new Date()): Promise<PaymentResult> {
+export async function chargeCard(input: CardInput, amountSAR: number, now = new Date()): Promise<PaymentResult> {
+  if (!input) return { ok: false, code: "invalid_card" };
+  if (isIntent(input)) {
+    const { settleIntent } = await import("./payments/intents");
+    return settleIntent(input.paymentId, amountSAR, now);
+  }
+  const { gatewayConfig } = await import("./payments/gateway");
+  if (gatewayConfig()) return { ok: false, code: "invalid_card" }; // live: cards go through the checkout (3-D Secure)
+  const card = input;
   const num = card.number.replace(/\D/g, "");
   if (!luhn(num) || !/^\d{3,4}$/.test(card.cvc) || !card.holder.trim() || !(amountSAR > 0))
     return { ok: false, code: "invalid_card" };
@@ -66,5 +80,12 @@ export type RefundResult = { ok: true; refundId: string } | { ok: false; code: "
 /** Refunds part of a captured payment to the original card (sandbox: always approved). */
 export async function refundPayment(transactionId: string, amountSAR: number): Promise<RefundResult> {
   if (!transactionId || !(amountSAR > 0)) return { ok: false, code: "invalid_amount" };
+  const { refundIntent } = await import("./payments/intents");
+  try {
+    const r = await refundIntent(transactionId, amountSAR);
+    if (r) return { ok: true, refundId: r.refundId };
+  } catch {
+    return { ok: false, code: "invalid_amount" };
+  }
   return { ok: true, refundId: `RFD-${randomUUID()}` };
 }

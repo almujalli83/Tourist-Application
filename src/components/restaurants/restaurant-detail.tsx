@@ -4,16 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { fmt } from "@/i18n";
-import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import { SAUDI_CITIES } from "@/lib/data/cities";
 import { fmtDay, ksaDay } from "@/lib/events/format";
 import { directionsLinks } from "@/lib/guide/geo";
 import { isOpenNow } from "@/lib/guide/hours";
 import type { Restaurant } from "@/lib/restaurants/catalog";
 import { useApp } from "../app-provider";
+import { Checkout, type PaymentRef } from "../payments/checkout";
 import { BackLink } from "../back-link";
-import { ClockIcon, DirectionsIcon, LockIcon, MapPinIcon } from "../icons";
-import { Alert, Badge, Button, Card, Field, Input, Spinner } from "../ui";
+import { ClockIcon, DirectionsIcon, MapPinIcon } from "../icons";
+import { Alert, Badge, Card, Spinner } from "../ui";
 import { priceSigns, SlotPicker, Stars } from "./shared";
 import { RideMenu } from "../transport/ride-menu";
 import { RatingBadge, ReviewsSection, useSummaries } from "../reviews/shared";
@@ -33,7 +33,6 @@ export function RestaurantDetail({ id }: { id: string }) {
   const [day, setDay] = useState(() => ksaDay(new Date()));
   const [party, setParty] = useState(2);
   const [time, setTime] = useState<string | null>(null);
-  const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const key = useRef(newKey());
@@ -66,22 +65,20 @@ export function RestaurantDetail({ id }: { id: string }) {
   const open = isOpenNow(r, new Date());
   const links = directionsLinks(r);
 
-  async function book(e: React.FormEvent) {
-    e.preventDefault();
+  async function book(payment: PaymentRef | undefined): Promise<boolean> {
     if (!time) {
       setErr(d.chooseTime);
-      return;
+      return false;
     }
     setBusy(true);
     setErr(null);
     try {
-      const { expMonth, expYear } = parseExpiry(card.exp);
       const res = await fetch("/api/restaurants/bookings", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           restaurantId: r!.id, day, time, party, expectedFeeSAR: fee, idempotencyKey: key.current,
-          card: fee > 0 ? { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } : undefined,
+          card: fee > 0 ? payment : undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -89,9 +86,10 @@ export function RestaurantDetail({ id }: { id: string }) {
         setErr((rs.errors as Record<string, string>)[body.error] ?? rs.errors.generic);
         key.current = newKey();
         if (body.error === "slotFull") setTime(null);
-        return;
+        return false;
       }
       router.push(`/${locale}/account/table-bookings/${body.booking.id}?new=1`);
+      return true;
     } finally {
       setBusy(false);
     }
@@ -173,25 +171,10 @@ export function RestaurantDetail({ id }: { id: string }) {
                 <Link href={`/${locale}/login?next=${encodeURIComponent(`/${locale}/restaurants/${r.id}`)}`} className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800">{d.login}</Link>
               </div>
             ) : (
-              <form onSubmit={book} className="mt-4 space-y-3">
-                {fee > 0 && (
-                  <>
-                    <Field label={t.review.cardHolder} required><Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required /></Field>
-                    <Field label={t.review.cardNumber} required>
-                      <Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required />
-                    </Field>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label={t.review.expiry} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={card.exp} onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required /></Field>
-                      <Field label={t.review.cvc} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required /></Field>
-                    </div>
-                    <p className="text-xs text-slate-500">{t.review.testCards}</p>
-                  </>
-                )}
-                <Button type="submit" variant="gold" size="lg" className="w-full" loading={busy}>
-                  {fee > 0 && <LockIcon className="size-5" />}
-                  {busy ? d.processing : fee > 0 ? fmt(d.pay, { amount: money(fee) }) : d.confirm}
-                </Button>
-              </form>
+              <div className="mt-4 space-y-3">
+                <Checkout amountSAR={fee} description={`Table ${r.nameEn} ${day} ${time ?? ""}`} disabled={busy}
+                  label={busy ? d.processing : fee > 0 ? fmt(d.pay, { amount: money(fee) }) : d.confirm} onPay={book} testId="table-checkout" />
+              </div>
             )}
           </Card>
         </div>

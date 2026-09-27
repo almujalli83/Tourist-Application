@@ -10,7 +10,7 @@ import { fmtKsa } from "@/lib/events/format";
 import type { BusSeatMap, BusTrip } from "@/lib/buses/types";
 import { useApp } from "../app-provider";
 import { BusIcon } from "../icons";
-import { CardFields, EMPTY_CARD, toCardInput, type CardDraft } from "../transit/card-fields";
+import { Checkout, type PaymentRef } from "../payments/checkout";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
 
 interface PassengerOption { ref: string; nameEn: string; nationality: string; passportMasked: string }
@@ -37,8 +37,6 @@ export function BusesView() {
   const [seats, setSeats] = useState<string[]>([]);
   const [options, setOptions] = useState<PassengerOption[]>([]);
   const [pax, setPax] = useState<Pax[]>([]);
-  const [card, setCard] = useState<CardDraft>(EMPTY_CARD);
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const errText = (c?: string) => (b.errors as Record<string, string>)[c ?? ""] ?? b.errors.generic;
   const n = q.adults + q.children;
@@ -69,24 +67,24 @@ export function BusesView() {
     setMap(d.seats);
   }
   const total = trip ? q.adults * trip.fare.adult + q.children * trip.fare.child : 0;
-  async function pay() {
-    if (!trip) return;
-    setBusy(true);
+  async function pay(payment: PaymentRef | undefined): Promise<boolean> {
+    if (!trip) return false;
     setErr(null);
     const r = await fetch("/api/buses/orders", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        providerId: trip.providerId, tripId: trip.id, from: trip.from, to: trip.to, date: q.date, seats, expectedTotalSAR: total, card: toCardInput(card),
+        providerId: trip.providerId, tripId: trip.id, from: trip.from, to: trip.to, date: q.date, seats, expectedTotalSAR: total, card: payment,
         passengers: pax.map((p) => (p.ref ? { type: p.type, ref: p.ref } : { type: p.type, nameEn: p.nameEn, nationality: p.nationality, passportNo: p.passportNo })),
       }),
     }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
-    setBusy(false);
     if (!r?.ok) {
       if (d?.error === "seatTaken") void choose(trip);
-      return setErr(errText(d?.error));
+      setErr(errText(d?.error));
+      return false;
     }
     router.push(`/${locale}/account/buses/${d.order.id}`);
+    return true;
   }
   const citySel = (id: string, v: string, on: (x: string) => void) => (
     <Select id={id} value={v} onChange={(e) => on(e.target.value)} data-testid={id}>
@@ -183,11 +181,10 @@ export function BusesView() {
                     )}
                   </div>
                 ))}
-                <CardFields card={card} onChange={setCard} />
                 <p className="text-base font-bold">{b.total}: <span className="ltr-nums text-brand-800" data-testid="bus-total">{money(total)}</span></p>
                 <p className="text-xs text-slate-500">{b.refundPolicy}</p>
                 <div className="flex flex-wrap gap-2">
-                  <Button loading={busy} disabled={seats.length !== n} onClick={() => void pay()} data-testid="bus-pay">{b.pay}</Button>
+                  <Checkout amountSAR={total} description={`Bus ${trip.from}-${trip.to} ${trip.tripNo}`} disabled={seats.length !== n} label={b.pay} onPay={pay} testId="bus-pay" />
                   <Button variant="ghost" onClick={() => setTrip(null)}>{t.common.back}</Button>
                 </div>
               </>

@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmt } from "@/i18n";
-import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import { addDaysISO, fmtKsa, ksaDay } from "@/lib/events/format";
 import type { Line, Station } from "@/lib/trains/network";
 import type { TrainClass, TrainTrip } from "@/lib/trains/sar";
 import { useApp } from "../app-provider";
+import { Checkout, type PaymentRef } from "../payments/checkout";
 import { CountrySelect } from "../booking/country-select";
-import { LockIcon, TrainIcon } from "../icons";
+import { TrainIcon } from "../icons";
 import { afterPoints, loyaltyError, PointsRedeemer } from "../loyalty/points-redeemer";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
 
@@ -53,7 +53,6 @@ export function TrainsView() {
   const [taken, setTaken] = useState<[string[] | null, string[] | null]>([null, null]);
   const [options, setOptions] = useState<PassengerOption[]>([]);
   const [pax, setPax] = useState<PassengerForm[]>([]);
-  const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [paying, setPaying] = useState(false);
   const [showMissing, setShowMissing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -177,18 +176,20 @@ export function TrainsView() {
     if (!paxComplete(p)) missing.push({ text: fmt(tr.missing.passenger, { n: i + 1 }), target: `passenger-${i}` });
   });
 
-  async function pay(e: React.FormEvent) {
-    e.preventDefault();
+  function revealMissing() {
+    setShowMissing(true);
+    const first = missing[0];
+    if (first) document.querySelector(`[data-testid="${first.target}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function pay(payment: PaymentRef | undefined): Promise<boolean> {
     if (!ready) {
-      setShowMissing(true);
-      const first = missing[0];
-      if (first) document.querySelector(`[data-testid="${first.target}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+      revealMissing();
+      return false;
     }
     setPaying(true);
     setErr(null);
     try {
-      const { expMonth, expYear } = parseExpiry(card.exp);
       const res = await fetch("/api/trains/orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -196,7 +197,7 @@ export function TrainsView() {
           legs: legs.map((l, i) => ({ tripId: l.id, cls, seats: seats[i] })),
           passengers: pax.map((p) => (p.ref ? { type: p.type, ref: p.ref } : { type: p.type, nameEn: p.nameEn, nationality: p.nationality, passportNo: p.passportNo })),
           expectedTotalSAR: total, idempotencyKey: key.current, displayCurrency: currency, redeemPoints: points || undefined,
-          card: restSAR > 0 ? { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } : undefined,
+          card: restSAR > 0 ? payment : undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -207,9 +208,10 @@ export function TrainsView() {
           const [a, b] = await Promise.all([loadTaken(0, outTrip), loadTaken(1, round ? retTrip : null)]);
           setSeats((cur) => [cur[0].filter((s) => !a?.includes(s)), cur[1].filter((s) => !b?.includes(s))]);
         }
-        return;
+        return false;
       }
       router.push(`/${locale}/account/train-tickets/${body.order.id}?new=1`);
+      return true;
     } finally {
       setPaying(false);
     }
@@ -400,21 +402,8 @@ export function TrainsView() {
               {!user ? (
                 <Link href={`/${locale}/login?next=${encodeURIComponent(`/${locale}/trains`)}`} className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800">{tr.login}</Link>
               ) : (
-                <form onSubmit={pay} className="mt-4 space-y-3">
+                <div className="mt-4 space-y-3">
                   {total > 0 && <PointsRedeemer service="train" totalSAR={total} value={points} onChange={setPoints} />}
-                  {restSAR > 0 && (
-                    <>
-                  <Field label={t.review.cardHolder} required><Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required /></Field>
-                  <Field label={t.review.cardNumber} required>
-                    <Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label={t.review.expiry} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={card.exp} onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required /></Field>
-                    <Field label={t.review.cvc} required><Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required /></Field>
-                  </div>
-                  <p className="text-xs text-slate-500">{t.review.testCards}</p>
-                    </>
-                  )}
                   {showMissing && missing.length > 0 && (
                     <Alert tone="warning" className="text-xs">
                       <p className="font-semibold">{tr.missing.title}</p>
@@ -423,10 +412,14 @@ export function TrainsView() {
                       </ul>
                     </Alert>
                   )}
-                  <Button type="submit" variant="gold" size="lg" className="w-full" loading={paying}>
-                    <LockIcon className="size-5" />{paying ? tr.paying : (restSAR > 0 ? fmt(tr.pay, { amount: money(restSAR) }) : t.loyalty.checkout.payWithPoints)}
-                  </Button>
-                </form>
+                  <Checkout amountSAR={restSAR} description={`Train ${legs.map((l) => l.id).join(" + ")}`} disabled={paying}
+                    guard={() => {
+                      if (ready) return true;
+                      revealMissing();
+                      return false;
+                    }}
+                    label={paying ? tr.paying : (restSAR > 0 ? fmt(tr.pay, { amount: money(restSAR) }) : t.loyalty.checkout.payWithPoints)} onPay={pay} testId="train-checkout" />
+                </div>
               )}
             </Card>
           </div>

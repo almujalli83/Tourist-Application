@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmt } from "@/i18n";
-import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import { fmtKsa } from "@/lib/events/format";
 import type { RestaurantBooking } from "@/lib/restaurants/bookings";
 import type { Restaurant } from "@/lib/restaurants/catalog";
 import { useApp } from "../app-provider";
+import { Checkout, type PaymentRef } from "../payments/checkout";
 import { BackLink } from "../back-link";
 import { CalendarIcon, MapPinIcon } from "../icons";
 import { PrintButton } from "../print-button";
-import { Alert, Badge, Button, Card, Field, Input, Spinner } from "../ui";
+import { Alert, Badge, Button, Card, Spinner } from "../ui";
 import { tableRide } from "@/lib/transport/booking-rides";
 import { BookingRide } from "../transport/booking-ride";
 import { SlotPicker } from "./shared";
@@ -143,7 +143,6 @@ function ChangePanel({ booking: b, onDone, onClose }: { booking: RestaurantBooki
   const [day, setDay] = useState(b.day);
   const [party, setParty] = useState(b.party);
   const [time, setTime] = useState<string | null>(b.time);
-  const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const key = useRef(newKey());
@@ -155,30 +154,29 @@ function ChangePanel({ booking: b, onDone, onClose }: { booking: RestaurantBooki
   const delta = Math.round((b.fee.perGuestSAR * party - b.fee.paidSAR) * 100) / 100;
   const unchanged = day === b.day && time === b.time && party === b.party;
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  async function save(payment: PaymentRef | undefined): Promise<boolean> {
     if (!time) {
       setErr(rs.details.chooseTime);
-      return;
+      return false;
     }
     setBusy(true);
     setErr(null);
     try {
-      const { expMonth, expYear } = parseExpiry(card.exp);
       const res = await fetch(`/api/restaurants/bookings/${encodeURIComponent(b.id)}/change`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           day, time, party, expectedDeltaSAR: delta, idempotencyKey: key.current,
-          card: delta > 0 ? { holder: card.holder, number: card.number.replace(/\s/g, ""), expMonth, expYear, cvc: card.cvc } : undefined,
+          card: delta > 0 ? payment : undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr((rs.errors as Record<string, string>)[body.error] ?? rs.errors.generic);
-        return;
+        return false;
       }
       await onDone();
+      return true;
     } finally {
       setBusy(false);
     }
@@ -186,22 +184,12 @@ function ChangePanel({ booking: b, onDone, onClose }: { booking: RestaurantBooki
 
   if (!r) return <p className="mt-4 flex items-center gap-2 text-sm text-slate-500"><Spinner className="size-4" /></p>;
   return (
-    <form onSubmit={save} className="mt-5 space-y-4 rounded-xl border border-brand-100 bg-brand-50/40 p-4 print:hidden" data-testid="change-panel">
+    <div className="mt-5 space-y-4 rounded-xl border border-brand-100 bg-brand-50/40 p-4 print:hidden" data-testid="change-panel">
       <SlotPicker restaurant={r} day={day} party={party} time={time} onDay={setDay} onParty={setParty} onTime={setTime} />
-      {delta > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t.review.cardHolder} required className="sm:col-span-2"><Input dir="ltr" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required /></Field>
-          <Field label={t.review.cardNumber} required className="sm:col-span-2"><Input dir="ltr" inputMode="numeric" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required /></Field>
-          <Field label={t.review.expiry} required><Input dir="ltr" inputMode="numeric" placeholder="MM/YY" value={card.exp} onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required /></Field>
-          <Field label={t.review.cvc} required><Input dir="ltr" inputMode="numeric" type="password" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required /></Field>
-        </div>
-      )}
       {delta < 0 && <p className="text-sm text-slate-600">{fmt(bk.refundDiff, { amount: money(-delta) })}</p>}
       {err && <Alert tone="error">{err}</Alert>}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" loading={busy} disabled={unchanged || !time}>{delta > 0 ? fmt(bk.payDiff, { amount: money(delta) }) : bk.saveChange}</Button>
-        <Button type="button" variant="ghost" onClick={onClose}>{bk.closeChange}</Button>
-      </div>
-    </form>
+      <Checkout amountSAR={Math.max(0, delta)} description={`Table change ${b.id}`} disabled={unchanged || !time || busy} label={delta > 0 ? fmt(bk.payDiff, { amount: money(delta) }) : bk.saveChange} onPay={save} testId="change-checkout" />
+      <Button type="button" variant="ghost" onClick={onClose}>{bk.closeChange}</Button>
+    </div>
   );
 }

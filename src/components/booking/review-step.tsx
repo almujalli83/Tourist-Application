@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
-import { formatExpiryInput, parseExpiry } from "@/lib/card-expiry";
 import { cityName } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import type { PrivacyPolicyResponse } from "@/lib/mt-evisa/types";
@@ -13,6 +12,7 @@ import { AuthForm } from "../auth-form";
 import { PointsRedeemer } from "../loyalty/points-redeemer";
 import { CardIcon, HotelIcon, LockIcon, PlaneIcon, ShieldIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Button, Card, Field, Input, SectionTitle, Stars } from "../ui";
+import { Checkout, type PaymentRef } from "../payments/checkout";
 import { useBooking } from "./booking-context";
 import { PackageRequirements, usePackageCheck } from "./package-requirements";
 import { useTravellerValidation } from "./travellers-step";
@@ -63,22 +63,19 @@ export function ReviewStep() {
   // Re-checked with the travellers' ages: minors (under 18) do not count towards the minimum price.
   const check = usePackageCheck({ useAges: true });
   const packageOk = check.ok;
-  const [card, setCard] = useState({ holder: "", number: "", exp: "", cvc: "" });
   const [clientReference, setClientReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const price = booking.price;
 
-  async function pay(e: React.FormEvent) {
-    e.preventDefault();
-    if (!price || !booking.criteria) return;
+  async function pay(payment: PaymentRef | undefined): Promise<boolean> {
+    if (!price || !booking.criteria) return false;
     if (!booking.disclaimerAccepted) {
       setError("disclaimerRequired");
-      return;
+      return false;
     }
     setSubmitting(true);
     setError(null);
-    const { expMonth, expYear } = parseExpiry(card.exp);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
@@ -99,7 +96,7 @@ export function ReviewStep() {
           planExtras: booking.planAuto ? { expectedSAR: booking.planExtrasSAR } : undefined,
           displayCurrency: currency,
           clientReference: clientReference || undefined,
-          card: { holder: card.holder, number: card.number, expMonth, expYear, cvc: card.cvc },
+          card: payment,
         }),
       });
       const data = await res.json();
@@ -108,9 +105,11 @@ export function ReviewStep() {
       if (!res.ok) throw new Error(data.error ?? "generic");
       // The confirmation page clears the wizard state (clearing it here would redirect to search).
       router.push(`/${locale}/package-visa/confirmation/${data.booking.id}`);
+      return true;
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);
+      return false;
     }
   }
 
@@ -246,7 +245,7 @@ export function ReviewStep() {
             </div>
           </Card>
         ) : (
-          <form onSubmit={pay}>
+          <div>
             <Card className="p-5 sm:p-6">
               <SectionTitle title={t.review.payment} icon={<CardIcon className="size-5" />} subtitle={t.review.secure} />
               {user.accountType === "company" && (
@@ -261,23 +260,6 @@ export function ReviewStep() {
                   </Field>
                 </div>
               )}
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Field label={t.review.cardHolder} required className="sm:col-span-2">
-                  <Input dir="ltr" autoComplete="cc-name" value={card.holder} onChange={(e) => setCard({ ...card, holder: e.target.value })} required />
-                </Field>
-                <Field label={t.review.cardNumber} required className="sm:col-span-2">
-                  <Input dir="ltr" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" value={card.number}
-                    onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} required />
-                </Field>
-                <Field label={t.review.expiry} required>
-                  <Input dir="ltr" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={card.exp}
-                    onChange={(e) => setCard({ ...card, exp: formatExpiryInput(e.target.value).slice(0, 7) })} required />
-                </Field>
-                <Field label={t.review.cvc} required>
-                  <Input dir="ltr" inputMode="numeric" autoComplete="cc-csc" type="password" value={card.cvc}
-                    onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} required />
-                </Field>
-              </div>
               {price && (
                 <PointsRedeemer
                   className="mt-4"
@@ -290,14 +272,13 @@ export function ReviewStep() {
                   onChange={() => undefined}
                 />
               )}
-              <Alert tone="info" className="mt-4"><Badge tone="gold" className="me-2">{t.common.sandbox}</Badge>{t.review.testCards}</Alert>
               {errorText && <Alert tone="error" className="mt-4">{errorText}</Alert>}
-              <Button type="submit" size="lg" variant="gold" className="mt-5 w-full" loading={submitting} disabled={!valid || !price || !packageOk}>
-                <LockIcon className="size-5" />
-                {submitting ? t.review.paying : fmt(t.review.pay, { amount: price ? money(booking.amountToPaySAR) : "" })}
-              </Button>
+              <div className="mt-5">
+                <Checkout amountSAR={price ? booking.amountToPaySAR : 0} description={`Package ${booking.criteria?.stays.map((st) => st.city).join("-") ?? ""}`} disabled={!valid || !price || !packageOk || submitting}
+                  label={submitting ? t.review.paying : fmt(t.review.pay, { amount: price ? money(booking.amountToPaySAR) : "" })} onPay={pay} testId="review-checkout" />
+              </div>
             </Card>
-          </form>
+          </div>
         )}
         <div className="lg:hidden">
           <Button variant="secondary" className="w-full" onClick={() => router.push(travellersHref)}>{t.common.back}</Button>
