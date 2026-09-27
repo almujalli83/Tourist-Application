@@ -57,6 +57,12 @@ export function hotelClassAllowed(h: { stars: number; licenseNo?: string | null 
 }
 
 /** Back-office (operations) access: comma-separated emails in ADMIN_EMAILS. */
+/** Ministry of Tourism viewers of the indicators dashboard: comma-separated emails in MINISTRY_EMAILS. */
+export function isMinistryEmail(email: string): boolean {
+  const list = (process.env.MINISTRY_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return list.includes(email.trim().toLowerCase());
+}
+
 export function isAdminEmail(email: string): boolean {
   const list = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
   return list.includes(email.trim().toLowerCase());

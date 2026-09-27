@@ -1,4 +1,4 @@
-import { isAdminEmail } from "../config";
+import { isAdminEmail, isMinistryEmail } from "../config";
 import type { AccountType } from "../types";
 
 export interface IndividualProfile {
@@ -39,13 +39,13 @@ export interface StoredUser {
   deletedAt?: string;
 }
 
-export type PublicUser = Omit<StoredUser, "passwordHash" | "mfa"> & { isAdmin?: boolean; mfaEnabled?: boolean };
+export type PublicUser = Omit<StoredUser, "passwordHash" | "mfa"> & { isAdmin?: boolean; isMinistry?: boolean; mfaEnabled?: boolean };
 
 /** Server-side only (reads ADMIN_EMAILS). */
 export function toPublicUser(u: StoredUser): PublicUser {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { passwordHash, mfa, ...rest } = u;
-  const pub: PublicUser = { ...rest, ...(mfa ? { mfaEnabled: true } : {}) };
+  const pub: PublicUser = { ...rest, ...(mfa ? { mfaEnabled: true } : {}), ...(isMinistryEmail(u.email) ? { isMinistry: true } : {}) };
   return isAdminEmail(u.email) ? { ...pub, isAdmin: true } : pub;
 }
 
