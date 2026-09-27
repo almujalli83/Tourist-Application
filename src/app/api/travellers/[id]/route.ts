@@ -1,4 +1,5 @@
 import { currentUser } from "@/lib/auth/session";
+import { familyTraveller } from "@/lib/family/family";
 import { todayISO } from "@/lib/dates";
 import { body, error, handle, json } from "@/lib/http";
 import { sanitizeSavedTraveller, validateSavedTraveller } from "@/lib/saved-travellers";
@@ -9,7 +10,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export const GET = handle(async (_req: Request, { params }: Ctx) => {
   const user = await currentUser();
   if (!user) return error("unauthorized", 401);
-  const traveller = await getSavedTraveller(user.id, (await params).id);
+  const id = (await params).id;
+  const traveller = id.startsWith("fam:") ? await familyTraveller(user.id, id) : await getSavedTraveller(user.id, id);
   return traveller ? json({ traveller }) : error("notFound", 404);
 });
 

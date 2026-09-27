@@ -9,20 +9,20 @@ export class SaveTravellerError extends Error {
   }
 }
 
-/** The signed-in user's saved travellers (empty and idle when `enabled` is false). */
-export function useSavedTravellers(enabled: boolean) {
+/** The signed-in user's saved travellers (empty and idle when `enabled` is false); `family` adds the ones family members share. */
+export function useSavedTravellers(enabled: boolean, family = false) {
   const [list, setList] = useState<SavedTravellerSummary[]>([]);
   const [loading, setLoading] = useState(enabled);
   const reload = useCallback(async () => {
     if (!enabled) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/travellers", { cache: "no-store" });
+      const res = await fetch(family ? "/api/travellers?family=1" : "/api/travellers", { cache: "no-store" });
       if (res.ok) setList((await res.json()).travellers);
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, family]);
   useEffect(() => {
     if (enabled) void reload();
     else setList([]);

@@ -28,7 +28,8 @@ export function SavedTravellerPicker({ id, saved, value, usedIds, arrivalDate, o
 
   const label = (x: SavedTravellerSummary) => {
     const name = (locale === "ar" && x.nameAr) || x.nameEn;
-    const parts = [name, countryName(x.nationality, locale), x.passportNoMasked];
+    const sharedBy = (x as SavedTravellerSummary & { sharedBy?: string }).sharedBy;
+    const parts = [sharedBy ? `${name} (${sharedBy})` : name, countryName(x.nationality, locale), x.passportNoMasked];
     if (x.passportExpiryDate) parts.push(fmt(s.expires, { date: x.passportExpiryDate }));
     return parts.filter(Boolean).join(" · ");
   };

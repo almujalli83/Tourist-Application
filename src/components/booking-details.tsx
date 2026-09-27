@@ -8,6 +8,7 @@ import type { BookingModification, StoredBooking } from "@/lib/bookings/types";
 import { cityName } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import { useApp } from "./app-provider";
+import { TripShareCard } from "./trip-share";
 import { ReceiptLink } from "./payments/receipt-link";
 import { BackLink } from "./back-link";
 import { ChatIcon, CheckIcon, RefreshIcon } from "./icons";
@@ -106,6 +107,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
           {booking.esim?.orderId ? t.wallet.view : t.esim.order.buy}
         </Link>
       </Card>
+      {booking.status !== "CANCELLED" && <TripShareCard bookingId={booking.id} />}
       {booking.tripPlanId && (
         <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5" data-testid="booking-plan">
           <div className="text-sm">
