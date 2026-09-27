@@ -7,6 +7,7 @@ import { cityName } from "@/lib/data/cities";
 import type { EsimOrder } from "@/lib/esim/orders";
 import type { GuideBooking } from "@/lib/guides/bookings";
 import type { PublicTransfer } from "@/lib/transfers/types";
+import type { PublicRental } from "@/lib/rentals/types";
 import { fmtDay, fmtKsa, ksaDay } from "@/lib/events/format";
 import type { EventOrder } from "@/lib/events/types";
 import type { RestaurantBooking } from "@/lib/restaurants/bookings";
@@ -23,8 +24,8 @@ import { CalendarIcon, CarIcon, PassportIcon, PhoneIcon, TicketIcon, TrainIcon, 
 import { useNetwork } from "./transport/train-ticket-view";
 import { Badge, Card, cx, Spinner } from "./ui";
 
-type Kind = "package" | "event" | "train" | "table" | "esim" | "guide" | "transfer";
-const KINDS: Kind[] = ["package", "event", "train", "table", "esim", "guide", "transfer"];
+type Kind = "package" | "event" | "train" | "table" | "esim" | "guide" | "transfer" | "rental";
+const KINDS: Kind[] = ["package", "event", "train", "table", "esim", "guide", "transfer", "rental"];
 const ICONS: Record<Kind, ReactNode> = {
   package: <PassportIcon className="size-5" />,
   event: <TicketIcon className="size-5" />,
@@ -33,8 +34,9 @@ const ICONS: Record<Kind, ReactNode> = {
   esim: <PhoneIcon className="size-5" />,
   guide: <UsersIcon className="size-5" />,
   transfer: <CarIcon className="size-5" />,
+  rental: <CarIcon className="size-5" />,
 };
-const BROWSE: Record<Kind, string> = { package: "/package-visa", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim", guide: "/guides", transfer: "/transport" };
+const BROWSE: Record<Kind, string> = { package: "/package-visa", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim", guide: "/guides", transfer: "/transport", rental: "/transport#rental" };
 
 interface Item {
   kind: Kind;
@@ -74,10 +76,11 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
   const [esims, setEsims] = useState<EsimOrder[] | null>(null);
   const [guides, setGuides] = useState<GuideBooking[] | null>(null);
   const [transfers, setTransfers] = useState<PublicTransfer[] | null>(null);
+  const [rentals, setRentals] = useState<PublicRental[] | null>(null);
   const [tab, setTab] = useState<"all" | Kind>("all");
 
   useEffect(() => {
-    const load = <T,>(url: string, key: "orders" | "bookings" | "transfers", set: (v: T[]) => void) =>
+    const load = <T,>(url: string, key: "orders" | "bookings" | "transfers" | "rentals", set: (v: T[]) => void) =>
       fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).then((d) => set((d as Record<string, T[]>)[key] ?? [])).catch(() => set([]));
     void load<EventOrder>("/api/events/orders", "orders", setEvents);
     void load<TrainOrder>("/api/trains/orders", "orders", setTrains);
@@ -85,9 +88,10 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
     void load<EsimOrder>("/api/esim/orders", "orders", setEsims);
     void load<GuideBooking>("/api/guides/bookings", "bookings", setGuides);
     void load<PublicTransfer>("/api/transfers", "transfers", setTransfers);
+    void load<PublicRental>("/api/rentals", "rentals", setRentals);
   }, []);
 
-  const loading = !events || !trains || !tables || !esims || !guides || !transfers;
+  const loading = !events || !trains || !tables || !esims || !guides || !transfers || !rentals;
   const items = useMemo<Item[]>(() => {
     const now = Date.now();
     const today = ksaDay(new Date());
@@ -193,8 +197,23 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         packageId: x.bookingId ?? undefined,
       });
     }
+    for (const x of rentals ?? []) {
+      const live = x.status === "requested" || x.status === "confirmed";
+      const start = Date.parse(`${x.pickupAt}:00+03:00`);
+      const end = Date.parse(`${x.returnAt}:00+03:00`);
+      out.push({
+        kind: "rental", id: x.id, href: `/${locale}/account/rentals/${x.id}`,
+        title: `${t.rentals.classes[x.carClass]} · ${ar ? x.providerNameAr : x.providerNameEn}`,
+        subtitle: `${when(new Date(start).toISOString())} → ${when(new Date(end).toISOString())} · ${cityName(x.city, locale)}`,
+        at: start, day: x.pickupAt.slice(0, 10),
+        upcoming: live && end > now, today: live && start <= now + 86_400_000 && end > now && x.pickupAt.slice(0, 10) <= today,
+        status: <Badge tone={x.status === "confirmed" ? "brand" : x.status === "requested" ? "amber" : x.status === "completed" ? "slate" : "red"}>{t.rentals.status[x.status]}</Badge>,
+        amount: money(x.totalSAR),
+        packageId: x.bookingId ?? undefined,
+      });
+    }
     return out;
-  }, [packages, events, trains, tables, esims, guides, transfers, net, locale, ar, money, t]);
+  }, [packages, events, trains, tables, esims, guides, transfers, rentals, net, locale, ar, money, t]);
 
   const shown = items.filter((i) => tab === "all" || i.kind === tab);
   // "All" and "Packages" show each trip with the bookings made for it; the other tabs stay flat.

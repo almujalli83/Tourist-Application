@@ -19,10 +19,11 @@ import { STATIONS, LINES } from "@/lib/trains/network";
 import { useApp } from "../app-provider";
 import { PlanGuides } from "../guides/plan-guides";
 import { GuideMap, type GuideCategory, type MapPoint } from "../guide/guide-map";
-import { CalendarIcon, ShareIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon, KaabaIcon } from "../icons";
+import { CarIcon, CalendarIcon, ShareIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon, KaabaIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "../ui";
 import { estimateRide, legBetween } from "@/lib/transport/rides";
 import { metroLeg } from "@/lib/metro/types";
+import { CAR_ADVISED_CITIES } from "@/lib/rentals/types";
 import { LineDots, lineName, stationName } from "../metro/metro-panel";
 import { useMetro } from "../metro/use-metro";
 import { RideMenu } from "../transport/ride-menu";
@@ -372,6 +373,12 @@ export function PlanEditor({ initial, warning, onNew, readOnly = false }: { init
                   <Link href={`/${locale}/umrah`} className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-gold-50 px-3 py-1.5 text-xs font-semibold text-gold-700 ring-1 ring-gold-500/30" data-testid="plan-umrah-day">
                     <KaabaIcon className="size-4" />{t.umrah.steps.title}
                   </Link>
+                )}
+                {CAR_ADVISED_CITIES.includes(d.city) && (i === 0 || plan.days[i - 1].city !== d.city) && (
+                  <p className="mt-1 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-700 ring-1 ring-slate-200 print:hidden" data-testid="plan-rental-hint">
+                    <CarIcon className="size-4 text-brand-700" />{fmt(t.rentals.advised, { city: cityName(d.city, locale) })}
+                    <Link href={`/${locale}/transport?city=${d.city}#rental`} className="font-semibold text-brand-700 hover:underline">{t.rentals.advisedCta}</Link>
+                  </p>
                 )}
               </div>
               {editable && i === dayIdx && (
