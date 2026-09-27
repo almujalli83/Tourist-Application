@@ -17,6 +17,9 @@ export const GET = handle(async (req: Request) => {
     mine: q.get("mine") === "1" ? a.user.email : undefined,
   });
   const all = await adminListTickets({ status: "all" });
-  const counts = { open: all.filter((t) => t.status === "open").length, waiting: all.filter((t) => t.status === "waiting").length, high: all.filter((t) => t.status !== "closed" && t.priority === "high").length };
+  const counts = {
+    open: all.filter((t) => t.status === "open").length, waiting: all.filter((t) => t.status === "waiting").length,
+    high: all.filter((t) => t.status !== "closed" && t.priority === "high").length, complaints: all.filter((t) => t.status !== "closed" && t.category === "complaint").length,
+  };
   return json({ tickets, counts, me: a.user.email });
 });

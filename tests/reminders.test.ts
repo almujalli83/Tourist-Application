@@ -110,6 +110,12 @@ describe("sample reminders (sandbox)", () => {
     const now = at("2026-09-26T09:00:00");
     await seedDemoNotifications("demo-user", now);
     const list = await listNotifications("demo-user", now);
+    // Sample trip alerts (service 15): heat, today's programme and suggested events.
+    const alerts = list.filter((n) => ["weather", "daily", "events"].includes(n.kind));
+    expect(alerts.map((n) => n.kind).sort()).toEqual(["daily", "events", "weather"]);
+    expect(alerts.find((n) => n.kind === "weather")).toMatchObject({ severity: "warning", demo: true });
+    for (const n of alerts) await deleteNotification("demo-user", n.id, now);
+    list.splice(0, list.length, ...list.filter((n) => !alerts.includes(n)));
     expect(list.map((n) => n.kind)).toEqual(["review", "arrival", "departure", "visa7", "visa1"]);
     expect(list[0]).toMatchObject({ href: "/account/reviews", demo: true });
     await deleteNotification("demo-user", list.shift()!.id, now);

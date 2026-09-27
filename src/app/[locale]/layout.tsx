@@ -6,6 +6,7 @@ import { AppProvider } from "@/components/app-provider";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { PrayerAlerts } from "@/components/prayer/prayer-alerts";
 import { SosButton } from "@/components/emergency/sos-button";
+import { WeatherBanner } from "@/components/alerts/weather-banner";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getDictionary } from "@/i18n";
@@ -53,6 +54,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
       <body className="flex min-h-dvh flex-col">
         <AppProvider locale={locale} dict={getDictionary(locale)} initialCurrency={currency} initialUser={user}>
           <SiteHeader />
+          <WeatherBanner />
           <main className="flex-1">{children}</main>
           <SiteFooter />
           <AssistantWidget />

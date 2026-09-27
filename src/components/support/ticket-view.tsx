@@ -8,6 +8,7 @@ import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
 import { Composer, Conversation, type Attachment } from "./conversation";
+import { SupportComplaintCard } from "./complaint-card";
 import { STATUS_TONE } from "./support-center";
 
 /** A traveller's support ticket: the conversation, reply and close. */
@@ -61,6 +62,7 @@ export function TicketView({ id }: { id: string }) {
           {ticket.demo && <Badge>{s.sample}</Badge>}
         </div>
       </div>
+      {ticket.category === "complaint" && <SupportComplaintCard />}
       <Card className="bg-slate-50/60 p-4">
         <Conversation ticket={ticket} viewer="traveller" />
       </Card>

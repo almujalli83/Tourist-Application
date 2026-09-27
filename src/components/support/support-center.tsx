@@ -11,6 +11,7 @@ import { MAX_SUBJECT, SUPPORT_CATEGORIES, type PublicTicket, type SupportCategor
 import { useApp } from "../app-provider";
 import { ChatIcon, ChevronIcon, PhoneIcon, SearchIcon } from "../icons";
 import { Alert, Badge, Card, cx, Field, Input, Select, Spinner } from "../ui";
+import { SupportComplaintCard } from "./complaint-card";
 import { Composer, type Attachment } from "./conversation";
 
 export const STATUS_TONE = { open: "amber", waiting: "brand", closed: "slate" } as const;
@@ -145,6 +146,7 @@ export function SupportCenter() {
                 </Select>
               </Field>
             </div>
+            {form.category === "complaint" && <SupportComplaintCard />}
             {err && <Alert tone="error">{err}</Alert>}
             <Composer onSend={(m, a) => open(m, a)} placeholder={s.message} busy={busy} testId="ticket-composer" />
           </div>

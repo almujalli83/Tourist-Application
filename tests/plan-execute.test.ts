@@ -19,7 +19,17 @@ const today = todayISO();
 const card = { holder: "S A", number: "4111111111111111", expMonth: "12", expYear: "30", cvc: "123" };
 
 async function planWithExtras(u: PublicUser, rooms = [{ adults: 2, childAges: [7] }], budgetTier = "comfort") {
-  const dep = addDays(today, 6);
+  // The first arrival date (from 6 days ahead) whose second day has a general-admission event in Riyadh
+  // (events run within their seasons, so a fixed offset breaks as the calendar moves on).
+  let dep = addDays(today, 6);
+  for (let i = 6; i < 120; i++) {
+    const second = addDays(today, i + 1);
+    const p = (await loadPools(["RUH"], second, second)).get("RUH")!;
+    if (p.events.some((e) => e.event.seating === "general" && !e.event.minAge && e.slots.some((x) => x.date === second))) {
+      dep = addDays(today, i);
+      break;
+    }
+  }
   const { plan } = await generatePlan({ origin: "CAI", nationality: "EG", departureDate: dep, nights: 3, cities: ["RUH"], rooms, cabin: "economy", interests: ["heritage", "food"], pace: "moderate", budgetTier, maxBudgetSAR: null, prayer: false, accessible: false, notes: "" }, "ar", today);
   const saved = await savePlan(u, plan);
   // A general-admission event and a restaurant dinner on the second day.

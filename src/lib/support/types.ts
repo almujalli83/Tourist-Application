@@ -1,7 +1,7 @@
 /** Multilingual support (service 13): shared types (client-safe). */
 import type { Lang } from "../assistant/translate";
 
-export const SUPPORT_CATEGORIES = ["visa", "payment", "booking", "events", "restaurants", "trains", "esim", "account", "other"] as const;
+export const SUPPORT_CATEGORIES = ["complaint", "visa", "payment", "booking", "events", "restaurants", "trains", "esim", "account", "other"] as const;
 export type SupportCategory = (typeof SUPPORT_CATEGORIES)[number];
 export type TicketStatus = "open" | "waiting" | "closed";
 export type TicketPriority = "high" | "normal";
