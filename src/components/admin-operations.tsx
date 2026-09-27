@@ -93,6 +93,9 @@ export function AdminOperations() {
           <Link href={`/${locale}/admin/audio`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
             <HeadphonesIcon className="size-4" />{t.audio.admin.nav}
           </Link>
+          <Link href={`/${locale}/indicators`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
+            <StarIcon className="size-4" />{t.indicators.nav}
+          </Link>
           <Button variant="secondary" onClick={() => void load()}><RefreshIcon className="size-4" />{a.refresh}</Button>
         </div>
       </div>

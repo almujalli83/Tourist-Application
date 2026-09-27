@@ -42,6 +42,7 @@ export function SiteHeader() {
         { href: `/${locale}/account/family`, label: t.family.nav },
         { href: `/${locale}/account/security`, label: t.security.nav },
         ...(user.isAdmin ? [{ href: `/${locale}/admin`, label: t.admin.nav }] : []),
+        ...(user.isAdmin || user.isMinistry ? [{ href: `/${locale}/indicators`, label: t.indicators.nav }] : []),
       ]
     : [];
 
