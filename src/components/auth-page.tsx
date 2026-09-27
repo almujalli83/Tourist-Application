@@ -25,7 +25,7 @@ function Inner({ mode }: { mode: "login" | "register" }) {
             <p className="text-sm text-slate-500">{t.meta.appName}</p>
           </div>
         </div>
-        <AuthForm initialMode={mode} referralCode={params.get("ref") ?? ""} onSuccess={() => { router.push(safeNext); router.refresh(); }} />
+        <AuthForm initialMode={mode} referralCode={params.get("ref") ?? ""} mfaTicket={params.get("mfa") ?? undefined} initialError={params.get("error") ?? undefined} onSuccess={() => { router.push(safeNext); router.refresh(); }} />
       </Card>
     </div>
   );

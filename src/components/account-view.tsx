@@ -109,6 +109,7 @@ export function AccountView({ bookings, savedTravellers }: { bookings: BookingRo
         <h1 className="text-2xl font-bold">{t.account.title}</h1>
         <Link href={`/${locale}/package-visa`} className="inline-flex h-11 items-center rounded-lg bg-gold-500 px-5 text-sm font-semibold text-white hover:bg-gold-600">{t.confirmation.newBooking}</Link>
       </div>
+      {user?.accountType === "individual" && !user.individual?.phone && <Alert tone="info"><span data-testid="complete-profile">{t.security.completeProfile}</span></Alert>}
       {user && !user.emailVerifiedAt && (
         <Alert tone="warning">
           <span className="flex flex-wrap items-center justify-between gap-2" data-testid="verify-banner">

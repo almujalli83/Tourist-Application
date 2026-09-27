@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fmt } from "@/i18n";
 import type { PublicUser } from "@/lib/auth/types";
@@ -8,11 +9,15 @@ import { useApp } from "./app-provider";
 import { PhoneInput, phoneHint } from "./phone-input";
 import { CountrySelect } from "./booking/country-select";
 import { BuildingIcon, UserIcon } from "./icons";
+import { OtherSignIn, type Outcome } from "./auth-methods";
 import { PasswordInput, PasswordStrength } from "./password-input";
 import { Alert, Button, cx, Field, Input } from "./ui";
 
-export function AuthForm({ initialMode = "login", onSuccess, compact, referralCode = "" }: {
+export function AuthForm({ initialMode = "login", onSuccess, compact, referralCode = "", mfaTicket, initialError }: {
   initialMode?: "login" | "register"; onSuccess: (u: PublicUser) => void; compact?: boolean;
+  /** The second step of a sign-in started elsewhere (Google, Apple, reset link). */
+  mfaTicket?: string;
+  initialError?: string;
   /** From an invitation link (`?ref=`): the loyalty programme's referral code. */
   referralCode?: string;
 }) {
@@ -24,11 +29,24 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
     email: "", password: "", fullName: "", phone: "", nationality: "",
     companyName: "", commercialRegNo: "", tourismLicenseNo: "", vatNo: "", contactPerson: "", city: "", referralCode,
   });
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [minutes, setMinutes] = useState(0);
   const [busy, setBusy] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [mfa, setMfa] = useState<{ ticket: string; code: string } | null>(null);
+  const [mfa, setMfa] = useState<{ ticket: string; code: string } | null>(mfaTicket ? { ticket: mfaTicket, code: "" } : null);
+
+  function outcome(o: Outcome) {
+    if (o.status === "ok") {
+      setUser(o.user);
+      onSuccess(o.user);
+    } else if (o.status === "mfa") {
+      setError(null);
+      setMfa({ ticket: o.ticket, code: "" });
+    } else if (o.status === "signup") {
+      router.push(`/${locale}/complete-signup?ticket=${o.ticket}`);
+    }
+  }
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function submit(e: React.FormEvent) {
@@ -100,6 +118,7 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
   }
 
   return (
+    <div className="space-y-4">
     <form onSubmit={submit} className="space-y-4" noValidate>
       <div className="grid grid-cols-2 rounded-lg bg-slate-100 p-1 text-sm font-semibold">
         {(["login", "register"] as const).map((m) => (
@@ -168,5 +187,8 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
       {errText && <Alert tone="error">{errText}</Alert>}
       <Button type="submit" className="w-full" loading={busy}>{mode === "login" ? a.submitLogin : a.submitRegister}</Button>
     </form>
+    <div className="flex items-center gap-3 text-xs text-slate-500" aria-hidden><span className="h-px flex-1 bg-slate-200" />{a.or}<span className="h-px flex-1 bg-slate-200" /></div>
+    <OtherSignIn onDone={outcome} remember={remember} />
+    </div>
   );
 }

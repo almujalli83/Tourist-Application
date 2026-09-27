@@ -5,7 +5,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { store } from "../store";
 
-export type TokenKind = "reset" | "verifyEmail" | "changeEmail" | "mfaLogin";
+export type TokenKind = "reset" | "verifyEmail" | "changeEmail" | "mfaLogin" | "signup" | "nafath";
 
 interface TokenDoc {
   id: string;
