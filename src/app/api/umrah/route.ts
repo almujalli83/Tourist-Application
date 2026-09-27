@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/auth/session";
 import { handle, json } from "@/lib/http";
-import { nusukLinked, nusukLinks } from "@/lib/umrah/nusuk";
+import { nusukLinks, nusukProvider } from "@/lib/umrah/nusuk";
+import { permitQrSvg } from "@/lib/umrah/permits";
 import { getUmrahSeason } from "@/lib/umrah/season";
 import { listUmrahTrips } from "@/lib/umrah/trips";
 
@@ -10,7 +11,10 @@ export const GET = handle(async () => {
   return json({
     season: await getUmrahSeason(),
     links: nusukLinks(),
-    linked: nusukLinked(),
-    trips: user ? await listUmrahTrips(user.id) : null,
+    /** Automatic permits: through the Nusuk API, the sandbox simulation, or none (links only). */
+    nusuk: nusukProvider()?.mode ?? null,
+    trips: user
+      ? await Promise.all((await listUmrahTrips(user.id)).map(async (t) => ({ ...t, permits: await Promise.all(t.permits.map(async (p) => ({ ...p, qrSvg: await permitQrSvg(p) }))) })))
+      : null,
   });
 });

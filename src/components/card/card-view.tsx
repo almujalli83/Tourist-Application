@@ -8,7 +8,7 @@ import { countryName } from "@/lib/data/countries";
 import { fmtDay, fmtKsa } from "@/lib/events/format";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
-import { Logo, PassportIcon, UserIcon } from "../icons";
+import { KaabaIcon, Logo, PassportIcon, UserIcon } from "../icons";
 import { Badge, Card, cx, Spinner } from "../ui";
 
 interface Codes { live: { token: string; expiresAt: string; svg: string }; offline: { token: string; expiresAt: string; svg: string } }
@@ -73,6 +73,19 @@ function CardFace({ card, codes, offline }: { card: TouristCard; codes: Codes | 
             </div>
           )}
         </dl>
+        {card.permits?.length > 0 && (
+          <div className="mt-5 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20" data-testid="card-permits">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-gold-100"><KaabaIcon className="size-4" />{t.umrah.permits.onCard}</p>
+            <ul className="mt-1.5 space-y-1 text-sm">
+              {card.permits.map((p) => (
+                <li key={p.permitNo} className="flex flex-wrap justify-between gap-x-3">
+                  <span className="font-semibold">{t.umrah.permits.type[p.type]} · {d(p.date)}</span>
+                  <span className="ltr-nums" dir="ltr">{p.start}–{p.end} · {p.permitNo}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {card.demo && <p className="mt-4"><Badge tone="gold">{c.sample}</Badge></p>}
       </div>
 

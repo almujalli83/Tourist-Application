@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
 import { fmtDay } from "@/lib/events/format";
 import { CITY_CENTERS } from "@/lib/guide/centers";
@@ -9,14 +9,14 @@ import { DAILY_PRAYERS, prayerTimes } from "@/lib/prayer/times";
 import {
   IHRAM_DONTS, MIQATS, miqatMapUrl, RITE_LANG_NAMES, RITE_LANGS, RITES, ROUTE_MIQAT, ROUTES, TALBIYAH_AR, TALBIYAH_LATIN, type RiteLang, type Route,
 } from "@/lib/umrah/content";
-import type { NusukPermit } from "@/lib/umrah/nusuk";
 import type { UmrahSeason } from "@/lib/umrah/season";
 import type { UmrahTrip } from "@/lib/umrah/trips";
 import { useApp } from "../app-provider";
 import { ChevronIcon, ClockIcon, KaabaIcon, MapPinIcon, PassportIcon, PhoneIcon, UsersIcon } from "../icons";
 import { Alert, Badge, Card, cx, Spinner } from "../ui";
+import { PermitsPanel, type PermitView } from "./permits-panel";
 
-interface Data { season: UmrahSeason; links: { web: string; ios: string; android: string }; linked: boolean; trips: UmrahTrip[] | null }
+interface Data { season: UmrahSeason; links: { web: string; ios: string; android: string }; nusuk: "api" | "sandbox" | null; trips: (UmrahTrip & { permits: PermitView[] })[] | null }
 
 const ksaToday = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 
@@ -33,12 +33,11 @@ function NusukButtons({ links }: { links: Data["links"] }) {
   );
 }
 
-function TripCard({ trip, links }: { trip: UmrahTrip; links: Data["links"] }) {
+function TripCard({ trip, links, nusuk, onChange }: { trip: UmrahTrip & { permits: PermitView[] }; links: Data["links"]; nusuk: Data["nusuk"]; onChange: () => void }) {
   const { t, locale } = useApp();
   const u = t.umrah.trips;
   const d = (x: string) => fmtDay(x, locale, { weekday: "long", day: "numeric", month: "long" });
   const href = trip.bookingId ? `/${locale}/account/bookings/${trip.bookingId}` : trip.planId ? `/${locale}/planner/${trip.planId}` : null;
-  const permitLine = (p: NusukPermit) => `${u.permitType[p.type]} · ${fmtDay(p.date, locale, { day: "numeric", month: "short" })}${p.time ? ` ${p.time}` : ""} · ${u.permitStatus[p.status]}`;
   return (
     <Card className="space-y-3 p-5" data-testid="umrah-trip">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -55,17 +54,9 @@ function TripCard({ trip, links }: { trip: UmrahTrip; links: Data["links"] }) {
       </p>
       {trip.pause && <Alert tone="warning"><span data-testid="umrah-pause-trip">{fmt(t.umrah.pause.trip, { from: trip.pause.from, to: trip.pause.to })}</span></Alert>}
       <p className="text-sm leading-6 text-slate-700">{trip.route === "jeddah" ? u.viaJeddah : u.viaAir}</p>
-      {trip.travellers.some((x) => x.permits) ? (
-        <div>
-          <p className="mb-1 text-sm font-bold">{u.permits}</p>
-          <ul className="space-y-1 text-sm">
-            {trip.travellers.map((x) => (
-              <li key={x.name}><span dir="ltr">{x.name}</span>: {x.permits?.length ? x.permits.map(permitLine).join(" — ") : u.noPermit}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      <NusukButtons links={links} />
+      <div className="border-t border-slate-100 pt-3">
+        <PermitsPanel trip={trip} nusuk={nusuk} links={<NusukButtons links={links} />} onChange={onChange} />
+      </div>
     </Card>
   );
 }
@@ -79,9 +70,10 @@ export function UmrahView() {
   const [open, setOpen] = useState<string | null>("ihram");
   const [route, setRoute] = useState<Route>("air");
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/umrah", { cache: "no-store" }).then((r) => r.json()).then(setData).catch(() => undefined);
-  }, [user]);
+  }, []);
+  useEffect(load, [load, user]);
   const today = ksaToday();
   const times = useMemo(() => prayerTimes(today, CITY_CENTERS.MKX.lat, CITY_CENTERS.MKX.lng), [today]);
   const miqat = ROUTE_MIQAT[route] ? MIQATS.find((m) => m.id === ROUTE_MIQAT[route]) : null;
@@ -108,7 +100,7 @@ export function UmrahView() {
           {!data ? (
             <div className="grid h-24 place-items-center text-brand-700"><Spinner className="size-6" /></div>
           ) : data.trips?.length ? (
-            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">{data.trips.map((x) => <TripCard key={x.id} trip={x} links={data.links} />)}</div>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">{data.trips.map((x) => <TripCard key={x.id} trip={x} links={data.links} nusuk={data.nusuk} onChange={load} />)}</div>
           ) : (
             <Card className="p-5 text-sm text-slate-600">{u.trips.none}</Card>
           )}

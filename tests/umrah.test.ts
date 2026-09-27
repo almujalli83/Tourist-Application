@@ -14,7 +14,10 @@ const { estimateBudget } = await import("@/lib/planner/budget");
 const { searchActivities, searchHotels } = await import("@/lib/agents/aggregator");
 const { getUmrahSeason, pauseOverlap, setUmrahSeason } = await import("@/lib/umrah/season");
 const { listUmrahTrips, umrahReminders } = await import("@/lib/umrah/trips");
-const { nusukPermits } = await import("@/lib/umrah/nusuk");
+const { nusukProvider } = await import("@/lib/umrah/nusuk");
+const { availableSlots, cancelPermit, issuePermit, reconcilePermits } = await import("@/lib/umrah/permits");
+const { listCards } = await import("@/lib/card/card");
+const { walletOverview } = await import("@/lib/wallet");
 const { saveBooking } = await import("@/lib/repo");
 const { store } = await import("@/lib/store");
 const { addDays, todayISO } = await import("@/lib/dates");
@@ -135,14 +138,118 @@ describe("Umrah trips, the Hajj-season pause and reminders", () => {
     expect(await listUmrahTrips("umrah-nobody")).toEqual([]);
   });
 
-  it("reads the traveller's permits from Nusuk when linked", async () => {
-    expect(await nusukPermits("A1", "EG")).toBeNull();
+});
+
+const umrahBooking = (id: string, userId: string, c: SearchCriteria, visas = true) => ({
+  id, reference: `TA-${id.toUpperCase()}`, userId, accountType: "individual", clientReference: null, createdAt: new Date().toISOString(),
+  criteria: c, flights: [], hotels: [], activities: [], price: { totalSAR: 1 }, displayCurrency: "SAR", payment: null, status: "COMPLETED",
+  mt: { mode: "sandbox", messageId: "m", packageId: "p", packageStatus: "COMPLETED", lastCheckedAt: null },
+  applicants: [
+    { applicationNo: "1", paxType: "adult", nameEn: "SARA ALI", nationality: "EG", passportNo: "A12345678", email: "s@example.com", visaNumber: visas ? "601" : null, visaIssueDate: "2026-09-01", visaExpiryDate: "2027-12-01", visaStatus: "ISSUED", insuranceStatus: "ISSUED" },
+    { applicationNo: "2", paxType: "adult", nameEn: "OMAR ALI", nationality: "EG", passportNo: "A87654321", email: "o@example.com", visaNumber: visas ? "602" : null, visaIssueDate: "2026-09-01", visaExpiryDate: "2027-12-01", visaStatus: "ISSUED", insuranceStatus: "ISSUED" },
+  ],
+  ticketNos: [], modifications: [],
+}) as unknown as StoredBooking;
+
+describe("Nusuk permits issued automatically", () => {
+  it("offers times of the Makkah nights (Umrah) and the Madinah days (Rawdah, by group) and issues the permit", async () => {
+    const u = user("permit-u1");
+    await store().put("users", u.id, { ...u, passwordHash: "x" });
+    const c = crit([{ city: "JED", nights: 2 }, { city: "MKX", nights: 2 }, { city: "MED", nights: 2 }], { umrah: true });
+    await saveBooking(umrahBooking("permit-b1", u.id, c));
+    const [trip] = await listUmrahTrips(u.id);
+    const mk = addDays(c.departureDate, 2);
+    expect(trip.windows.umrah).toEqual([mk, addDays(mk, 1)]);
+    expect(trip.windows.rawdah).toEqual([addDays(mk, 2), addDays(mk, 3), addDays(mk, 4)]);
+    await expect(availableSlots(u.id, { tripKey: "permit-b1", type: "umrah", date: c.departureDate, people: 2 })).rejects.toMatchObject({ code: "invalidDate" });
+    await expect(availableSlots(u.id, { tripKey: "permit-b1", type: "rawdah", date: addDays(mk, 2), people: 1 })).rejects.toMatchObject({ code: "invalidGroup" });
+    const women = await availableSlots(u.id, { tripKey: "permit-b1", type: "rawdah", date: addDays(mk, 2), people: 1, group: "women" });
+    expect(women.every((x) => x.group === "women")).toBe(true);
+
+    const slots = await availableSlots(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, people: 2 });
+    const open = slots.find((x) => x.remaining >= 2)!;
+    const full = slots.find((x) => x.remaining < 2);
+    if (full) await expect(issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, slotId: full.id, applicationNos: ["1", "2"] })).rejects.toMatchObject({ code: "slotFull" });
+    const p = await issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, slotId: open.id, applicationNos: ["1", "2"] });
+    expect(p).toMatchObject({ type: "umrah", status: "issued", source: "sandbox", date: trip.umrahDate, start: open.start });
+    expect(p.permitNo).toMatch(/^SBX-/);
+    expect(JSON.stringify(p)).not.toContain("A12345678");
+    // Seats are taken in Nusuk.
+    expect((await availableSlots(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, people: 1 })).find((x) => x.id === open.id)!.remaining).toBe(open.remaining - 2);
+    // One Umrah permit per traveller and trip.
+    await expect(issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, slotId: open.id, applicationNos: ["1"] })).rejects.toMatchObject({ code: "alreadyHasPermit" });
+    // Rawdah for the women's group.
+    const w = (await availableSlots(u.id, { tripKey: "permit-b1", type: "rawdah", date: addDays(mk, 3), people: 1, group: "women" })).find((x) => x.remaining >= 1)!;
+    await issuePermit(u.id, { tripKey: "permit-b1", type: "rawdah", group: "women", date: addDays(mk, 3), slotId: w.id, applicationNos: ["1"] });
+
+    // In the trip, the wallet (PDF per traveller), the digital card and the notifications.
+    const [t2] = await listUmrahTrips(u.id);
+    expect(t2.permits.map((x) => x.type).sort()).toEqual(["rawdah", "umrah"]);
+    const wallet = await walletOverview(u.id);
+    const sara = wallet.people.find((x) => x.nameEn === "SARA ALI")!;
+    expect(sara.documents.filter((d) => d.type === "permit").length).toBe(2);
+    const card = (await listCards(u.id)).find((x) => x.nameEn === "SARA ALI")!;
+    expect(card.permits.map((x) => x.type).sort()).toEqual(["rawdah", "umrah"]);
+    expect(await store().get("notifications", `umrah:permit:${p.id}`)).toMatchObject({ kind: "umrah" });
+    // The reminder to book is no longer needed once everyone has the Umrah permit.
+    await umrahReminders(u.id, new Date(`${addDays(c.departureDate, -3)}T06:00:00Z`));
+    expect(await store().get("notifications", "umrah:book:permit-b1")).toBeNull();
+
+    // Cancelling releases the permit and removes it from the wallet.
+    await cancelPermit(u.id, p.id);
+    await expect(cancelPermit(u.id, p.id)).rejects.toMatchObject({ code: "alreadyCancelled" });
+    expect((await walletOverview(u.id)).people.find((x) => x.nameEn === "SARA ALI")!.documents.filter((d) => d.type === "permit").length).toBe(1);
+  });
+
+  it("waits for the visas, and cancels permits that no longer fit a changed trip", async () => {
+    const u = user("permit-u2");
+    await store().put("users", u.id, { ...u, passwordHash: "x" });
+    const c = crit([{ city: "MKX", nights: 3 }, { city: "RUH", nights: 3 }], { umrah: true });
+    await saveBooking(umrahBooking("permit-b2", u.id, c, false));
+    const [t] = await listUmrahTrips(u.id);
+    const slot = (await availableSlots(u.id, { tripKey: "permit-b2", type: "umrah", date: t.windows.umrah[2], people: 1 })).find((x) => x.remaining >= 1)!;
+    await expect(issuePermit(u.id, { tripKey: "permit-b2", type: "umrah", date: t.windows.umrah[2], slotId: slot.id, applicationNos: ["1"] })).rejects.toMatchObject({ code: "visaNotIssued" });
+    await saveBooking(umrahBooking("permit-b2", u.id, c));
+    const p = await issuePermit(u.id, { tripKey: "permit-b2", type: "umrah", date: t.windows.umrah[2], slotId: slot.id, applicationNos: ["1"] });
+    expect(await reconcilePermits(u.id)).toBe(0);
+    // Makkah shortened to one night: the permit on the third day no longer fits.
+    await saveBooking(umrahBooking("permit-b2", u.id, { ...c, stays: [{ city: "MKX", nights: 1 }, { city: "RUH", nights: 5 }] }));
+    expect(await reconcilePermits(u.id)).toBe(1);
+    expect(await store().get("umrahPermits", p.id)).toMatchObject({ status: "cancelled", cancelReason: "tripChanged" });
+    expect(await store().get("notifications", `umrah:permitCancelled:${p.id}`)).toMatchObject({ severity: "warning" });
+  });
+
+  it("lets anyone try it on the sample trip in sandbox", async () => {
+    const [t] = await listUmrahTrips("permit-demo");
+    expect(t).toMatchObject({ key: "demo", demo: true });
+    expect(t.windows.rawdah.length).toBeGreaterThan(0);
+    const slot = (await availableSlots("permit-demo", { tripKey: "demo", type: "umrah", date: t.umrahDate, people: 1 })).find((x) => x.remaining >= 1)!;
+    await issuePermit("permit-demo", { tripKey: "demo", type: "umrah", date: t.umrahDate, slotId: slot.id, applicationNos: ["demo-1"] });
+    expect((await listCards("permit-demo"))[0].permits).toHaveLength(1);
+  });
+
+  it("uses the Nusuk API when linked", async () => {
     process.env.NUSUK_API_URL = "https://nusuk.example/api/";
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: [{ type: "umrah", date: "2026-10-20T00:00:00", time: "05:30:00", status: "confirmed" }, { type: "rawdah", date: "bad" }] }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    expect(await nusukPermits("A1", "EG")).toEqual([{ type: "umrah", date: "2026-10-20", time: "05:30", status: "confirmed" }]);
-    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toBe("https://nusuk.example/api/permits?passportNo=A1&nationality=EG");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 500 })));
-    expect(await nusukPermits("A1", "EG")).toBeNull();
+    process.env.NUSUK_API_TOKEN = "tok";
+    const calls: [string, RequestInit | undefined][] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push([url, init]);
+      if (url.includes("/slots")) return new Response(JSON.stringify([{ id: "S1", date: "2026-11-02", start: "06:00:00", end: "08:00:00", remaining: 5 }, { id: "bad" }]), { status: 200 });
+      if (init?.method === "POST") return new Response(JSON.stringify({ permitNo: "NSK-1", qr: "QR-1" }), { status: 201 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      return new Response("", { status: 500 });
+    }));
+    const n = nusukProvider()!;
+    expect(n.mode).toBe("api");
+    expect(await n.slots({ type: "umrah", date: "2026-11-02", people: 2 })).toEqual([{ id: "S1", date: "2026-11-02", start: "06:00", end: "08:00", remaining: 5 }]);
+    expect(calls[0][0]).toBe("https://nusuk.example/api/slots?type=umrah&date=2026-11-02&people=2");
+    expect((calls[0][1]!.headers as Record<string, string>).authorization).toBe("Bearer tok");
+    expect(await n.issue({ type: "umrah", slot: { id: "S1", date: "2026-11-02", start: "06:00", end: "08:00", remaining: 5 }, travellers: [{ passportNo: "A1", nationality: "EG", nameEn: "X", visaNumber: "6" }] })).toEqual({ permitNo: "NSK-1", qr: "QR-1" });
+    expect(JSON.parse(String(calls[1][1]!.body))).toMatchObject({ type: "umrah", slotId: "S1", travellers: [{ passportNo: "A1" }] });
+    await n.cancel("NSK-1");
+    expect(calls[2][0]).toBe("https://nusuk.example/api/permits/NSK-1");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 409 })));
+    await expect(n.issue({ type: "umrah", slot: { id: "S1", date: "2026-11-02", start: "06:00", end: "08:00", remaining: 5 }, travellers: [] })).rejects.toMatchObject({ code: "slotFull" });
+    delete process.env.NUSUK_API_TOKEN;
   });
 });
