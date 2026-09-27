@@ -21,13 +21,14 @@ import { runTripAlerts, tripWeatherLines } from "../alerts/alerts";
 import { cardReadyNotifications } from "../card/card";
 import { expireGuideRequests } from "../guides/bookings";
 import { umrahReminders } from "../umrah/trips";
+import { transportReminders } from "../transport/reminders";
 import { syncGuidesFromMt } from "../guides/guides";
 import { store } from "../store";
 
 export type ReminderKind = "arrival" | "departure" | "visa7" | "visa1";
 
 /** Notification kinds: trip reminders, requests to rate experiences (service 9) and points about to expire (service 10). */
-export type NotificationKind = ReminderKind | "review" | "points" | "support" | "weather" | "daily" | "events" | "eventReminder" | "eventChange" | "card" | "guide" | "umrah";
+export type NotificationKind = ReminderKind | "review" | "points" | "support" | "weather" | "daily" | "events" | "eventReminder" | "eventChange" | "card" | "guide" | "umrah" | "transport";
 
 export interface AppNotification {
   /** `${bookingId}:${kind}` (for visa reminders also the expiry date). */
@@ -244,6 +245,7 @@ export async function runReminders(now = new Date()): Promise<{ bookings: number
     await runTripAlerts(u.id, now);
     await cardReadyNotifications(u.id, now);
     await umrahReminders(u.id, now);
+    await transportReminders(u.id, now);
   }
   const loyalty = await runLoyalty(now);
   // Licensed guides: daily MoT sync (when configured), then cancel requests of expired licences.
@@ -260,6 +262,7 @@ export async function listNotifications(userId: string, now = new Date()): Promi
   await runTripAlerts(userId, now);
   await cardReadyNotifications(userId, now);
   await umrahReminders(userId, now);
+  await transportReminders(userId, now);
   const rows = await store().findBy<AppNotification>(COL, "userId", userId);
   return rows.filter((n) => !n.deletedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

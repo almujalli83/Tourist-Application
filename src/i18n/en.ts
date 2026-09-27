@@ -1176,6 +1176,19 @@ const en: Dictionary = {
       email: "Invalid email address",
     },
   },
+  rides: {
+    order: "Order a car",
+    estimate: "Estimate: SAR {min}–{max} · about {mins} min",
+    direct: "Destination filled in",
+    copy: "Destination copied",
+    copied: "Copied — paste it in the app",
+    directions: "Directions on the map",
+    note: "Fare and time are estimates; the final price is in the app. Use licensed apps only.",
+    walk: "On foot, about {mins} min",
+    car: "By car, about {mins} min · est. SAR {min}–{max}",
+    haramain: "Book the Haramain train",
+    toMakkah: "Car to Makkah",
+  },
   umrah: {
     nav: "Umrah",
     title: "Umrah for tourists",
@@ -1700,7 +1713,7 @@ const en: Dictionary = {
       prefsNote: "Weather hazard alerts, reminders for booked events and changes to them are always sent for your safety.",
       demoHint: "These are samples for a demo trip to show how reminders look; you can delete them. Reminders for your real trips appear here automatically.",
       bell: "Notifications ({n} unread)",
-      kinds: { arrival: "Before arrival", departure: "Before departure", visa7: "Visa expiry", visa1: "Visa expiry", review: "Rating request", support: "Support", weather: "Weather alert", daily: "Today's programme", events: "Suggested events", eventReminder: "Event reminder", eventChange: "Event change", card: "Digital card", guide: "Tour guide", points: "Reward points", umrah: "Umrah" },
+      kinds: { arrival: "Before arrival", departure: "Before departure", visa7: "Visa expiry", visa1: "Visa expiry", review: "Rating request", support: "Support", weather: "Weather alert", daily: "Today's programme", events: "Suggested events", eventReminder: "Event reminder", eventChange: "Event change", card: "Digital card", guide: "Tour guide", points: "Reward points", umrah: "Umrah", transport: "Getting around" },
     },
     all: {
       tabs: { all: "All", package: "Packages", event: "Events", train: "Trains", table: "Restaurants", esim: "eSIM", guide: "Guides" },
