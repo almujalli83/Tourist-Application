@@ -60,6 +60,7 @@ const SERVICE_NAMES: Record<ServiceId, [string, string]> = {
   trains: ["خدمة تذاكر القطار", "Train tickets service"],
   esim: ["خدمة شريحة eSIM", "eSIM service"],
   assistant: ["المساعد الذكي", "Smart assistant"],
+  support: ["الدعم الفني متعدد اللغات", "Multilingual support"],
 };
 export const serviceName = (s: ServiceId, locale: "ar" | "en") => SERVICE_NAMES[s][locale === "ar" ? 0 : 1];
 
@@ -128,6 +129,8 @@ async function experiences(user: Pick<StoredUser, "id">): Promise<ReviewableItem
   for (const p of await listPlans(user.id)) used("planner", p.createdAt);
   const chat = await store().get<{ messages: { at: string }[] }>("chats", user.id);
   if (chat && chat.messages.length >= 2) used("assistant", chat.messages[0].at);
+  // Support is rated once a ticket is closed.
+  for (const t of await store().findBy<{ closedAt: string | null; demo?: boolean }>("supportTickets", "userId", user.id)) if (t.closedAt && !t.demo) used("support", t.closedAt);
   // Each service is rated once, after its first use.
   for (const [s, at] of firstUse) {
     out.push({

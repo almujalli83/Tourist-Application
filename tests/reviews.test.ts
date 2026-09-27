@@ -136,7 +136,7 @@ describe("verified reviews", () => {
     const s = await summaries("restaurant", ["ruh-najd-heritage", "unknown-id"]);
     expect(s["ruh-najd-heritage"].count).toBeGreaterThanOrEqual(3);
     const svc = await serviceRatings();
-    expect(svc.services).toHaveLength(7);
+    expect(svc.services).toHaveLength(8);
     expect(svc.overall.count).toBeGreaterThan(50);
     const demo = (await pendingReviews(user, at("2026-09-26T12:00:00"))).filter((i) => i.demo);
     expect(demo.map((i) => i.targetType)).toEqual(expect.arrayContaining(["package", "hotel", "airline", "restaurant", "event", "place", "service"]));

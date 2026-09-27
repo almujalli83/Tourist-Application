@@ -22,7 +22,7 @@ import { store } from "../store";
 export type ReminderKind = "arrival" | "departure" | "visa7" | "visa1";
 
 /** Notification kinds: trip reminders, requests to rate experiences (service 9) and points about to expire (service 10). */
-export type NotificationKind = ReminderKind | "review" | "points";
+export type NotificationKind = ReminderKind | "review" | "points" | "support";
 
 export interface AppNotification {
   /** `${bookingId}:${kind}` (for visa reminders also the expiry date). */

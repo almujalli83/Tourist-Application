@@ -133,13 +133,16 @@ export function SiteHeader() {
                   onClick={() => setAccountOpen((o) => !o)}
                   aria-expanded={accountOpen}
                   aria-haspopup="menu"
+                  aria-label={t.nav.account}
+                  title={t.nav.account}
                   className={cx(
                     "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-white/10 px-3 text-sm font-medium hover:bg-white/15",
                     accountLinks.some((l) => l.href === activeHref) && "text-gold-100",
                   )}
                 >
                   <UserIcon className="size-4" />
-                  {t.nav.account}
+                  {/* The label shows from 1400px; below that the bar would overflow in English. */}
+                  <span className="hidden min-[1400px]:inline">{t.nav.account}</span>
                   <ChevronIcon className={cx("size-3.5 transition-transform", accountOpen ? "-rotate-90" : "rotate-90")} />
                 </button>
                 {accountOpen && (
