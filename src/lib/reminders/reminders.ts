@@ -23,6 +23,7 @@ import { expireGuideRequests } from "../guides/bookings";
 import { umrahReminders } from "../umrah/trips";
 import { transportReminders } from "../transport/reminders";
 import { transferReminders } from "../transfers/transfers";
+import { rentalReminders } from "../rentals/rentals";
 import { syncGuidesFromMt } from "../guides/guides";
 import { store } from "../store";
 
@@ -248,6 +249,7 @@ export async function runReminders(now = new Date()): Promise<{ bookings: number
     await umrahReminders(u.id, now);
     await transportReminders(u.id, now);
     await transferReminders(u.id, now);
+    await rentalReminders(u.id, now);
   }
   const loyalty = await runLoyalty(now);
   // Licensed guides: daily MoT sync (when configured), then cancel requests of expired licences.
@@ -266,6 +268,7 @@ export async function listNotifications(userId: string, now = new Date()): Promi
   await umrahReminders(userId, now);
   await transportReminders(userId, now);
   await transferReminders(userId, now);
+  await rentalReminders(userId, now);
   const rows = await store().findBy<AppNotification>(COL, "userId", userId);
   return rows.filter((n) => !n.deletedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
