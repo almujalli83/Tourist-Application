@@ -22,6 +22,9 @@ import { GuideMap, type GuideCategory, type MapPoint } from "../guide/guide-map"
 import { CalendarIcon, ShareIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon, KaabaIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "../ui";
 import { estimateRide, legBetween } from "@/lib/transport/rides";
+import { metroLeg } from "@/lib/metro/types";
+import { LineDots, lineName, stationName } from "../metro/metro-panel";
+import { useMetro } from "../metro/use-metro";
 import { RideMenu } from "../transport/ride-menu";
 import { ActivityPicker } from "./activity-picker";
 
@@ -437,14 +440,26 @@ export function PlanEditor({ initial, warning, onNew, readOnly = false }: { init
 }
 
 /** How to get there from the previous activity: on foot when close, otherwise by car (estimate). */
-function LegLine({ from, to }: { from: PlanItem; to: PlanItem }) {
-  const { t } = useApp();
+function LegLine({ from, to, city }: { from: PlanItem; to: PlanItem; city: string }) {
+  const { t, locale } = useApp();
   const leg = legBetween(from, to);
+  const net = useMetro(city === "RUH" && leg.mode === "car");
+  const metro = net ? metroLeg(net.stations, from, to) : null;
+  const ar = locale === "ar";
   return (
-    <p className="mb-1.5 flex items-center gap-1 text-[11px] text-slate-500" data-testid="plan-leg">
-      <span aria-hidden>↓</span>
-      {leg.mode === "walk" ? fmt(t.rides.walk, { mins: leg.mins }) : fmt(t.rides.car, { mins: leg.mins, min: leg.minSAR, max: leg.maxSAR })}
-    </p>
+    <div className="mb-1.5 space-y-0.5 text-[11px] text-slate-500" data-testid="plan-leg">
+      <p className="flex items-center gap-1">
+        <span aria-hidden>↓</span>
+        {leg.mode === "walk" ? fmt(t.rides.walk, { mins: leg.mins }) : fmt(t.rides.car, { mins: leg.mins, min: leg.minSAR, max: leg.maxSAR })}
+      </p>
+      {metro && (
+        <p className="flex flex-wrap items-center gap-1 ps-3 font-semibold text-slate-600" data-testid="plan-leg-metro" title={t.metro.estimate}>
+          <LineDots lines={[metro.line]} />
+          {fmt(t.metro.leg, { mins: metro.mins, from: stationName(metro.from, ar), to: stationName(metro.to, ar), line: lineName(metro.line, ar) })}
+          <span className="font-normal text-slate-400">· {fmt(t.metro.legWalk, { to: metro.walkToMins, from: metro.walkFromMins })}</span>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -473,7 +488,7 @@ function EntryRow({ entry: e, day, prev, editable, selected, onSelect, onMove, o
   const dir = directionsLinks(it);
   return (
     <li className={cx("rounded-xl border bg-white p-3 transition", selected ? "border-brand-600 ring-1 ring-brand-600" : "border-slate-200")} data-testid="plan-item" data-ref={it.ref}>
-      {prev && e.travelMins ? <LegLine from={prev} to={it} /> : null}
+      {prev && e.travelMins ? <LegLine from={prev} to={it} city={day.city} /> : null}
       <div className="flex gap-3">
         {time}
         <div className="min-w-0 flex-1">

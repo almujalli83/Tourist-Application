@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import type { operationsOverview } from "@/lib/admin";
 import { useApp } from "./app-provider";
+import { AdminMetroSync } from "./metro/metro-panel";
 import { ChatIcon, GiftIcon, MapPinIcon, RefreshIcon, StarIcon, TicketIcon, UsersIcon, KaabaIcon } from "./icons";
 import { StatusBadge } from "./booking-details";
 import { Alert, Badge, Button, Card, Spinner } from "./ui";
@@ -91,6 +92,7 @@ export function AdminOperations() {
       </div>
 
       {!data.emailProvider && <Alert tone="warning">{a.emailProviderOff}</Alert>}
+      <AdminMetroSync />
       {msg && <Alert tone="info">{msg}</Alert>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
