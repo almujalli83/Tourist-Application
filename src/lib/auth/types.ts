@@ -27,15 +27,26 @@ export interface StoredUser {
   preferredLocale: "ar" | "en";
   preferredCurrency: string;
   createdAt: string;
+  emailVerifiedAt?: string;
+  phoneVerifiedAt?: string;
+  /** The verified number (the profile's number may change afterwards). */
+  verifiedPhone?: string;
+  passwordChangedAt?: string;
+  /** Two-step sign-in with an authenticator app. */
+  mfa?: { secret: string; enabledAt: string; recovery: string[] };
+  /** Accounts created with Google, Apple, Nafath or a mobile number have no password until they set one. */
+  hasPassword?: boolean;
+  deletedAt?: string;
 }
 
-export type PublicUser = Omit<StoredUser, "passwordHash"> & { isAdmin?: boolean };
+export type PublicUser = Omit<StoredUser, "passwordHash" | "mfa"> & { isAdmin?: boolean; mfaEnabled?: boolean };
 
 /** Server-side only (reads ADMIN_EMAILS). */
 export function toPublicUser(u: StoredUser): PublicUser {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { passwordHash, ...rest } = u;
-  return isAdminEmail(u.email) ? { ...rest, isAdmin: true } : rest;
+  const { passwordHash, mfa, ...rest } = u;
+  const pub: PublicUser = { ...rest, ...(mfa ? { mfaEnabled: true } : {}) };
+  return isAdminEmail(u.email) ? { ...pub, isAdmin: true } : pub;
 }
 
 export function displayName(u: PublicUser): string {

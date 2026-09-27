@@ -1,7 +1,7 @@
 /**
  * Traveller notifications by email. Every message is recorded in the "outbox" collection (shown
  * in the back office). With RESEND_API_KEY and EMAIL_FROM set, messages are sent through Resend;
- * otherwise they are only recorded (status "logged").
+ * otherwise they are only recorded (status "logged"). RESEND_API_URL overrides the endpoint (e.g. a relay).
  */
 import { randomUUID } from "node:crypto";
 import { store } from "./store";
@@ -29,7 +29,7 @@ async function deliver(msg: Pick<OutboxMessage, "to" | "subject" | "text">): Pro
     return { status: "logged", providerId: null, error: null };
   }
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch(process.env.RESEND_API_URL?.trim() || "https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.RESEND_API_KEY!.trim()}`, "content-type": "application/json" },
       body: JSON.stringify({ from: process.env.EMAIL_FROM!.trim(), to: msg.to, subject: msg.subject, text: msg.text }),
@@ -45,12 +45,14 @@ async function deliver(msg: Pick<OutboxMessage, "to" | "subject" | "text">): Pro
 export async function notifyTravellers(
   emails: string[],
   message: { subject: string; text: string },
-  meta: { bookingId?: string } = {},
+  meta: { bookingId?: string; redact?: string[] } = {},
 ): Promise<OutboxMessage | null> {
   const to = [...new Set(emails.map((e) => e.trim()).filter(Boolean))];
   if (!to.length) return null;
   const result = await deliver({ to, ...message });
-  const entry: OutboxMessage = { id: randomUUID(), createdAt: new Date().toISOString(), to, ...message, bookingId: meta.bookingId ?? null, ...result, attempts: 1 };
+  // Secrets (sign-in links) are sent but never kept in the back-office record.
+  const text = (meta.redact ?? []).reduce((t, secret) => (secret ? t.split(secret).join("[…]") : t), message.text);
+  const entry: OutboxMessage = { id: randomUUID(), createdAt: new Date().toISOString(), to, subject: message.subject, text, bookingId: meta.bookingId ?? null, ...result, attempts: 1 };
   await store().put("outbox", entry.id, entry);
   return entry;
 }

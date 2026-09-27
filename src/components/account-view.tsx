@@ -8,7 +8,7 @@ import { PhoneInput, phoneHint } from "./phone-input";
 import { BackLink } from "./back-link";
 import { MyBookings } from "./my-bookings";
 import { CountrySelect } from "./booking/country-select";
-import { BuildingIcon, PassportIcon, UserIcon, UsersIcon } from "./icons";
+import { BuildingIcon, PassportIcon, ShieldIcon, UserIcon, UsersIcon } from "./icons";
 import { Alert, Badge, Button, Card, Field, Input } from "./ui";
 
 export interface BookingRow {
@@ -96,7 +96,7 @@ function ProfileForm() {
 }
 
 export function AccountView({ bookings, savedTravellers }: { bookings: BookingRow[]; savedTravellers: number }) {
-  const { t, locale } = useApp();
+  const { t, locale, user } = useApp();
   const stats = [
     { label: t.account.stats.total, v: bookings.length },
     { label: t.account.stats.travellers, v: bookings.reduce((a, b) => a + b.travellers, 0) },
@@ -109,6 +109,14 @@ export function AccountView({ bookings, savedTravellers }: { bookings: BookingRo
         <h1 className="text-2xl font-bold">{t.account.title}</h1>
         <Link href={`/${locale}/package-visa`} className="inline-flex h-11 items-center rounded-lg bg-gold-500 px-5 text-sm font-semibold text-white hover:bg-gold-600">{t.confirmation.newBooking}</Link>
       </div>
+      {user && !user.emailVerifiedAt && (
+        <Alert tone="warning">
+          <span className="flex flex-wrap items-center justify-between gap-2" data-testid="verify-banner">
+            <span>{t.security.emailBanner}</span>
+            <Link href={`/${locale}/account/security`} className="font-semibold underline">{t.security.resend}</Link>
+          </span>
+        </Alert>
+      )}
       <div className="grid gap-3 sm:grid-cols-3">
         {stats.map((s) => (
           <Card key={s.label} className="p-5">
@@ -138,6 +146,13 @@ export function AccountView({ bookings, savedTravellers }: { bookings: BookingRo
             <p className="mt-2 text-sm text-slate-500">{t.account.travellers.intro}</p>
             <Link href={`/${locale}/account/travellers`} className="mt-4 inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
               {t.account.travellers.manage}
+            </Link>
+          </Card>
+          <Card className="p-5 sm:p-6">
+            <h2 className="flex items-center gap-2 font-bold"><ShieldIcon className="size-5 text-brand-700" />{t.security.title}</h2>
+            <p className="mt-2 text-sm text-slate-500">{t.security.intro}</p>
+            <Link href={`/${locale}/account/security`} className="mt-4 inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50" data-testid="security-link">
+              {t.security.nav}
             </Link>
           </Card>
           <ProfileForm />
