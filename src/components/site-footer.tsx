@@ -18,6 +18,7 @@ export function SiteFooter() {
         </div>
         <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm md:justify-end">
           <li><Link href={`/${locale}/ratings`} className="font-semibold text-white hover:underline">{t.reviews.servicesLink}</Link></li>
+          <li><Link href={`/${locale}/umrah`} className="font-semibold text-white hover:underline">{t.umrah.nav}</Link></li>
           <li><Link href={`/${locale}/guides`} className="font-semibold text-white hover:underline">{t.guides.nav}</Link></li>
           <li><Link href={`/${locale}/emergency`} className="font-semibold text-red-300 hover:underline">{t.emergency.nav}</Link></li>
           <li><Link href={`/${locale}/prayer`} className="font-semibold text-white hover:underline">{t.prayer.nav}</Link></li>

@@ -59,3 +59,4 @@ export const StarIcon = (p: P) => (<svg {...base(p)}><path d="m12 3 2.8 5.7 6.2.
 export const GiftIcon = (p: P) => (<svg {...base(p)}><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8M12 8v13M12 8S10.5 3 8 3a2.5 2.5 0 0 0 0 5M12 8s1.5-5 4-5a2.5 2.5 0 0 1 0 5" /></svg>);
 export const ChatIcon = (p: P) => (<svg {...base(p)}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z" /><path d="M8.5 11h.01M12 11h.01M15.5 11h.01" /></svg>);
 export const SunIcon = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>);
+export const KaabaIcon = (p: P) => (<svg {...base(p)}><path d="M4 8.5 12 5l8 3.5V19l-8 2-8-2z" /><path d="M4 8.5 12 12l8-3.5M12 12v9M4 11.5l8 3.5 8-3.5" /></svg>);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, ShieldIcon, TicketIcon, UserIcon, UsersIcon } from "@/components/icons";
+import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, ShieldIcon, KaabaIcon, TicketIcon, UserIcon, UsersIcon } from "@/components/icons";
 import { PrayerHomeCard } from "@/components/prayer/prayer-home-card";
 import { getDictionary } from "@/i18n";
 import type { Locale } from "@/i18n/config";
@@ -84,6 +84,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
             <div className="flex-1">
               <p className="font-semibold text-ink">{t.emergency.title}</p>
               <p className="mt-0.5 text-sm text-slate-600">{t.emergency.serviceCard}</p>
+            </div>
+          </Link>
+          <Link href={`/${locale}/umrah`} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:shadow-md" data-testid="umrah-service">
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><KaabaIcon className="size-5" /></div>
+            <div className="flex-1">
+              <p className="font-semibold text-ink">{t.umrah.title}</p>
+              <p className="mt-0.5 text-sm text-slate-600">{t.umrah.serviceCard}</p>
             </div>
           </Link>
           <Link href={`/${locale}/guides`} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:shadow-md" data-testid="guides-service">

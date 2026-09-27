@@ -54,6 +54,14 @@ export const DISTRICTS = [
   { en: "Near Airport", ar: "بالقرب من المطار" },
 ];
 
+/** Makkah hotels are near the Holy Mosque. */
+export const MAKKAH_DISTRICTS = [
+  { en: "Ajyad — facing the Haram", ar: "أجياد — مقابل الحرم" },
+  { en: "Jabal Omar — 5 min walk to the Haram", ar: "جبل عمر — 5 دقائق مشيًا إلى الحرم" },
+  { en: "Ibrahim Al-Khalil St. — near the Haram", ar: "شارع إبراهيم الخليل — قرب الحرم" },
+  { en: "Al-Aziziyah — shuttle to the Haram", ar: "العزيزية — حافلات إلى الحرم" },
+];
+
 export const ROOM_TYPES = [
   { en: "Deluxe Room", ar: "غرفة ديلوكس" },
   { en: "Superior Room", ar: "غرفة سوبيريور" },

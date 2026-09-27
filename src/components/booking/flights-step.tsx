@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
+import { groundTransfers } from "@/lib/itinerary";
 import type { FlightOffer } from "@/lib/types";
 import { useApp } from "../app-provider";
 import { RatingBadge, useSummaries } from "../reviews/shared";
@@ -157,6 +158,14 @@ export function FlightsStep() {
       {error && (
         <Alert tone="error">
           {(t.review.errors as Record<string, string>)[error] ?? t.review.errors.generic} <button className="font-semibold underline" onClick={retry}>{t.common.retry}</button>
+        </Alert>
+      )}
+      {booking.criteria && groundTransfers(booking.criteria).length > 0 && (
+        <Alert tone="info" className="mb-6">
+          <span data-testid="ground-transfers">
+            {t.umrah.option.ground}{" "}
+            {groundTransfers(booking.criteria).map((g) => `${cityName(g.from, locale)} → ${cityName(g.to, locale)} (${g.date})`).join(" · ")}
+          </span>
         </Alert>
       )}
       <div className="space-y-8">

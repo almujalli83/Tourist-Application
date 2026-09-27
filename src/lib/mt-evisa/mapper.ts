@@ -4,7 +4,7 @@
  */
 import { mtConfig } from "../config";
 import { diffDays } from "../dates";
-import { getSaudiCity } from "../data/cities";
+import { getStayCity } from "../data/cities";
 import { isArabCountry } from "../data/countries";
 import { applicantShare } from "../pricing";
 import type { ActivityOffer, FlightOffer, HotelOffer, PaxType, Traveller } from "../types";
@@ -144,7 +144,7 @@ function packageTravelData(lk: { city: Lookup; entry: Lookup; exit: Lookup }, in
       hotelClassification: String(h.stars),
       checkInDate: h.checkIn,
       checkOutDate: h.checkOut,
-      city: lookupId(lk.city, getSaudiCity(h.city)?.mtCityCode ?? h.city),
+      city: lookupId(lk.city, getStayCity(h.city)?.mtCityCode ?? h.city),
       hotelPrice: money(share.hotelPrices[hi]),
     })),
     arrivalAndDepartureData: {
@@ -187,7 +187,7 @@ function clar(a: Traveller["security"]["moneyLaunderingOffence"]) {
 }
 
 function mapActivities(activities: ActivityOffer[], cityLookup: Awaited<ReturnType<MtClient["getLookup"]>>) {
-  const cityId = (code: string) => lookupId(cityLookup, getSaudiCity(code)?.mtCityCode ?? code);
+  const cityId = (code: string) => lookupId(cityLookup, getStayCity(code)?.mtCityCode ?? code);
   const ticket = (a: ActivityOffer) => ({
     id: `TKT-${a.id.slice(-12)}`,
     title: a.titleEn,

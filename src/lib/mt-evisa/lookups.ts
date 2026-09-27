@@ -3,7 +3,7 @@
  * from MT and matched by `code` (ISO2 for countries, city codes, airport codes).
  */
 import { COUNTRIES } from "../data/countries";
-import { SAUDI_CITIES } from "../data/cities";
+import { MAKKAH, SAUDI_CITIES } from "../data/cities";
 import type { MtLookupItem, MtLookupName } from "./types";
 
 const countryItems: MtLookupItem[] = COUNTRIES.map((c, i) => ({ id: String(i + 1), code: c.iso2, enValue: c.en }));
@@ -23,7 +23,7 @@ export const SANDBOX_LOOKUPS: Record<MtLookupName, MtLookupItem[]> = {
   getNationality: countryItems,
   getPassportIssuePlace: countryItems,
   getCompanionType: COMPANION_TYPES.map((c, i) => ({ id: String(i + 1), code: c.code, enValue: c.en })),
-  getCity: SAUDI_CITIES.map((c, i) => ({ id: String(i + 1), code: c.mtCityCode, enValue: c.en })),
+  getCity: [...SAUDI_CITIES, MAKKAH].map((c, i) => ({ id: String(i + 1), code: c.mtCityCode, enValue: c.en })),
   getEntryPort: SAUDI_CITIES.map((c, i) => ({ id: String(i + 1), code: c.code, enValue: `${c.en} - ${c.airportEn} (Airport)` })),
   getExitPort: SAUDI_CITIES.map((c, i) => ({ id: String(i + 1), code: c.code, enValue: `${c.en} - ${c.airportEn} (Airport)` })),
 };

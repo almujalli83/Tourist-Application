@@ -77,7 +77,22 @@ export const ORIGIN_CITIES: City[] = [
   { code: "NRT", en: "Tokyo", ar: "طوكيو", country: "JP", airportEn: "Narita International", airportAr: "مطار ناريتا الدولي" },
 ];
 
-const ALL = new Map<string, City>([...ORIGIN_CITIES, ...SAUDI_CITIES].map((c) => [c.code, c]));
+/**
+ * Makkah: only for Muslim travellers performing Umrah (chosen with the Umrah option, never in the
+ * general city lists). It has no airport: flights use Jeddah, and Jeddah ↔ Makkah is a ground
+ * transfer (Haramain train or car).
+ */
+export const MAKKAH: SaudiCity = {
+  code: "MKX", mtCityCode: "MAKKAH", en: "Makkah", ar: "مكة المكرمة", country: "SA",
+  airportEn: "King Abdulaziz International (Jeddah)", airportAr: "مطار الملك عبدالعزيز الدولي (جدة)",
+  descriptionEn: "The Holy Mosque — Umrah", descriptionAr: "المسجد الحرام — أداء العمرة",
+};
+export const UMRAH_CITY = MAKKAH.code;
+
+/** The airport serving a city (Makkah → Jeddah). */
+export const airportOf = (code: string) => (code === UMRAH_CITY ? "JED" : code);
+
+const ALL = new Map<string, City>([...ORIGIN_CITIES, ...SAUDI_CITIES, MAKKAH].map((c) => [c.code, c]));
 
 export function getCity(code: string): City | undefined {
   return ALL.get(code);
@@ -85,6 +100,11 @@ export function getCity(code: string): City | undefined {
 
 export function getSaudiCity(code: string): SaudiCity | undefined {
   return SAUDI_CITIES.find((c) => c.code === code);
+}
+
+/** A city a package can stay in: the general list, or Makkah (Umrah option only). */
+export function getStayCity(code: string): SaudiCity | undefined {
+  return getSaudiCity(code) ?? (code === UMRAH_CITY ? MAKKAH : undefined);
 }
 
 export function cityName(code: string, locale: "ar" | "en"): string {

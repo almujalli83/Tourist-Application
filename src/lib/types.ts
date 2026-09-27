@@ -31,6 +31,8 @@ export interface SearchCriteria {
   pax: PaxCount;
   cabin: CabinClass;
   nationality: string; // ISO2
+  /** The traveller performs Umrah and declared being Muslim: Makkah may be a stay. */
+  umrah?: boolean;
 }
 
 export type LegKind = "outbound" | "domestic" | "return";

@@ -14,7 +14,7 @@ import { verifyOffer } from "../agents/offer-signing";
 import type { PublicUser } from "../auth/types";
 import { hotelClassAllowed, PACKAGE_LIMITS } from "../config";
 import { addDays, diffDays, isValidISODate } from "../dates";
-import { cityName, getSaudiCity } from "../data/cities";
+import { airportOf, cityName, getSaudiCity } from "../data/cities";
 import { stayDates } from "../itinerary";
 import { getMtClient, mtIsOk } from "../mt-evisa/client";
 import { buildUpdateRequests } from "../mt-evisa/mapper";
@@ -132,6 +132,8 @@ function resolveTarget(b: StoredBooking, kind: ModificationKind, newReturnDate: 
   if (!getSaudiCity(city) || city === lastCity) throw new BookingError("invalidCity");
   const transport = target.transport ?? "flight";
   if (!["flight", "car", "train"].includes(transport)) throw new BookingError("invalidTransport");
+  // No flight between cities served by the same airport (Makkah ↔ Jeddah).
+  if (transport === "flight" && airportOf(city) === airportOf(lastCity)) throw new BookingError("invalidTransport");
   return { mode: "newCity" as const, departureCity: city, lastCity, city, transport };
 }
 
@@ -149,7 +151,7 @@ export async function modificationOptions(booking: StoredBooking, input: { newRe
 
   // The return ticket is changed by the agent that issued it.
   const returnFlights = searchFlights(
-    { leg: { index: ret.legIndex + (addsLeg ? 1 : 0), kind: "return", from: t.departureCity, to: c.origin, date: input.newReturnDate }, pax: c.pax, cabin: c.cabin },
+    { leg: { index: ret.legIndex + (addsLeg ? 1 : 0), kind: "return", from: airportOf(t.departureCity), to: c.origin, date: input.newReturnDate }, pax: c.pax, cabin: c.cabin },
     [ret.agentId],
   );
   // Lists that came back empty because the agents could not be reached (not for lack of inventory).
@@ -166,7 +168,7 @@ export async function modificationOptions(booking: StoredBooking, input: { newRe
     });
     hotels = Promise.all([same, others]).then(([s, o]) => (s ? [s, ...o] : o));
     if (addsLeg)
-      domesticFlights = searchFlights({ leg: { index: ret.legIndex, kind: "domestic", from: t.lastCity, to: t.city!, date: c.returnDate }, pax: c.pax, cabin: c.cabin }).then((r) => {
+      domesticFlights = searchFlights({ leg: { index: ret.legIndex, kind: "domestic", from: airportOf(t.lastCity), to: airportOf(t.city!), date: c.returnDate }, pax: c.pax, cabin: c.cabin }).then((r) => {
         if (!r.offers.length && r.failedAgents.length) unavailable.push("domesticFlights");
         return r.offers;
       });
@@ -248,7 +250,7 @@ export function quoteModification(booking: StoredBooking, plan: ModificationPlan
       stays.push({ city: t.city!, nights: extra });
       if (t.transport === "flight") {
         const d = plan.offers.domesticFlight;
-        if (!d || !verifyOffer(d) || d.kind !== "domestic" || d.from !== t.lastCity || d.to !== t.city || !d.departAt.startsWith(c.returnDate))
+        if (!d || !verifyOffer(d) || d.kind !== "domestic" || d.from !== airportOf(t.lastCity) || d.to !== airportOf(t.city!) || !d.departAt.startsWith(c.returnDate))
           throw new BookingError("offerExpired");
         flights.push({ f: { ...d, legIndex: flights.length }, ticket: ticketNo() });
         lines.push({ type: "flightAdded", ...flightLabel(d), ...agentOf(d), amountSAR: d.totalSAR, nonRefundableSAR: 0 });
@@ -303,7 +305,7 @@ export function quoteModification(booking: StoredBooking, plan: ModificationPlan
 
   // Return flight: changed by the issuing agent (fare difference + change fee per its policy).
   const r = plan.offers.returnFlight;
-  if (!r || !verifyOffer(r) || r.kind !== "return" || r.agentId !== oldRet.agentId || r.from !== t.departureCity || r.to !== c.origin || !r.departAt.startsWith(newReturnDate))
+  if (!r || !verifyOffer(r) || r.kind !== "return" || r.agentId !== oldRet.agentId || r.from !== airportOf(t.departureCity) || r.to !== c.origin || !r.departAt.startsWith(newReturnDate))
     throw new BookingError("offerExpired");
   const fee = flightChangeFee(oldRet, c.pax);
   const diff = round2(r.totalSAR - oldRet.totalSAR);

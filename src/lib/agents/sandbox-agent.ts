@@ -1,7 +1,7 @@
 import { addDays } from "../dates";
 import type { CabinClass } from "../types";
 import {
-  ACTIVITIES, AMENITIES, CARRIERS, DISTRICTS, DOMESTIC_CARRIERS, HOTEL_BRANDS, ORIGIN_BLOCK_MIN,
+  ACTIVITIES, AMENITIES, CARRIERS, DISTRICTS, DOMESTIC_CARRIERS, HOTEL_BRANDS, MAKKAH_DISTRICTS, ORIGIN_BLOCK_MIN,
   ORIGIN_HOME_CARRIER, ROOM_TYPES, sandboxHotelLicense,
 } from "./mock-data";
 import type { TravelAgentProvider } from "./provider";
@@ -90,7 +90,7 @@ export function createSandboxAgent(opts: {
         while (used.has(bi)) bi = (bi + 1) % HOTEL_BRANDS.length;
         used.add(bi);
         const brand = HOTEL_BRANDS[bi];
-        const district = r.pick(DISTRICTS);
+        const district = r.pick(city === "MKX" ? MAKKAH_DISTRICTS : DISTRICTS);
         const room = r.pick(ROOM_TYPES);
         const perNight = Math.round((brand.stars * 180 + r.int(40, 380)) * opts.priceFactor) * rooms;
         offers.push({
@@ -122,6 +122,8 @@ export function createSandboxAgent(opts: {
 
     async searchActivities({ city, from, pax }) {
       await wait();
+      // Makkah: the stay is for Umrah; no leisure tickets are sold there.
+      if (city === "MKX") return [];
       const r = rng(`${opts.id}|A|${city}|${from}`);
       // One ticket per traveller in the package.
       const party = pax.adults + pax.children + pax.infants;

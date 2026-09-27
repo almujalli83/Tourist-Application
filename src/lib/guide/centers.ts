@@ -2,6 +2,7 @@
 export const CITY_CENTERS: Record<string, { lat: number; lng: number; zoom: number }> = {
   RUH: { lat: 24.7136, lng: 46.6753, zoom: 11 },
   JED: { lat: 21.5433, lng: 39.1728, zoom: 11 },
+  MKX: { lat: 21.4225, lng: 39.8262, zoom: 13 },
   ULH: { lat: 26.6167, lng: 37.9167, zoom: 10 },
   DMM: { lat: 26.3927, lng: 50.1100, zoom: 10 },
   AHB: { lat: 18.2164, lng: 42.5053, zoom: 11 },

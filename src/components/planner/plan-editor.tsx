@@ -19,7 +19,7 @@ import { STATIONS, LINES } from "@/lib/trains/network";
 import { useApp } from "../app-provider";
 import { PlanGuides } from "../guides/plan-guides";
 import { GuideMap, type GuideCategory, type MapPoint } from "../guide/guide-map";
-import { CalendarIcon, ShareIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon } from "../icons";
+import { CalendarIcon, ShareIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon, KaabaIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "../ui";
 import { ActivityPicker } from "./activity-picker";
 
@@ -363,6 +363,11 @@ export function PlanEditor({ initial, warning, onNew, readOnly = false }: { init
               <div>
                 <p className="text-xs font-semibold text-brand-700">{fmt(p.dayN, { n: i + 1 })} · {fmtDay(d.date, locale, { weekday: "long", day: "numeric", month: "long" })} · {cityName(d.city, locale)}</p>
                 <h2 className="text-lg font-bold" dir="auto">{d.title}</h2>
+                {d.umrah && (
+                  <Link href={`/${locale}/umrah`} className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-gold-50 px-3 py-1.5 text-xs font-semibold text-gold-700 ring-1 ring-gold-500/30" data-testid="plan-umrah-day">
+                    <KaabaIcon className="size-4" />{t.umrah.steps.title}
+                  </Link>
+                )}
               </div>
               {editable && i === dayIdx && (
                 <div className="flex flex-wrap gap-2 print:hidden">

@@ -1,26 +1,50 @@
 import { addDays, diffDays, isValidISODate } from "./dates";
 import { PACKAGE_LIMITS } from "./config";
 import { paxFromRooms, validateRooms } from "./occupancy";
-import { getCity, getSaudiCity } from "./data/cities";
+import { airportOf, getCity, getSaudiCity, getStayCity, UMRAH_CITY } from "./data/cities";
 import { getCountry } from "./data/countries";
 import type { CityStay, FlightLeg, PaxCount, SearchCriteria } from "./types";
 
 /**
  * Builds the flight legs of a package: international outbound to the first city,
- * one domestic flight between each consecutive city, and the international return.
+ * one domestic flight between consecutive cities (none when they share an airport), and the return.
  */
 export function buildLegs(c: SearchCriteria): FlightLeg[] {
   const legs: FlightLeg[] = [];
   const first = c.stays[0];
   const last = c.stays[c.stays.length - 1];
-  legs.push({ index: 0, kind: "outbound", from: c.origin, to: first.city, date: c.departureDate });
+  // Flights use each city's airport (Makkah → Jeddah); cities sharing an airport are a ground transfer.
+  legs.push({ index: 0, kind: "outbound", from: c.origin, to: airportOf(first.city), date: c.departureDate });
   let date = c.departureDate;
   for (let i = 0; i < c.stays.length - 1; i++) {
     date = addDays(date, c.stays[i].nights);
-    legs.push({ index: legs.length, kind: "domestic", from: c.stays[i].city, to: c.stays[i + 1].city, date });
+    const from = airportOf(c.stays[i].city);
+    const to = airportOf(c.stays[i + 1].city);
+    if (from !== to) legs.push({ index: legs.length, kind: "domestic", from, to, date });
   }
-  legs.push({ index: legs.length, kind: "return", from: last.city, to: c.origin, date: c.returnDate });
+  legs.push({ index: legs.length, kind: "return", from: airportOf(last.city), to: c.origin, date: c.returnDate });
   return legs;
+}
+
+/** Road/rail transfers the package includes instead of a flight (e.g. Jeddah airport ↔ Makkah). */
+export function groundTransfers(c: SearchCriteria): { from: string; to: string; date: string }[] {
+  const out: { from: string; to: string; date: string }[] = [];
+  const first = c.stays[0];
+  const last = c.stays[c.stays.length - 1];
+  if (airportOf(first.city) !== first.city) out.push({ from: airportOf(first.city), to: first.city, date: c.departureDate });
+  let date = c.departureDate;
+  for (let i = 0; i < c.stays.length - 1; i++) {
+    date = addDays(date, c.stays[i].nights);
+    const a = c.stays[i].city;
+    const b = c.stays[i + 1].city;
+    if (airportOf(a) === airportOf(b)) out.push({ from: a, to: b, date });
+    else {
+      if (airportOf(a) !== a) out.push({ from: a, to: airportOf(a), date });
+      if (airportOf(b) !== b) out.push({ from: airportOf(b), to: b, date });
+    }
+  }
+  if (airportOf(last.city) !== last.city) out.push({ from: last.city, to: airportOf(last.city), date: c.returnDate });
+  return out;
 }
 
 /** Check-in / check-out dates for each city stay. */
@@ -63,8 +87,10 @@ export type SearchError =
 export function validateCriteria(c: SearchCriteria, today: string): SearchError[] {
   const errors: SearchError[] = [];
   if (!getCity(c.origin) || getSaudiCity(c.origin)) errors.push("origin");
-  if (c.stays.length === 0 || c.stays.some((s) => !getSaudiCity(s.city) || !(s.nights >= 1)))
+  if (c.stays.length === 0 || c.stays.some((s) => !getStayCity(s.city) || !(s.nights >= 1)))
     errors.push("cities");
+  // Makkah only with the Umrah option (Muslim declaration).
+  if (c.stays.some((s) => s.city === UMRAH_CITY) && c.umrah !== true) errors.push("cities");
   if (!isValidISODate(c.departureDate) || !isValidISODate(c.returnDate)) {
     errors.push("dates");
   } else {
