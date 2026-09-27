@@ -1,7 +1,8 @@
 /**
- * The traveller's Umrah trips (packages and draft plans with a Makkah stay), their Umrah day, the
- * way to Makkah (by air through Jeddah, or from Jeddah by road), the Hajj-season warning, the Nusuk
- * permits when linked, and the reminders (book the appointment in Nusuk; the Umrah day itself).
+ * The traveller's Umrah trips (packages and draft plans with a Makkah stay): the Umrah day, the way
+ * to Makkah (flying into Jeddah, or from Jeddah by road), the Hajj-season warning, the days on which
+ * Nusuk permits can be requested (Umrah: the nights in Makkah; Rawdah: the days in Madinah), the
+ * permits issued, and the reminders.
  */
 import { mtConfig } from "../config";
 import { UMRAH_CITY } from "../data/cities";
@@ -12,11 +13,14 @@ import { listPlans } from "../planner/plans";
 import type { AppNotification } from "../reminders/reminders";
 import { getUserById, listBookingsByUser } from "../repo";
 import { store } from "../store";
-import { nusukLinked, nusukPermits, type NusukPermit } from "./nusuk";
-import { getUmrahSeason, pauseOverlap } from "./season";
+import type { PublicPermit, StoredPermit } from "./permits";
+import { nusukProvider } from "./nusuk";
+import { getUmrahSeason, pauseOverlap, type UmrahSeason } from "./season";
 
 export interface UmrahTrip {
   id: string;
+  /** Key for permits: the booking id, or "demo" (sandbox sample); null for a draft plan. */
+  key: string | null;
   bookingId: string | null;
   planId: string | null;
   reference: string | null;
@@ -24,73 +28,120 @@ export interface UmrahTrip {
   returnDate: string;
   makkahFrom: string;
   makkahTo: string;
+  madinahFrom: string | null;
+  madinahTo: string | null;
   umrahDate: string;
   /** How the traveller reaches Makkah: flying into Jeddah, or from a stay in Jeddah. */
   route: "air" | "jeddah";
   fromCity: string | null;
-  travellers: { name: string; permits: NusukPermit[] | null }[];
+  /** Travellers of the booking; permits can be issued once the visa is. */
+  travellers: { applicationNo: string; name: string; visa: boolean }[];
   pause: { from: string; to: string } | null;
+  /** Days on which a permit can be requested now. */
+  windows: { umrah: string[]; rawdah: string[] };
+  permits: PublicPermit[];
   demo?: boolean;
+}
+
+/** Server-side context of a trip (with the passport data Nusuk needs). */
+export interface TripContext extends UmrahTrip {
+  people: { applicationNo: string; nameEn: string; passportNo: string; nationality: string; visaNumber: string | null }[];
 }
 
 const ksaToday = (now: Date) => new Date(now.getTime() + 3 * 3600_000).toISOString().slice(0, 10);
 export const demoUmrahEnabled = () => mtConfig().mock && process.env.DEMO_UMRAH !== "off";
-/** Days before departure to remind the traveller to book in Nusuk. */
+/** Days before departure to remind the traveller to book the permit. */
 export const BOOK_REMINDER_DAYS = 5;
 
-function makkahOf(stays: { city: string; checkIn: string; checkOut: string; nights: number }[]) {
+type Stay = { city: string; checkIn: string; checkOut: string; nights: number };
+
+function daysBetween(from: string, to: string, inclusive: boolean): string[] {
+  const out: string[] = [];
+  for (let d = from; inclusive ? d <= to : d < to; d = addDays(d, 1)) out.push(d);
+  return out;
+}
+
+function shape(stays: Stay[], season: UmrahSeason, today: string) {
   const i = stays.findIndex((s) => s.city === UMRAH_CITY);
   if (i < 0) return null;
   const s = stays[i];
   const prev = i > 0 ? stays[i - 1].city : null;
+  const med = stays.find((x) => x.city === "MED") ?? null;
+  const pause = pauseOverlap(season, s.checkIn, s.checkOut);
+  const inPause = (d: string) => !!season.pauseFrom && !!season.pauseTo && d >= season.pauseFrom && d <= season.pauseTo;
   return {
-    from: s.checkIn, to: s.checkOut,
+    makkahFrom: s.checkIn, makkahTo: s.checkOut,
+    madinahFrom: med?.checkIn ?? null, madinahTo: med?.checkOut ?? null,
     // The first full day there (the arrival day itself on a one-night stay).
     umrahDate: s.nights >= 2 ? addDays(s.checkIn, 1) : s.checkIn,
     route: prev === "JED" ? ("jeddah" as const) : ("air" as const),
     fromCity: prev,
+    pause,
+    windows: {
+      umrah: daysBetween(s.checkIn, s.checkOut, false).filter((d) => d >= today && !inPause(d)),
+      rawdah: med ? daysBetween(med.checkIn, med.checkOut, true).filter((d) => d >= today) : [],
+    },
+    /** Every day of the stays (whatever today is): permits outside them no longer fit the trip. */
+    stayDays: { umrah: daysBetween(s.checkIn, s.checkOut, false), rawdah: med ? daysBetween(med.checkIn, med.checkOut, true) : [] },
+  };
+}
+
+export async function tripContexts(userId: string, now = new Date()): Promise<(TripContext & { stayDays: { umrah: string[]; rawdah: string[] }; cancelled?: boolean })[]> {
+  const today = ksaToday(now);
+  const season = await getUmrahSeason();
+  const out: (TripContext & { stayDays: { umrah: string[]; rawdah: string[] }; cancelled?: boolean })[] = [];
+  for (const b of await listBookingsByUser(userId)) {
+    const m = shape(stayDates(b.criteria), season, today);
+    if (!m) continue;
+    const cancelled = b.status === "CANCELLED" || b.mt.packageStatus === "CANCELLED";
+    const people = b.applicants.map((a) => ({ applicationNo: a.applicationNo, nameEn: a.nameEn, passportNo: a.passportNo, nationality: a.nationality, visaNumber: a.visaNumber }));
+    out.push({
+      id: `booking:${b.id}`, key: b.id, bookingId: b.id, planId: null, reference: b.reference, departureDate: b.criteria.departureDate, returnDate: b.criteria.returnDate,
+      ...m, travellers: people.map((p) => ({ applicationNo: p.applicationNo, name: p.nameEn, visa: !!p.visaNumber })), permits: [], people,
+      ...(cancelled ? { cancelled: true, windows: { umrah: [], rawdah: [] } } : {}),
+    });
+  }
+  for (const p of await listPlans(userId)) {
+    if (p.status !== "draft" || !p.request.umrah || p.returnDate < today) continue;
+    const m = shape(stayDates({ ...p.request, stays: p.stays, returnDate: p.returnDate } as never), season, today);
+    if (!m) continue;
+    const marked = p.days.find((d) => d.umrah)?.date;
+    out.push({
+      id: `plan:${p.id}`, key: null, bookingId: null, planId: p.id, reference: null, departureDate: p.request.departureDate, returnDate: p.returnDate,
+      ...m, umrahDate: marked ?? m.umrahDate, windows: { umrah: [], rawdah: [] }, travellers: [], permits: [], people: [],
+    });
+  }
+  if (!out.length && demoUmrahEnabled()) out.push(demoTrip(today, season));
+  return out;
+}
+
+/** A sample trip (sandbox): Jeddah, two nights in Makkah, then Madinah, ten days from now. */
+function demoTrip(today: string, season: UmrahSeason): TripContext & { stayDays: { umrah: string[]; rawdah: string[] } } {
+  const dep = addDays(today, 10);
+  const stays: Stay[] = [
+    { city: "JED", checkIn: dep, checkOut: addDays(dep, 2), nights: 2 },
+    { city: UMRAH_CITY, checkIn: addDays(dep, 2), checkOut: addDays(dep, 4), nights: 2 },
+    { city: "MED", checkIn: addDays(dep, 4), checkOut: addDays(dep, 5), nights: 1 },
+  ];
+  const m = shape(stays, season, today)!;
+  const people = [
+    { applicationNo: "demo-1", nameEn: "AHMED ALI", passportNo: "A00000001", nationality: "EG", visaNumber: "6000000001" },
+    { applicationNo: "demo-2", nameEn: "FATIMA ALI", passportNo: "A00000002", nationality: "EG", visaNumber: "6000000002" },
+  ];
+  return {
+    id: "demo", key: "demo", bookingId: null, planId: null, reference: "TA-DEMO2026", departureDate: dep, returnDate: addDays(dep, 5),
+    ...m, travellers: people.map((p) => ({ applicationNo: p.applicationNo, name: p.nameEn, visa: true })), permits: [], people, demo: true,
   };
 }
 
 export async function listUmrahTrips(userId: string, now = new Date()): Promise<UmrahTrip[]> {
   const today = ksaToday(now);
-  const season = await getUmrahSeason();
-  const out: UmrahTrip[] = [];
-  for (const b of await listBookingsByUser(userId)) {
-    if (b.status === "CANCELLED" || b.mt.packageStatus === "CANCELLED" || b.criteria.returnDate < today) continue;
-    const m = makkahOf(stayDates(b.criteria));
-    if (!m) continue;
-    const travellers = await Promise.all(b.applicants.map(async (a) => ({
-      name: a.nameEn,
-      permits: nusukLinked() ? await nusukPermits(a.passportNo, a.nationality) : null,
-    })));
-    out.push({
-      id: `booking:${b.id}`, bookingId: b.id, planId: null, reference: b.reference, departureDate: b.criteria.departureDate, returnDate: b.criteria.returnDate,
-      makkahFrom: m.from, makkahTo: m.to, umrahDate: m.umrahDate, route: m.route, fromCity: m.fromCity, travellers, pause: pauseOverlap(season, m.from, m.to),
-    });
-  }
-  for (const p of await listPlans(userId)) {
-    if (p.status !== "draft" || !p.request.umrah || p.returnDate < today) continue;
-    const m = makkahOf(stayDates({ ...p.request, stays: p.stays, returnDate: p.returnDate } as never));
-    if (!m) continue;
-    const marked = p.days.find((d) => d.umrah)?.date;
-    out.push({
-      id: `plan:${p.id}`, bookingId: null, planId: p.id, reference: null, departureDate: p.request.departureDate, returnDate: p.returnDate,
-      makkahFrom: m.from, makkahTo: m.to, umrahDate: marked ?? m.umrahDate, route: m.route, fromCity: m.fromCity, travellers: [], pause: pauseOverlap(season, m.from, m.to),
-    });
-  }
-  if (!out.length && demoUmrahEnabled()) out.push(demoTrip(today));
-  return out.sort((a, b) => a.departureDate.localeCompare(b.departureDate));
-}
-
-/** A sample trip (sandbox): Jeddah then two nights in Makkah, ten days from now. */
-function demoTrip(today: string): UmrahTrip {
-  const dep = addDays(today, 10);
-  return {
-    id: "demo", bookingId: null, planId: null, reference: "TA-DEMO2026", departureDate: dep, returnDate: addDays(dep, 5),
-    makkahFrom: addDays(dep, 2), makkahTo: addDays(dep, 4), umrahDate: addDays(dep, 3), route: "jeddah", fromCity: "JED",
-    travellers: [{ name: "AHMED ALI", permits: null }], pause: null, demo: true,
-  };
+  const permits = (await store().findBy<StoredPermit>("umrahPermits", "userId", userId)).filter((p) => p.status === "issued");
+  const { toPublicPermit } = await import("./permits");
+  return (await tripContexts(userId, now))
+    .filter((t) => !t.cancelled && t.returnDate >= today)
+    .map(({ people: _p, stayDays: _s, cancelled: _c, ...t }) => ({ ...t, permits: t.key ? permits.filter((p) => p.tripKey === t.key).map(toPublicPermit) : [] })) // eslint-disable-line @typescript-eslint/no-unused-vars
+    .sort((a, b) => a.departureDate.localeCompare(b.departureDate));
 }
 
 /* ------------------------------------------------------------ reminders */
@@ -102,23 +153,36 @@ async function notify(userId: string, doc: AppNotification) {
   const sent = await notifyTravellers([user.email], { subject: `Saudi Trip — ${doc.titleEn} / ${doc.titleAr}`, text: [doc.titleEn, ...doc.linesEn, "", doc.titleAr, ...doc.linesAr].join("\n") }, { bookingId: doc.bookingId });
   if (sent) await store().update<AppNotification>("notifications", doc.id, (n) => ({ ...n, email: { to: sent.to, status: sent.status } }));
 }
+export { notify as notifyUmrah };
 
-/** «Book your Umrah appointment in Nusuk» a few days before the trip, and the Umrah-day reminder. */
+/** «Book your Umrah permit» a few days before the trip (unless everyone has one), and the Umrah-day reminder. */
 export async function umrahReminders(userId: string, now = new Date()): Promise<number> {
   const today = ksaToday(now);
+  const auto = !!nusukProvider();
+  const { reconcilePermits } = await import("./permits");
+  await reconcilePermits(userId, now);
   let n = 0;
   for (const t of await listUmrahTrips(userId, now)) {
     if (!t.bookingId || t.demo) continue;
     const base = { userId, kind: "umrah" as const, bookingId: t.bookingId, reference: t.reference ?? "", createdAt: now.toISOString(), href: "/umrah", readAt: null, deletedAt: null, email: null };
     const d = (x: string, ar: boolean) => new Date(`${x}T12:00:00Z`).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { weekday: "long", day: "numeric", month: "long" });
-    if (today >= addDays(t.departureDate, -BOOK_REMINDER_DAYS) && today <= t.makkahFrom) {
+    const allHave = t.travellers.length > 0 && t.travellers.every((x) => t.permits.some((p) => p.type === "umrah" && p.travellers.some((y) => y.applicationNo === x.applicationNo)));
+    if (!allHave && today >= addDays(t.departureDate, -BOOK_REMINDER_DAYS) && today <= t.makkahFrom) {
       const pauseAr = t.pause ? [`⚠️ رحلتك تقع في فترة إيقاف تصاريح العمرة لموسم الحج (${t.pause.from} – ${t.pause.to}).`] : [];
       const pauseEn = t.pause ? [`⚠️ Your trip falls in the Umrah permit pause for the Hajj season (${t.pause.from} – ${t.pause.to}).`] : [];
       await notify(userId, {
         ...base, id: `umrah:book:${t.bookingId}`,
-        titleAr: "احجز موعد العمرة في تطبيق نسك", titleEn: "Book your Umrah appointment in Nusuk",
-        linesAr: [`يوم العمرة في برنامجك: ${d(t.umrahDate, true)}. احجز التصريح في «نسك» بجوازك ورقم تأشيرتك قبل الرحلة.`, ...pauseAr],
-        linesEn: [`Your Umrah day: ${d(t.umrahDate, false)}. Book the permit in Nusuk with your passport and visa number before the trip.`, ...pauseEn],
+        titleAr: "احجز تصريح العمرة", titleEn: "Book your Umrah permit",
+        linesAr: [
+          `يوم العمرة في برنامجك: ${d(t.umrahDate, true)}.`,
+          auto ? "اختر اليوم والوقت المناسبين من صفحة العمرة، ويصدر التصريح من «نسك» تلقائيًا." : "احجز التصريح في تطبيق «نسك» بجوازك ورقم تأشيرتك قبل الرحلة.",
+          ...pauseAr,
+        ],
+        linesEn: [
+          `Your Umrah day: ${d(t.umrahDate, false)}.`,
+          auto ? "Pick the day and time on the Umrah page and the permit is issued by Nusuk automatically." : "Book the permit in the Nusuk app with your passport and visa number before the trip.",
+          ...pauseEn,
+        ],
         ...(t.pause ? { severity: "warning" as const } : {}),
       });
       n++;

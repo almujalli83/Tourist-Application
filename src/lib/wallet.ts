@@ -18,7 +18,7 @@ import { listBookingsByUser } from "./repo";
 import { listWithKeys, passportKey } from "./saved-travellers-repo";
 import { store } from "./store";
 
-export const WALLET_DOC_TYPES = ["passport", "photo", "nationalId", "residence", "visa", "insurance", "other"] as const;
+export const WALLET_DOC_TYPES = ["passport", "photo", "nationalId", "residence", "visa", "insurance", "permit", "other"] as const;
 export type WalletDocType = (typeof WALLET_DOC_TYPES)[number];
 export const UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // below the 4.5 MB request limit of serverless functions
 
@@ -154,6 +154,31 @@ export async function syncIssuedDocuments(userId: string, bookings: StoredBookin
     }
   }
   return added;
+}
+
+/**
+ * Adds a document issued for the traveller by another service (a Nusuk permit…), once per id;
+ * `retire` marks it withdrawn (the permit was cancelled): it leaves the wallet and is not added again.
+ */
+export async function addIssuedDocument(userId: string, input: {
+  id: string; person: { nationality: string; passportNo: string; nameEn: string }; type: WalletDocType; title: string;
+  bookingId: string | null; applicationNo: string | null; data: Buffer; contentType: string; meta: WalletDocMeta;
+}): Promise<boolean> {
+  if (await store().get("wallet", input.id)) return false;
+  const file = await saveFile(userId, input.data, input.contentType);
+  const doc: WalletDoc = {
+    id: input.id, personKey: passportKey(input.person), personName: input.person.nameEn, type: input.type, title: input.title, source: "central",
+    bookingId: input.bookingId, applicationNo: input.applicationNo, file, meta: input.meta, createdAt: new Date().toISOString(),
+  };
+  const row: StoredWalletDoc = { id: doc.id, userId, createdAt: doc.createdAt, enc: encryptJson(doc) };
+  if (await store().insert("wallet", doc.id, row)) return true;
+  await deleteFile(file);
+  return false;
+}
+
+export async function retireIssuedDocument(userId: string, id: string): Promise<void> {
+  const doc = await getWalletDoc(userId, id);
+  if (doc && !doc.deleted) await deleteWalletDocument(userId, id);
 }
 
 /* ------------------------------------------------------------ overview */

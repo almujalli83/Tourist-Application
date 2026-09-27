@@ -15,6 +15,7 @@ import { notifyTravellers } from "../notify";
 import type { AppNotification } from "../reminders/reminders";
 import { getUserById } from "../repo";
 import { store } from "../store";
+import { travellerPermits } from "../umrah/permits";
 
 export const ROTATE_SECONDS = 60;
 export const OFFLINE_HOURS = 12;
@@ -32,6 +33,8 @@ export interface TouristCard {
   valid: boolean;
   insurance: "ISSUED" | "PENDING";
   trip: { reference: string; city: string | null; hotelAr: string | null; hotelEn: string | null; returnDate: string } | null;
+  /** Nusuk permits (Umrah, Rawdah) issued for this traveller through Saudi Trip. */
+  permits: { type: "umrah" | "rawdah"; date: string; start: string; end: string; permitNo: string; demo?: boolean }[];
   demo?: boolean;
 }
 
@@ -53,7 +56,7 @@ function demoCard(userId: string, now: Date): TouristCard {
   return {
     id: `demo-${userId}`, userId, nameEn: "AHMED ALI", nationality: "EG", passportLast4: "4567", visaNumber: "6000000001", visaType: "tourism-package",
     visaIssueDate: plus(-10), visaExpiryDate: plus(355), valid: true, insurance: "ISSUED",
-    trip: { reference: "TA-DEMO2026", city: "RUH", hotelAr: "فندق نجد الكبير", hotelEn: "Najd Grand Hotel", returnDate: plus(5) }, demo: true,
+    trip: { reference: "TA-DEMO2026", city: "RUH", hotelAr: "فندق نجد الكبير", hotelEn: "Najd Grand Hotel", returnDate: plus(5) }, permits: [], demo: true,
   };
 }
 
@@ -75,12 +78,18 @@ export async function listCards(userId: string, now = new Date()): Promise<Touri
         id: `${b.id}:${a.applicationNo}`, userId, nameEn: a.nameEn, nationality: a.nationality, passportLast4: a.passportNo.slice(-4),
         visaNumber: a.visaNumber, visaType: "tourism-package", visaIssueDate: a.visaIssueDate, visaExpiryDate: a.visaExpiryDate,
         valid: a.visaStatus !== "CANCELLED" && a.visaExpiryDate >= today, insurance: a.insuranceStatus === "ISSUED" ? "ISSUED" : "PENDING",
-        trip: tripNow(b, today),
+        trip: tripNow(b, today), permits: [],
       });
     }
   }
   const list = [...cards.values()];
   if (!list.length && demoCardsEnabled()) list.push(demoCard(userId, now));
+  for (const c of list) {
+    const [tripKey, applicationNo] = c.demo ? ["demo", "demo-1"] : c.id.split(":");
+    c.permits = (await travellerPermits(userId, tripKey, applicationNo))
+      .filter((p) => p.date >= today)
+      .map((p) => ({ type: p.type, date: p.date, start: p.start, end: p.end, permitNo: p.permitNo, ...(p.source === "sandbox" ? { demo: true } : {}) }));
+  }
   return list;
 }
 
