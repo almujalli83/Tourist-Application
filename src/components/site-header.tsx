@@ -34,6 +34,7 @@ export function SiteHeader() {
   const accountLinks = user
     ? [
         { href: `/${locale}/account`, label: t.nav.myBookings },
+        { href: `/${locale}/account/card`, label: t.card.nav },
         { href: `/${locale}/account/wallet`, label: t.wallet.nav },
         { href: `/${locale}/account/notifications`, label: t.account.notifications.nav },
         ...(user.accountType === "individual" ? [{ href: `/${locale}/account/loyalty`, label: t.loyalty.nav }] : []),
@@ -61,7 +62,7 @@ export function SiteHeader() {
   // The most specific matching link is the active one (e.g. /account/wallet over /account).
   const activeHref = [...links, ...accountLinks]
     .map((l) => l.href)
-    .filter((h) => (h === `/${locale}` ? pathname === h : pathname.startsWith(h)))
+    .filter((h) => (h === `/${locale}` ? pathname === h : pathname === h || pathname.startsWith(`${h}/`)))
     .sort((a, b) => b.length - a.length)[0];
 
   async function logout() {

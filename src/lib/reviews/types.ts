@@ -1,6 +1,6 @@
 /** Verified ratings and reviews (service 9): shared types (no server-only imports). */
 
-export const REVIEW_TARGETS = ["package", "hotel", "airline", "event", "restaurant", "place", "service"] as const;
+export const REVIEW_TARGETS = ["package", "hotel", "airline", "event", "restaurant", "place", "service", "guide"] as const;
 export type ReviewTarget = (typeof REVIEW_TARGETS)[number];
 
 /** Saudi Trip services that travellers rate once they've used them. */
@@ -16,6 +16,7 @@ export const CRITERIA: Record<ReviewTarget, readonly string[]> = {
   restaurant: ["food", "service", "ambience", "value"],
   place: ["experience", "facilities", "access"],
   service: ["ease", "speed", "clarity"],
+  guide: ["knowledge", "communication", "punctuality"],
 };
 
 export const MAX_COMMENT = 1000;

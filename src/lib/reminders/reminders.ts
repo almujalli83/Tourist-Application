@@ -18,12 +18,15 @@ import { planForBooking } from "../planner/plans";
 import { getUserById, listBookingsByUser } from "../repo";
 import { requestReviews } from "../reviews/reviews";
 import { runTripAlerts, tripWeatherLines } from "../alerts/alerts";
+import { cardReadyNotifications } from "../card/card";
+import { expireGuideRequests } from "../guides/bookings";
+import { syncGuidesFromMt } from "../guides/guides";
 import { store } from "../store";
 
 export type ReminderKind = "arrival" | "departure" | "visa7" | "visa1";
 
 /** Notification kinds: trip reminders, requests to rate experiences (service 9) and points about to expire (service 10). */
-export type NotificationKind = ReminderKind | "review" | "points" | "support" | "weather" | "daily" | "events" | "eventReminder" | "eventChange";
+export type NotificationKind = ReminderKind | "review" | "points" | "support" | "weather" | "daily" | "events" | "eventReminder" | "eventChange" | "card" | "guide";
 
 export interface AppNotification {
   /** `${bookingId}:${kind}` (for visa reminders also the expiry date). */
@@ -238,8 +241,12 @@ export async function runReminders(now = new Date()): Promise<{ bookings: number
   for (const u of await store().list<{ id: string }>("users", 100_000)) {
     if (await requestReviews(u.id, now)) reviewRequests++;
     await runTripAlerts(u.id, now);
+    await cardReadyNotifications(u.id, now);
   }
   const loyalty = await runLoyalty(now);
+  // Licensed guides: daily MoT sync (when configured), then cancel requests of expired licences.
+  await syncGuidesFromMt(now).catch((e) => console.error("guides sync failed", e));
+  await expireGuideRequests(now);
   return { bookings: bookings.length, created, reviewRequests, pointsReminders: loyalty.reminders };
 }
 
@@ -249,6 +256,7 @@ export async function listNotifications(userId: string, now = new Date()): Promi
   await requestReviews(userId, now);
   await expiryReminders(userId, now);
   await runTripAlerts(userId, now);
+  await cardReadyNotifications(userId, now);
   const rows = await store().findBy<AppNotification>(COL, "userId", userId);
   return rows.filter((n) => !n.deletedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

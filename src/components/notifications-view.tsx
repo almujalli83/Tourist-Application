@@ -6,13 +6,13 @@ import { fmtKsa } from "@/lib/events/format";
 import type { AppNotification, NotificationKind } from "@/lib/reminders/reminders";
 import { useApp } from "./app-provider";
 import { BackLink } from "./back-link";
-import { CalendarIcon, ChatIcon, ClockIcon, GiftIcon, PassportIcon, PlaneIcon, StarIcon, SunIcon, TicketIcon, TrashIcon } from "./icons";
+import { CalendarIcon, ChatIcon, ClockIcon, UsersIcon, GiftIcon, PassportIcon, PlaneIcon, StarIcon, SunIcon, TicketIcon, TrashIcon } from "./icons";
 import { NOTIFICATIONS_CHANGED } from "./notification-bell";
 import { AlertPrefsCard } from "./alerts/alert-prefs";
 import { Alert, Badge, Card, cx, Spinner } from "./ui";
 
 const ICON: Record<NotificationKind, typeof PlaneIcon> = { arrival: PlaneIcon, departure: CalendarIcon, visa7: PassportIcon, visa1: PassportIcon, review: StarIcon, points: GiftIcon, support: ChatIcon,
-  weather: SunIcon, daily: CalendarIcon, events: TicketIcon, eventReminder: ClockIcon, eventChange: TicketIcon,
+  weather: SunIcon, daily: CalendarIcon, events: TicketIcon, eventReminder: ClockIcon, eventChange: TicketIcon, card: PassportIcon, guide: UsersIcon,
 };
 
 /** Service 8 — trip reminders (before arrival, before departure, before the visa expires). */

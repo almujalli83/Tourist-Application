@@ -38,6 +38,8 @@ const PAGES = [
   ["Notifications: trip reminders (before arrival, before departure, visa expiry) and rating requests", "/{locale}/account/notifications"],
   ["My reviews: rate verified experiences (trip, hotels, airlines, events, restaurants, landmarks, Saudi Trip services); low ratings link to the Ministry of Tourism complaint service", "/{locale}/account/reviews"],
   ["Service ratings (public verified ratings of Saudi Trip services)", "/{locale}/ratings"],
+  ["Digital tourist card: each traveller's visa card with a rotating signed QR code (shown instead of the passport at hotels and events; works offline)", "/{locale}/account/card"],
+  ["Licensed tour guides (Ministry of Tourism register; only valid licences, expired ones hidden): directory by city, language (native/fluent/good), track and gender; call/WhatsApp; send a request the guide confirms (no payment); licence verification by number or QR at /{locale}/verify/guide/<licence>", "/{locale}/guides"],
   ["Support centre: FAQ and multilingual support tickets with the Saudi Trip team (write in any language; replies are translated), optionally linked to a booking", "/{locale}/support"],
   ["Emergency: one-tap calls (911 unified, 997 ambulance, 999 police, 998 civil defence, 993 traffic, 996 road security, 937 health line), the traveller's location to share, nearest hospitals/pharmacies/police, medical insurance, embassy, emergency phrases, lost passport steps. For any emergency, tell the traveller to call 911 first", "/{locale}/emergency"],
   ["Prayer times (optional): Umm al-Qura times by location, trip city or chosen city; Qibla compass; nearest mosques and grand mosques for Friday; optional alert before each prayer", "/{locale}/prayer"],

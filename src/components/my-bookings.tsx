@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
 import type { EsimOrder } from "@/lib/esim/orders";
+import type { GuideBooking } from "@/lib/guides/bookings";
 import { fmtDay, fmtKsa, ksaDay } from "@/lib/events/format";
 import type { EventOrder } from "@/lib/events/types";
 import type { RestaurantBooking } from "@/lib/restaurants/bookings";
@@ -13,20 +14,21 @@ import { groupByTrip } from "@/lib/account/trips";
 import type { BookingRow } from "./account-view";
 import { useApp } from "./app-provider";
 import { StatusBadge } from "./booking-details";
-import { CalendarIcon, PassportIcon, PhoneIcon, TicketIcon, TrainIcon } from "./icons";
+import { CalendarIcon, PassportIcon, PhoneIcon, TicketIcon, TrainIcon, UsersIcon } from "./icons";
 import { useNetwork } from "./transport/train-ticket-view";
 import { Badge, Card, cx, Spinner } from "./ui";
 
-type Kind = "package" | "event" | "train" | "table" | "esim";
-const KINDS: Kind[] = ["package", "event", "train", "table", "esim"];
+type Kind = "package" | "event" | "train" | "table" | "esim" | "guide";
+const KINDS: Kind[] = ["package", "event", "train", "table", "esim", "guide"];
 const ICONS: Record<Kind, ReactNode> = {
   package: <PassportIcon className="size-5" />,
   event: <TicketIcon className="size-5" />,
   train: <TrainIcon className="size-5" />,
   table: <CalendarIcon className="size-5" />,
   esim: <PhoneIcon className="size-5" />,
+  guide: <UsersIcon className="size-5" />,
 };
-const BROWSE: Record<Kind, string> = { package: "/package-visa", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim" };
+const BROWSE: Record<Kind, string> = { package: "/package-visa", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim", guide: "/guides" };
 
 interface Item {
   kind: Kind;
@@ -62,6 +64,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
   const [trains, setTrains] = useState<TrainOrder[] | null>(null);
   const [tables, setTables] = useState<RestaurantBooking[] | null>(null);
   const [esims, setEsims] = useState<EsimOrder[] | null>(null);
+  const [guides, setGuides] = useState<GuideBooking[] | null>(null);
   const [tab, setTab] = useState<"all" | Kind>("all");
 
   useEffect(() => {
@@ -71,9 +74,10 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
     void load<TrainOrder>("/api/trains/orders", "orders", setTrains);
     void load<RestaurantBooking>("/api/restaurants/bookings", "bookings", setTables);
     void load<EsimOrder>("/api/esim/orders", "orders", setEsims);
+    void load<GuideBooking>("/api/guides/bookings", "bookings", setGuides);
   }, []);
 
-  const loading = !events || !trains || !tables || !esims;
+  const loading = !events || !trains || !tables || !esims || !guides;
   const items = useMemo<Item[]>(() => {
     const now = Date.now();
     const today = ksaDay(new Date());
@@ -146,8 +150,21 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         packageId: o.booking?.id,
       });
     }
+    for (const b of guides ?? []) {
+      const live = b.status === "pending" || b.status === "confirmed";
+      const start = Date.parse(`${b.date}T${b.startTime}:00+03:00`);
+      const end = start + b.hours * 3_600_000;
+      out.push({
+        kind: "guide", id: b.id, href: `/${locale}/account/guide-bookings/${b.id}`,
+        title: ar ? b.guide.nameAr : b.guide.nameEn,
+        subtitle: `${when(new Date(start).toISOString())} · ${cityName(b.city, locale)} · ${fmt(t.guides.booking.people, { n: b.people })}`,
+        at: start, day: b.date,
+        upcoming: live && end > now, today: live && end > now && b.date === today,
+        status: <Badge tone={b.status === "confirmed" ? "brand" : b.status === "pending" ? "amber" : "red"}>{t.guides.booking.status[b.status]}</Badge>,
+      });
+    }
     return out;
-  }, [packages, events, trains, tables, esims, net, locale, ar, money, t]);
+  }, [packages, events, trains, tables, esims, guides, net, locale, ar, money, t]);
 
   const shown = items.filter((i) => tab === "all" || i.kind === tab);
   // "All" and "Packages" show each trip with the bookings made for it; the other tabs stay flat.

@@ -9,13 +9,13 @@ import {
 } from "@/lib/reviews/types";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
-import { CalendarIcon, CameraIcon, HotelIcon, MapPinIcon, PassportIcon, PlaneIcon, ShieldIcon, StarIcon, TicketIcon, XIcon } from "../icons";
+import { CalendarIcon, CameraIcon, HotelIcon, MapPinIcon, PassportIcon, PlaneIcon, ShieldIcon, StarIcon, TicketIcon, UsersIcon, XIcon } from "../icons";
 import { NOTIFICATIONS_CHANGED } from "../notification-bell";
 import { Alert, Badge, Button, Card, cx, Spinner, Textarea } from "../ui";
 import { RatingStars, StarInput } from "./shared";
 
 type Mine = PublicReview & { status: ReviewStatus; moderationReason: ModerationReason | null; sourceRef: string };
-const ICONS = { package: PassportIcon, hotel: HotelIcon, airline: PlaneIcon, event: TicketIcon, restaurant: CalendarIcon, place: MapPinIcon, service: StarIcon };
+const ICONS = { package: PassportIcon, hotel: HotelIcon, airline: PlaneIcon, event: TicketIcon, restaurant: CalendarIcon, place: MapPinIcon, service: StarIcon, guide: UsersIcon };
 const STATUS_TONE = { published: "brand", pending: "amber", rejected: "red" } as const;
 
 /** Resizes a photo in the browser (longest side 1280px, JPEG) before upload. */

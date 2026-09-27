@@ -17,6 +17,7 @@ import { dayWarnings, fmtMin, scheduleDay, type ScheduledEntry } from "@/lib/pla
 import { isFlexible, maxItems, type PlanDay, type PlanItem, type TripPlan } from "@/lib/planner/types";
 import { STATIONS, LINES } from "@/lib/trains/network";
 import { useApp } from "../app-provider";
+import { PlanGuides } from "../guides/plan-guides";
 import { GuideMap, type GuideCategory, type MapPoint } from "../guide/guide-map";
 import { CalendarIcon, ShareIcon, ClockIcon, DirectionsIcon, MapPinIcon, PlaneIcon, RefreshIcon, TicketIcon, TrainIcon, XIcon } from "../icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "../ui";
@@ -299,6 +300,8 @@ export function PlanEditor({ initial, warning, onNew, readOnly = false }: { init
           <p className="mt-2 text-xs text-slate-500">{p.budget.note}</p>
         </Card>
       </div>
+
+      <PlanGuides cities={plan.stays.map((x) => x.city)} interests={plan.request.interests} />
 
       <div className={cx("grid gap-6 print:hidden", editable && "lg:grid-cols-[1fr_360px]")}>
         {editable && (
