@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { SAUDI_CITIES } from "@/lib/data/cities";
+import { getStayCity, SAUDI_CITIES } from "@/lib/data/cities";
 import { CITY_TRANSPORT, DEFAULT_CITY, GENERAL_TIPS, INTERCITY, type ModeInfo, type ModeKind } from "@/lib/transport/content";
 import { useApp } from "../app-provider";
 import { BusIcon, CarIcon, CheckIcon, GlobeIcon, MapPinIcon, PlaneIcon, TicketIcon, TrainIcon } from "../icons";
@@ -10,12 +10,13 @@ import { Card, cx } from "../ui";
 import { RideFinder } from "./ride-finder";
 import { ManualTransfer } from "../transfers/manual-transfer";
 import { TransitPanel } from "../transit/transit-panel";
+import { useTransitOperators } from "../transit/use-transit";
 import { RentalPanel } from "../rentals/rental-panel";
 
 const ICONS: Record<ModeKind, (p: { className?: string }) => React.ReactElement> = {
   train: TrainIcon, metro: TrainIcon, bus: BusIcon, taxi: CarIcon, car: CarIcon, airport: PlaneIcon, flight: PlaneIcon, tour: MapPinIcon,
 };
-const FEATURED = ["RUH", "JED", "MED", "ULH", "DMM", "HOF", "ELQ", "HAS"];
+const FEATURED = ["RUH", "MKX", "JED", "MED", "ULH", "DMM", "HOF", "ELQ", "HAS"];
 
 /** Transport guide: between cities and within each city (information only). */
 export function TransportView() {
@@ -23,14 +24,15 @@ export function TransportView() {
   const tr = t.transport;
   const ar = locale === "ar";
   const [tab, setTab] = useState<string>("intercity");
+  const ops = useTransitOperators();
   // ?city=ULH opens a city (links from the day plan), then scrolls to the #anchor once shown.
   useEffect(() => {
     const c = new URLSearchParams(window.location.search).get("city")?.toUpperCase();
-    if (c && SAUDI_CITIES.some((x) => x.code === c)) setTab(c);
+    if (c && getStayCity(c)) setTab(c);
     const id = window.location.hash.slice(1);
     if (id) setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }), 300);
   }, []);
-  const featured = FEATURED.map((c) => SAUDI_CITIES.find((x) => x.code === c)!).filter(Boolean);
+  const featured = FEATURED.map((c) => getStayCity(c)!).filter(Boolean);
   const others = SAUDI_CITIES.filter((c) => !FEATURED.includes(c.code));
   const modes = tab === "intercity" ? INTERCITY : CITY_TRANSPORT[tab] ?? DEFAULT_CITY;
 
@@ -73,10 +75,10 @@ export function TransportView() {
         )}
       </div>
 
-      {tab === "RUH" && <TransitPanel />}
+      {tab !== "intercity" && <TransitPanel city={tab} />}
 
       <div className="grid gap-4 md:grid-cols-2" data-testid="transport-modes">
-        {(tab === "RUH" ? modes.filter((m) => m.kind !== "metro" && m.kind !== "bus") : modes).map((m, i) => <ModeCard key={`${tab}-${i}`} m={m} />)}
+        {(ops?.some((o) => o.city === tab) ? modes.filter((m) => m.kind !== "metro" && m.kind !== "bus") : modes).map((m, i) => <ModeCard key={`${tab}-${i}`} m={m} />)}
       </div>
 
       <RentalPanel city={SAUDI_CITIES.some((c) => c.code === tab) ? tab : "RUH"} />

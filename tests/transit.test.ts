@@ -49,7 +49,7 @@ describe("journey planner (sandbox on the metro network)", () => {
 
   it("plans through the service and validates places", async () => {
     await expect(planJourneys("RUH", { from: KAFD, to: { name: "x" } as never }, now)).rejects.toMatchObject({ code: "invalidPlace" });
-    await expect(planJourneys("JED", { from: KAFD, to: HOKM }, now)).rejects.toMatchObject({ code: "noOperator" });
+    await expect(planJourneys("ULH", { from: KAFD, to: HOKM }, now)).rejects.toMatchObject({ code: "noOperator" });
   });
 });
 
@@ -101,5 +101,51 @@ describe("tickets and top-ups", () => {
     expect(t).toMatchObject({ cardNo: "••••7890", amountSAR: 20 });
     expect(t.balanceSAR).toBeGreaterThanOrEqual(20);
     expect(JSON.stringify(t)).not.toContain("1234567890");
+  });
+});
+
+describe("city buses (Makkah, Madinah, Jeddah, Dammam)", () => {
+  it("lists the cities with their features", async () => {
+    const { transitOperators } = await import("@/lib/transit/transit");
+    const ops = transitOperators();
+    expect(ops.map((o) => o.city).sort()).toEqual(["DMM", "JED", "MED", "MKX", "RUH"]);
+    expect(ops.find((o) => o.city === "RUH")).toMatchObject({ metro: true, topUp: true });
+    expect(ops.find((o) => o.city === "MKX")).toMatchObject({ metro: false, topUp: false, sandbox: true });
+  });
+
+  it("plans the bus from a Makkah hotel to the Haram, and changes at the hub in Madinah", async () => {
+    const { busJourneys } = await import("@/lib/transit/provider");
+    const { BUS_NETWORKS } = await import("@/lib/transit/networks");
+    const mk = busJourneys(BUS_NETWORKS.MKX, { name: "Hotel", lat: 21.4185, lng: 39.871 }, { name: "Haram", lat: 21.4225, lng: 39.8262 }, "2026-10-01T09:00");
+    expect(mk[0].changes).toBe(0);
+    const ride = mk[0].legs.find((l) => l.mode === "bus")!;
+    expect(ride).toMatchObject({ line: "M1", from: { nameAr: "العزيزية" }, to: { nameAr: "المسجد الحرام" }, headsignAr: "المسجد الحرام" });
+    const md = busJourneys(BUS_NETWORKS.MED, { name: "Quba", lat: 24.4393, lng: 39.6173 }, { name: "Qiblatain", lat: 24.4838, lng: 39.5791 }, "2026-10-01T09:00");
+    const change = md.find((j) => j.changes === 1)!;
+    expect(change.legs.filter((l) => l.mode === "bus").map((l) => l.line)).toEqual(["D1", "D2"]);
+    expect(change.legs.filter((l) => l.mode === "bus")[0].to.name).toBe("The Prophet's Mosque");
+  });
+
+  it("serves departures, stops and lines; no card top-up where the city has none", async () => {
+    const { liveArrivals, transitLines, transitStops } = await import("@/lib/transit/transit");
+    const a = await liveArrivals("JED", { lat: 21.4858, lng: 39.1868 }, now);
+    expect(a.some((x) => x.line === "J1") && a.some((x) => x.line === "J2")).toBe(true);
+    expect((await transitStops("DMM")).some((s) => s.nameEn === "Ithra")).toBe(true);
+    expect((await transitLines("MED")).map((l) => l.id)).toEqual(["D1", "D2", "D3"]);
+    expect(await transitLines("RUH")).toEqual([]);
+    await expect(topUpCard(user("tt-4"), { city: "MKX", cardNo: "1234567890", amountSAR: 20, card }, now)).rejects.toMatchObject({ code: "noTopUp" });
+    const { products } = await listProducts("MED");
+    expect(products.every((p) => p.modes.join() === "bus")).toBe(true);
+    const ts = await buyTickets(user("tt-5"), { city: "MKX", productId: "1d", qty: 1, expectedTotalSAR: products.find((p) => p.id === "1d")!.priceSAR, card }, now);
+    expect(ts[0]).toMatchObject({ city: "MKX", validityMins: 1440 });
+  });
+
+  it("suggests the bus between plan places on the same line", async () => {
+    const { busLeg } = await import("@/lib/transit/legs");
+    const { BUS_NETWORKS } = await import("@/lib/transit/networks");
+    const leg = busLeg(BUS_NETWORKS.JED.lines, { lat: 21.4858, lng: 39.1868 }, { lat: 21.6045, lng: 39.105 })!;
+    expect(leg.line.id).toBe("J1");
+    expect(leg.toStop).toBe("Jeddah Waterfront");
+    expect(busLeg(BUS_NETWORKS.JED.lines, { lat: 21.4858, lng: 39.1868 }, { lat: 21.4833, lng: 39.1871 })).toBeNull(); // a short walk
   });
 });

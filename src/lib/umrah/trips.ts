@@ -40,6 +40,8 @@ export interface UmrahTrip {
   /** Days on which a permit can be requested now. */
   windows: { umrah: string[]; rawdah: string[] };
   permits: PublicPermit[];
+  /** The hotel in Makkah (for the bus or car to the Haram), when known. */
+  makkahHotel?: { name: string; lat: number; lng: number } | null;
   demo?: boolean;
 }
 
@@ -98,6 +100,10 @@ export async function tripContexts(userId: string, now = new Date()): Promise<(T
     out.push({
       id: `booking:${b.id}`, key: b.id, bookingId: b.id, planId: null, reference: b.reference, departureDate: b.criteria.departureDate, returnDate: b.criteria.returnDate,
       ...m, travellers: people.map((p) => ({ applicationNo: p.applicationNo, name: p.nameEn, visa: !!p.visaNumber })), permits: [], people,
+      makkahHotel: (() => {
+        const h = b.hotels.find((x) => x.city === UMRAH_CITY && x.lat != null && x.lng != null);
+        return h ? { name: h.nameEn, lat: h.lat!, lng: h.lng! } : null;
+      })(),
       ...(cancelled ? { cancelled: true, windows: { umrah: [], rawdah: [] } } : {}),
     });
   }
@@ -131,6 +137,7 @@ function demoTrip(today: string, season: UmrahSeason): TripContext & { stayDays:
   return {
     id: "demo", key: "demo", bookingId: null, planId: null, reference: "TA-DEMO2026", departureDate: dep, returnDate: addDays(dep, 5),
     ...m, travellers: people.map((p) => ({ applicationNo: p.applicationNo, name: p.nameEn, visa: true })), permits: [], people, demo: true,
+    makkahHotel: { name: "Sample hotel — Al-Aziziyah", lat: 21.4185, lng: 39.871 },
   };
 }
 

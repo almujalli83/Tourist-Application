@@ -16,6 +16,7 @@ import { ChevronIcon, ClockIcon, KaabaIcon, MapPinIcon, PassportIcon, PhoneIcon,
 import { Alert, Badge, Card, cx, Spinner } from "../ui";
 import { PermitsPanel, type PermitView } from "./permits-panel";
 import { RideMenu } from "../transport/ride-menu";
+import { UmrahBus } from "../transit/umrah-bus";
 
 interface Data { season: UmrahSeason; links: { web: string; ios: string; android: string }; nusuk: "api" | "sandbox" | null; trips: (UmrahTrip & { permits: PermitView[] })[] | null }
 
@@ -60,8 +61,9 @@ function TripCard({ trip, links, nusuk, onChange }: { trip: UmrahTrip & { permit
           className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-50 px-3 text-xs font-semibold text-brand-800 ring-1 ring-brand-700/15 hover:bg-brand-100" data-testid="umrah-train">
           <TrainIcon className="size-4" />{t.rides.haramain}
         </Link>
-        <RideMenu to={{ lat: KAABA.lat, lng: KAABA.lng, name: locale === "ar" ? "المسجد الحرام، مكة المكرمة" : "Masjid al-Haram, Makkah" }} />
+        <RideMenu to={{ lat: KAABA.lat, lng: KAABA.lng, name: locale === "ar" ? "المسجد الحرام، مكة المكرمة" : "Masjid al-Haram, Makkah" }} from={trip.makkahHotel ?? null} />
       </div>
+      <UmrahBus hotel={trip.makkahHotel} />
       <div className="border-t border-slate-100 pt-3">
         <PermitsPanel trip={trip} nusuk={nusuk} links={<NusukButtons links={links} />} onChange={onChange} />
       </div>

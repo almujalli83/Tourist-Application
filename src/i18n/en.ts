@@ -1387,6 +1387,13 @@ const en: Dictionary = {
     },
   },
   transit: {
+    titleMetro: "Metro & buses in {city}",
+    titleBus: "Buses in {city}",
+    busLeg: "By bus {line}, about {mins} min: {from} to {to}",
+    umrahBus: "Bus to Masjid al-Haram",
+    umrahBusIntro: "Next buses from the stop nearest {place}",
+    umrahBuy: "Buy a bus ticket",
+    umrahPlan: "Plan bus journeys",
     title: "Riyadh metro & buses",
     tabs: { plan: "Plan a journey", live: "Live departures", tickets: "Tickets", map: "Map" },
     from: "From",

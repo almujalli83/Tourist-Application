@@ -11,16 +11,20 @@
  *   GET  {url}/products           → [TransitProduct]
  *   POST {url}/orders             { productId, qty, reference, email } → { ref, tickets: [{ code }] }
  *   POST {url}/tickets/{code}/activate → { activatedAt, validUntil }
- *   POST {url}/cards/{cardNo}/topups   { amountSAR, reference } → { ref, balanceSAR? }
+ *   POST {url}/cards/{cardNo}/topups   { amountSAR, reference } → { ref, balanceSAR? }   (when "topUp": true)
+ *   GET  {url}/stops              → [{ id, nameAr, nameEn, lat, lng }]
+ *   GET  {url}/lines              → [{ id, nameAr, nameEn, color, stops: [stop] }]   (optional)
  * Sandbox (no MT credentials): Riyadh is simulated on the metro network (stations from the open
- * data), with sample fares and estimated times. Off with DEMO_TRANSIT=off.
+ * data); Makkah, Madinah, Jeddah and Dammam on sample bus networks (networks.ts). Sample fares and
+ * estimated times. Off with DEMO_TRANSIT=off.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { mtConfig } from "../config";
 import { distanceKm } from "../guide/geo";
 import { getMetro } from "../metro/provider";
 import { METRO_LINES, type MetroLineId, type MetroStation } from "../metro/types";
-import type { Arrival, Journey, JourneyLeg, TransitPlace, TransitProduct } from "./types";
+import { allStops, BUS_NETWORKS, type BusNetwork, type NetLine, type NetStop } from "./networks";
+import type { Arrival, Journey, JourneyLeg, TransitLine, TransitPlace, TransitProduct, TransitStop } from "./types";
 
 export class TransitProviderError extends Error {
   constructor(public code: "unavailable" | "rejected") {
@@ -28,11 +32,18 @@ export class TransitProviderError extends Error {
   }
 }
 
+export type { TransitLine, TransitStop };
+
 export interface TransitProvider {
   city: string;
   nameAr: string;
   nameEn: string;
   sandbox: boolean;
+  /** A metro network (map tab), and top-ups of a transit card. */
+  features: { metro: boolean; topUp: boolean };
+  stops(): Promise<TransitStop[]>;
+  /** Bus lines with their stops, for the day plan (null when the operator doesn't publish them). */
+  lines(): Promise<TransitLine[] | null>;
   plan(from: TransitPlace, to: TransitPlace, departAt: string): Promise<Journey[]>;
   arrivals(at: { lat: number; lng: number }, now: Date): Promise<Arrival[]>;
   products(): Promise<TransitProduct[]>;
@@ -43,7 +54,7 @@ export interface TransitProvider {
 
 /* ------------------------------------------------------------------ API */
 
-interface OperatorConfig { city: string; nameAr?: string; nameEn?: string; url: string; token?: string }
+interface OperatorConfig { city: string; nameAr?: string; nameEn?: string; url: string; token?: string; metro?: boolean; topUp?: boolean }
 
 function readConfig(): OperatorConfig[] {
   try {
@@ -75,6 +86,15 @@ function apiProvider(c: OperatorConfig): TransitProvider {
   };
   return {
     city: c.city.toUpperCase(), nameAr: c.nameAr || c.nameEn || c.city, nameEn: c.nameEn || c.city, sandbox: false,
+    features: { metro: c.metro === true, topUp: c.topUp !== false },
+    async stops() {
+      return arr(await call("/stops")).filter((x) => typeof x.id === "string" && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)))
+        .map((x) => ({ id: x.id as string, nameAr: String(x.nameAr ?? x.nameEn ?? x.id), nameEn: String(x.nameEn ?? x.id), lat: Number(x.lat), lng: Number(x.lng) }));
+    },
+    async lines() {
+      const b = await call("/lines").catch(() => null);
+      return b ? (arr(b).filter((l) => typeof l.id === "string" && Array.isArray(l.stops)) as unknown as TransitLine[]) : null;
+    },
     async plan(from, to, departAt) {
       return arr(await call("/journeys", { method: "POST", body: JSON.stringify({ from, to, departAt }) }))
         .filter((j) => Array.isArray(j.legs) && (j.legs as unknown[]).length > 0)
@@ -280,6 +300,13 @@ export function sandboxArrivals(stations: MetroStation[], at: { lat: number; lng
 function sandboxProvider(): TransitProvider {
   return {
     city: "RUH", nameAr: "النقل العام بالرياض (تجريبي)", nameEn: "Riyadh Public Transport (sample)", sandbox: true,
+    features: { metro: true, topUp: true },
+    async stops() {
+      return (await getMetro()).stations.map((st) => ({ id: st.id, nameAr: st.nameAr, nameEn: st.nameEn, lat: st.lat, lng: st.lng }));
+    },
+    async lines() {
+      return null;
+    },
     async plan(from, to, departAt) {
       return sandboxJourneys((await getMetro()).stations, from, to, departAt);
     },
@@ -302,11 +329,133 @@ function sandboxProvider(): TransitProvider {
   };
 }
 
+/* ------------------------------------------------- sandbox: city buses */
+
+const BUS_HEADWAY = 12;
+const CITY_BUS_KMH = 20;
+const BUS_PRODUCTS: TransitProduct[] = [
+  { id: "2h", nameAr: "تذكرة ساعتين", nameEn: "2-hour ticket", cls: "standard", validityMins: 120, priceSAR: 4, modes: ["bus"] },
+  { id: "1d", nameAr: "تذكرة يوم", nameEn: "1-day pass", cls: "standard", validityMins: 1440, priceSAR: 10, modes: ["bus"] },
+  { id: "3d", nameAr: "تذكرة 3 أيام", nameEn: "3-day pass", cls: "standard", validityMins: 3 * 1440, priceSAR: 25, modes: ["bus"] },
+];
+const stopPlace = (st: NetStop): TransitPlace => ({ name: st.nameEn, nameAr: st.nameAr, lat: st.lat, lng: st.lng });
+const pathKm = (stops: NetStop[], i: number, j: number) => {
+  let km = 0;
+  for (let k = Math.min(i, j); k < Math.max(i, j); k++) km += distanceKm(stops[k], stops[k + 1]) * ROAD;
+  return km;
+};
+
+function busRide(line: NetLine, i: number, j: number, at: number): JourneyLeg {
+  const end = j > i ? line.stops[line.stops.length - 1] : line.stops[0];
+  const dep = nextDep(at, BUS_HEADWAY, `${line.id}${j > i ? "+" : "-"}${line.stops[i].id}`);
+  const mins = Math.max(3, Math.round((pathKm(line.stops, i, j) * 60) / CITY_BUS_KMH) + Math.abs(j - i));
+  return {
+    mode: "bus", line: line.id, lineNameAr: `${line.id} · ${line.nameAr}`, lineNameEn: `${line.id} · ${line.nameEn}`, color: line.color,
+    from: stopPlace(line.stops[i]), to: stopPlace(line.stops[j]), departAt: toLocal(dep), arriveAt: toLocal(dep + mins * 60_000),
+    mins: Math.round((dep - at) / 60_000) + mins, stops: Math.abs(j - i), headsign: end.nameEn, headsignAr: end.nameAr,
+  };
+}
+
+/** Bus journeys on a sample network: one line, or two lines changing at the hub. */
+export function busJourneys(net: BusNetwork, from: TransitPlace, to: TransitPlace, departAt: string): Journey[] {
+  const start = ksaMs(departAt);
+  const stops = allStops(net);
+  const near = (p: TransitPlace) => stops.map((st) => ({ st, km: distanceKm(p, st) })).filter((x) => x.km <= STATION_KM).sort((a, b) => a.km - b.km).slice(0, 3);
+  const out: Journey[] = [];
+  for (const x of near(from)) for (const y of near(to)) {
+    if (x.st.id === y.st.id) continue;
+    const common = net.lines.find((l) => l.stops.some((q) => q.id === x.st.id) && l.stops.some((q) => q.id === y.st.id));
+    if (common) {
+      const i = common.stops.findIndex((q) => q.id === x.st.id);
+      const j = common.stops.findIndex((q) => q.id === y.st.id);
+      out.push(finish(chain([(t) => walkLeg(from, stopPlace(x.st), t), (t) => busRide(common, i, j, t), (t) => walkLeg(stopPlace(y.st), to, t)], start), ""));
+      continue;
+    }
+    const la = net.lines.find((l) => l.stops.some((q) => q.id === x.st.id));
+    const lb = net.lines.find((l) => l.stops.some((q) => q.id === y.st.id));
+    if (!la || !lb) continue;
+    const ia = la.stops.findIndex((q) => q.id === x.st.id);
+    const jb = lb.stops.findIndex((q) => q.id === y.st.id);
+    out.push(finish(chain([(t) => walkLeg(from, stopPlace(x.st), t), (t) => busRide(la, ia, 0, t), (t) => busRide(lb, 0, jb, t + 3 * 60_000), (t) => walkLeg(stopPlace(y.st), to, t)], start), ""));
+  }
+  const seen = new Set<string>();
+  return out
+    .map((j) => ({ ...j, productId: "2h" }))
+    .sort((a, b) => ksaMs(a.arriveAt) - ksaMs(b.arriveAt) || a.changes - b.changes)
+    .filter((j) => {
+      const k = j.legs.filter((l) => l.mode !== "walk").map((l) => `${l.line}:${l.from.name}>${l.to.name}`).join("|");
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 4)
+    .map((j, i) => ({ ...j, id: `j${i + 1}` }));
+}
+
+export function busArrivals(net: BusNetwork, at: { lat: number; lng: number }, now: Date): Arrival[] {
+  const ms = now.getTime();
+  const out: Arrival[] = [];
+  const near = allStops(net).map((st) => ({ st, km: distanceKm(at, st) })).filter((x) => x.km <= 2).sort((a, b) => a.km - b.km).slice(0, 2);
+  for (const { st } of near) {
+    for (const line of net.lines) {
+      const i = line.stops.findIndex((q) => q.id === st.id);
+      if (i < 0) continue;
+      for (const dir of [1, -1]) {
+        const end = dir > 0 ? line.stops[line.stops.length - 1] : line.stops[0];
+        if (end.id === st.id) continue;
+        for (let k = 0; k < 2; k++) {
+          const dep = nextDep(ms + k * BUS_HEADWAY * 60_000, BUS_HEADWAY, `${line.id}${dir > 0 ? "+" : "-"}${st.id}`);
+          out.push({ mode: "bus", line: line.id, lineNameAr: `${line.id} · ${line.nameAr}`, lineNameEn: `${line.id} · ${line.nameEn}`, color: line.color, headsign: end.nameEn, headsignAr: end.nameAr, stopName: st.nameEn, stopNameAr: st.nameAr, inMins: Math.round((dep - ms) / 60_000), realtime: false });
+        }
+      }
+    }
+  }
+  return out.sort((a, b) => a.inMins - b.inMins).slice(0, 12);
+}
+
+const CITY_OPERATOR: Record<string, [string, string]> = {
+  MKX: ["حافلات مكة (تجريبي)", "Makkah Buses (sample)"],
+  MED: ["حافلات المدينة المنورة (تجريبي)", "Madinah Buses (sample)"],
+  JED: ["حافلات جدة (تجريبي)", "Jeddah Buses (sample)"],
+  DMM: ["حافلات الدمام والخبر (تجريبي)", "Dammam & Khobar Buses (sample)"],
+};
+
+function busSandbox(net: BusNetwork): TransitProvider {
+  const [nameAr, nameEn] = CITY_OPERATOR[net.city];
+  const base = sandboxProvider();
+  return {
+    city: net.city, nameAr, nameEn, sandbox: true, features: { metro: false, topUp: false },
+    async stops() {
+      return allStops(net);
+    },
+    async lines() {
+      return net.lines;
+    },
+    async plan(from, to, departAt) {
+      return busJourneys(net, from, to, departAt);
+    },
+    async arrivals(at, now) {
+      return busArrivals(net, at, now);
+    },
+    async products() {
+      return BUS_PRODUCTS;
+    },
+    buy: base.buy,
+    activate: base.activate,
+    async topUp() {
+      throw new TransitProviderError("rejected");
+    },
+  };
+}
+
 /** The operator of a city: linked by API, else the sandbox (Riyadh). */
 export function transitProvider(city: string): TransitProvider | null {
   const c = readConfig().find((p) => p.city.toUpperCase() === city);
   if (c) return apiProvider(c);
-  return city === "RUH" && mtConfig().mock && process.env.DEMO_TRANSIT !== "off" ? sandboxProvider() : null;
+  if (!(mtConfig().mock && process.env.DEMO_TRANSIT !== "off")) return null;
+  if (city === "RUH") return sandboxProvider();
+  return BUS_NETWORKS[city] ? busSandbox(BUS_NETWORKS[city]) : null;
 }
 
-export const transitCities = () => [...new Set([...readConfig().map((p) => p.city.toUpperCase()), ...(mtConfig().mock && process.env.DEMO_TRANSIT !== "off" ? ["RUH"] : [])])];
+const sandboxCities = () => (mtConfig().mock && process.env.DEMO_TRANSIT !== "off" ? ["RUH", ...Object.keys(BUS_NETWORKS)] : []);
+export const transitCities = () => [...new Set([...readConfig().map((p) => p.city.toUpperCase()), ...sandboxCities()])];

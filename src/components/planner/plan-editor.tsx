@@ -26,6 +26,8 @@ import { metroLeg } from "@/lib/metro/types";
 import { CAR_ADVISED_CITIES } from "@/lib/rentals/types";
 import { LineDots, lineName, stationName } from "../metro/metro-panel";
 import { useMetro } from "../metro/use-metro";
+import { useTransitLines } from "../transit/use-transit";
+import { busLeg } from "@/lib/transit/legs";
 import { RideMenu } from "../transport/ride-menu";
 import { ActivityPicker } from "./activity-picker";
 
@@ -452,6 +454,8 @@ function LegLine({ from, to, city }: { from: PlanItem; to: PlanItem; city: strin
   const leg = legBetween(from, to);
   const net = useMetro(city === "RUH" && leg.mode === "car");
   const metro = net ? metroLeg(net.stations, from, to) : null;
+  const lines = useTransitLines(leg.mode === "car" && city !== "RUH" ? city : null);
+  const bus = !metro && lines ? busLeg(lines, from, to) : null;
   const ar = locale === "ar";
   return (
     <div className="mb-1.5 space-y-0.5 text-[11px] text-slate-500" data-testid="plan-leg">
@@ -464,6 +468,12 @@ function LegLine({ from, to, city }: { from: PlanItem; to: PlanItem; city: strin
           <LineDots lines={[metro.line]} />
           {fmt(t.metro.leg, { mins: metro.mins, from: stationName(metro.from, ar), to: stationName(metro.to, ar), line: lineName(metro.line, ar) })}
           <span className="font-normal text-slate-400">· {fmt(t.metro.legWalk, { to: metro.walkToMins, from: metro.walkFromMins })}</span>
+        </p>
+      )}
+      {bus && (
+        <p className="flex flex-wrap items-center gap-1 ps-3 font-semibold text-slate-600" data-testid="plan-leg-bus" title={t.metro.estimate}>
+          <span className="inline-block size-2.5 rounded-full" style={{ background: bus.line.color }} aria-hidden />
+          {fmt(t.transit.busLeg, { line: bus.line.id, mins: bus.mins, from: ar ? bus.fromStopAr : bus.fromStop, to: ar ? bus.toStopAr : bus.toStop })}
         </p>
       )}
     </div>
