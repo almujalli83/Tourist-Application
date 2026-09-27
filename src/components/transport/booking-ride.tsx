@@ -39,7 +39,7 @@ export function BookingRide({ target }: { target: RideTarget | null }) {
         <p className="text-sm font-semibold">{fmt(r.purpose[target.purpose], { place: target.to.name })}</p>
         {e && <RideEstimateText e={e} className="text-xs text-slate-300" />}
       </div>
-      <RideMenu to={target.to} estimate={e} size="md" light />
+      <RideMenu to={target.to} from={from} estimate={e} size="md" light />
     </div>
   );
 }

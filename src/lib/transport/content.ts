@@ -21,8 +21,8 @@ const RIDE_APPS: ModeInfo = {
   kind: "taxi",
   titleAr: "سيارات الأجرة وتطبيقات النقل",
   titleEn: "Taxis & ride-hailing apps",
-  bodyAr: "تتوفر في المدن تطبيقات نقل مرخّصة مثل أوبر وكريم وجيني، إضافة إلى سيارات الأجرة الرسمية. الطلب عبر التطبيق يعرض السعر قبل الركوب.",
-  bodyEn: "Licensed ride-hailing apps such as Uber, Careem and Jeeny operate in the cities, alongside official taxis. Booking in the app shows the price before the ride.",
+  bodyAr: "اطلب سيارة من أوبر أو كريم أو جيني مباشرة من المنصة عبر زر «اطلب سيارة»: ترى السعر ووقت الوصول قبل الطلب، وتتابع السائق على الخريطة. وتتوفر أيضًا سيارات الأجرة الرسمية.",
+  bodyEn: "Order a car from Uber, Careem or Jeeny right here with the «Order a car» button: see the price and pickup time first, then follow the driver on the map. Official taxis are also available.",
   tipsAr: ["استخدم التطبيقات المرخّصة أو سيارات الأجرة الرسمية فقط.", "تحقّق من رقم اللوحة واسم السائق قبل الركوب."],
   tipsEn: ["Use licensed apps or official taxis only.", "Check the plate number and driver name before getting in."],
 };

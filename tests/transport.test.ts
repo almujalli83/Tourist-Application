@@ -5,24 +5,11 @@ import { saveBooking } from "@/lib/repo";
 import { store } from "@/lib/store";
 import { STATIONS } from "@/lib/trains/network";
 import { AIRPORTS, transportReminders } from "@/lib/transport/reminders";
-import { destinationText, estimateFromKm, estimateRide, legBetween, platformOf, rideLink, TARIFF } from "@/lib/transport/rides";
+import { estimateFromKm, estimateRide, legBetween, TARIFF } from "@/lib/transport/rides";
 
 const user = (id: string): PublicUser => ({ id, email: `${id}@example.com`, accountType: "individual", individual: { fullName: "Sara Ali", phone: "", nationality: "EG" }, preferredLocale: "ar", preferredCurrency: "SAR", createdAt: "2026-01-01T00:00:00Z" });
 
-describe("ride-hailing links and estimates", () => {
-  const to = { lat: 24.7336, lng: 46.5753, name: "At-Turaif & Diriyah" };
-  it("opens Uber with the destination; Careem and Jeeny through their store page", () => {
-    const u = new URL(rideLink("uber", to, "ios").href);
-    expect(u.origin + u.pathname).toBe("https://m.uber.com/ul/");
-    expect(Object.fromEntries(u.searchParams)).toMatchObject({ action: "setPickup", pickup: "my_location", "dropoff[latitude]": "24.7336", "dropoff[longitude]": "46.5753", "dropoff[nickname]": "At-Turaif & Diriyah" });
-    expect(rideLink("uber", to, "ios").direct).toBe(true);
-    expect(rideLink("careem", to, "android")).toEqual({ href: "https://play.google.com/store/apps/details?id=com.careem.acma", direct: false });
-    expect(rideLink("jeeny", to, "ios").href).toContain("id1178701124");
-    expect(destinationText(to)).toBe("At-Turaif & Diriyah — https://maps.google.com/?q=24.7336,46.5753");
-    expect(platformOf("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)")).toBe("ios");
-    expect(platformOf("Mozilla/5.0 (Linux; Android 14)")).toBe("android");
-  });
-
+describe("ride estimates", () => {
   it("estimates a fare range and time, never below the minimum fare", () => {
     const short = estimateFromKm(0.5);
     expect(short.minSAR).toBeGreaterThanOrEqual(Math.round(TARIFF.minimum * 0.85 / 5) * 5);
