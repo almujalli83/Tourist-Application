@@ -74,7 +74,7 @@ export function PriceSummary({ footer }: { footer?: ReactNode }) {
           <div key={r.label} className="flex items-start justify-between gap-3">
             <dt className="text-slate-600">
               {r.label}
-              {r.sub && <span className="mt-0.5 block text-xs text-slate-400">{r.sub}</span>}
+              {r.sub && <span className="mt-0.5 block text-xs text-slate-500">{r.sub}</span>}
             </dt>
             <dd className="ltr-nums font-medium tabular-nums">{r.v ? money(r.v) : "—"}</dd>
           </div>
@@ -89,7 +89,7 @@ export function PriceSummary({ footer }: { footer?: ReactNode }) {
           <div className="flex items-start justify-between gap-3">
             <span className="text-slate-600">
               {fmt(t.esim.summaryLine, { n: esim.travellers.length })}
-              <span className="mt-0.5 block text-xs text-slate-400">{t.esim.notInPackage}</span>
+              <span className="mt-0.5 block text-xs text-slate-500">{t.esim.notInPackage}</span>
             </span>
             <span className="ltr-nums font-medium tabular-nums">{money(esimSAR)}</span>
           </div>

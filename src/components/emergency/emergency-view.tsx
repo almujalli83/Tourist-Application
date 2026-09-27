@@ -72,7 +72,7 @@ function Nearby({ loc }: { loc: Loc }) {
           })}
         </ul>
       )}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
         <span>{e.osm}</span>
         <a href={maps} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-700 underline">{e.searchMaps}</a>
       </div>
@@ -168,7 +168,7 @@ export function EmergencyView() {
           {loc && (
             <div className="mt-3 space-y-2 text-sm">
               {loc.demo && <Badge tone="amber">{e.demoLocation}</Badge>}
-              <p><span className="text-slate-500">{e.coords}: </span><b className="ltr-nums" dir="ltr" data-testid="coords">{loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}</b>{loc.accuracy !== null && <span className="text-xs text-slate-400"> · {fmt(e.accuracy, { m: loc.accuracy })}</span>}</p>
+              <p><span className="text-slate-500">{e.coords}: </span><b className="ltr-nums" dir="ltr" data-testid="coords">{loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}</b>{loc.accuracy !== null && <span className="text-xs text-slate-500"> · {fmt(e.accuracy, { m: loc.accuracy })}</span>}</p>
               {address && <p><span className="text-slate-500">{e.address}: </span>{address}</p>}
               <p className="pt-1 text-xs font-semibold text-slate-600">{e.share}</p>
               <div className="flex flex-wrap gap-2">
@@ -196,7 +196,7 @@ export function EmergencyView() {
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-slate-500">
           <a href={SOURCES.portal} target="_blank" rel="noopener noreferrer" className="underline">{e.numbersSource}</a>
         </p>
       </Card>
@@ -276,7 +276,7 @@ export function EmergencyView() {
           <button type="button" onClick={() => setPhrase(null)} aria-label={e.close} className="absolute end-4 top-4 grid size-11 place-items-center rounded-full bg-slate-100"><XIcon className="size-5" /></button>
           <p className="text-5xl font-bold leading-tight text-ink sm:text-7xl" dir="rtl">{phrase.ar}</p>
           <p className="text-2xl text-slate-600" dir="ltr">{phrase.en}</p>
-          <p className="text-lg italic text-slate-400" dir="ltr">{phrase.say}</p>
+          <p className="text-lg italic text-slate-500" dir="ltr">{phrase.say}</p>
         </div>
       )}
     </div>

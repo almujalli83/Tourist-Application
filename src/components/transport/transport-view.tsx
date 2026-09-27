@@ -59,7 +59,7 @@ export function TransportView() {
         </Link>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2" role="tablist">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={tr.inCity}>
         <TabChip active={tab === "intercity"} onClick={() => setTab("intercity")}>{tr.intercity}</TabChip>
         {featured.map((c) => <TabChip key={c.code} active={tab === c.code} onClick={() => setTab(c.code)}>{ar ? c.ar : c.en}</TabChip>)}
         <label className="sr-only" htmlFor="tr-city">{tr.inCity}</label>
@@ -139,7 +139,7 @@ function ModeCard({ m }: { m: ModeInfo }) {
 
 function TabChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" role="tab" aria-selected={active} onClick={onClick}
+    <button type="button" aria-pressed={active} onClick={onClick}
       className={cx("h-9 rounded-full border px-4 text-sm font-semibold transition-colors", active ? "border-brand-700 bg-brand-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-brand-500")}>
       {children}
     </button>

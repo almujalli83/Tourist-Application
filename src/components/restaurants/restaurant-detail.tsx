@@ -122,7 +122,7 @@ export function RestaurantDetail({ id }: { id: string }) {
             </div>
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="flex items-center gap-1.5 font-semibold"><MapPinIcon className="size-4 text-slate-400" />{d.address}</dt>
+                <dt className="flex items-center gap-1.5 font-semibold"><MapPinIcon className="size-4 text-slate-500" />{d.address}</dt>
                 <dd className="mt-1 text-slate-700">{ar ? r.addressAr : r.addressEn}{city && ` · ${ar ? city.ar : city.en}`}</dd>
                 <dd className="mt-1 flex gap-3 text-xs">
                   <a href={links.google} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"><DirectionsIcon className="size-3.5" />{g.googleMaps}</a>
@@ -131,7 +131,7 @@ export function RestaurantDetail({ id }: { id: string }) {
                 <dd className="mt-2"><RideMenu to={{ lat: r.lat, lng: r.lng, name: ar ? r.nameAr : r.nameEn }} /></dd>
               </div>
               <div>
-                <dt className="flex items-center gap-1.5 font-semibold"><ClockIcon className="size-4 text-slate-400" />{d.hours}</dt>
+                <dt className="flex items-center gap-1.5 font-semibold"><ClockIcon className="size-4 text-slate-500" />{d.hours}</dt>
                 {r.hours.map((h, i) => (
                   <dd key={i} className="mt-1 text-slate-700">{h.days.length === 7 ? g.everyDay : h.days.map((x) => g.days[x]).join(ar ? "، " : ", ")} · <span dir="ltr">{h.open} – {h.close}</span></dd>
                 ))}

@@ -95,7 +95,7 @@ export function RestaurantsView() {
 
       <Card className="space-y-3 p-4">
         <div className="relative">
-          <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={rs.search} aria-label={rs.search}
             className="h-11 w-full rounded-lg border border-slate-300 bg-white ps-9 pe-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
         </div>

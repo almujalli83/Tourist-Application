@@ -64,3 +64,4 @@ export const HeadphonesIcon = (p: P) => (<svg {...base(p)}><path d="M3 18v-6a9 9
 export const PlayIcon = (p: P) => (<svg {...base(p)}><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" /></svg>);
 export const PauseIcon = (p: P) => (<svg {...base(p)}><path d="M7 4.5h3.5v15H7zM13.5 4.5H17v15h-3.5z" fill="currentColor" /></svg>);
 export const DownloadIcon = (p: P) => (<svg {...base(p)}><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>);
+export const AccessibilityIcon = (p: P) => (<svg {...base(p)}><circle cx="12" cy="4.5" r="1.8" /><path d="M5 8.5c2.3.7 4.6 1 7 1s4.7-.3 7-1M12 9.5v4.5m0 0-3 6.5m3-6.5 3 6.5" /></svg>);

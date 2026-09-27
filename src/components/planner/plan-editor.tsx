@@ -467,7 +467,7 @@ function LegLine({ from, to, city }: { from: PlanItem; to: PlanItem; city: strin
         <p className="flex flex-wrap items-center gap-1 ps-3 font-semibold text-slate-600" data-testid="plan-leg-metro" title={t.metro.estimate}>
           <LineDots lines={[metro.line]} />
           {fmt(t.metro.leg, { mins: metro.mins, from: stationName(metro.from, ar), to: stationName(metro.to, ar), line: lineName(metro.line, ar) })}
-          <span className="font-normal text-slate-400">· {fmt(t.metro.legWalk, { to: metro.walkToMins, from: metro.walkFromMins })}</span>
+          <span className="font-normal text-slate-500">· {fmt(t.metro.legWalk, { to: metro.walkToMins, from: metro.walkFromMins })}</span>
         </p>
       )}
       {bus && (
@@ -523,7 +523,7 @@ function EntryRow({ entry: e, day, prev, editable, selected, onSelect, onMove, o
                 {it.kind === "event" ? p.book.event : p.book.restaurant}
               </Link>
             )}
-            {it.bookHref && <span className="text-[11px] text-slate-400">{p.suggestBook}</span>}
+            {it.bookHref && <span className="text-[11px] text-slate-500">{p.suggestBook}</span>}
             <a href={dir.google} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><DirectionsIcon className="size-3.5" />{p.actions.directions}</a>
             <RideMenu to={{ lat: it.lat, lng: it.lng, name: title }} estimate={prev ? estimateRide(prev, it) : null} />
             {editable && (

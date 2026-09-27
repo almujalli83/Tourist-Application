@@ -57,7 +57,7 @@ export function GuidesDirectory() {
           {sel("track", g.filters.track, GUIDE_TRACKS.map((x) => [x, g.trackNames[x]]))}
           {sel("gender", g.filters.gender, [["male", g.filters.male], ["female", g.filters.female]])}
           <div className="relative min-w-0 flex-1 basis-56">
-            <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
             <Input value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} placeholder={g.filters.q} aria-label={g.filters.q} className="ps-9" data-testid="guide-filter-q" />
           </div>
         </div>

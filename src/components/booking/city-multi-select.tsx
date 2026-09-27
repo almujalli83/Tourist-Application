@@ -203,7 +203,7 @@ export function CityMultiSelect({ value, onChange, invalid, id, allowed, max }: 
                         <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                           <MapPinIcon className="size-4 shrink-0 text-gold-600" />
                           {c[locale]}
-                          <span className="text-xs font-normal text-slate-400">{locale === "ar" ? c.en : c.ar}</span>
+                          <span className="text-xs font-normal text-slate-500">{locale === "ar" ? c.en : c.ar}</span>
                         </span>
                         <span className="mt-0.5 block text-xs text-slate-500">{locale === "ar" ? c.descriptionAr : c.descriptionEn}</span>
                       </span>
@@ -212,7 +212,7 @@ export function CityMultiSelect({ value, onChange, invalid, id, allowed, max }: 
                   </li>
                 );
               })}
-              {options.length === 0 && <li className="px-4 py-3 text-sm text-slate-400">{t.common.noResults}</li>}
+              {options.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">{t.common.noResults}</li>}
             </ul>
           </div>
         </>

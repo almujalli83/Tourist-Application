@@ -134,7 +134,7 @@ export function BusesView() {
             <h2 className="font-bold">{fmt(b.seatsTitle, { n })}</h2>
             {!map ? <Spinner /> : (
               <div className="mt-3 inline-block rounded-2xl border-2 border-slate-300 p-3" dir="ltr" data-testid="bus-map">
-                <p className="mb-2 text-end text-[10px] font-semibold text-slate-400">{b.driver} ⎈</p>
+                <p className="mb-2 text-end text-[10px] font-semibold text-slate-500">{b.driver} ⎈</p>
                 {Array.from({ length: map.rows }, (_, r) => (
                   <div key={r} className="mb-1.5 flex gap-1.5">
                     {map.letters.map((l, i) => {
@@ -145,7 +145,7 @@ export function BusesView() {
                         <span key={s} className="flex">
                           <button type="button" disabled={taken} aria-pressed={mine} title={taken ? b.seatTaken : s} data-testid={`bus-seat-${s}`}
                             onClick={() => setSeats(mine ? seats.filter((x) => x !== s) : seats.length < n ? [...seats, s] : [...seats.slice(1), s])}
-                            className={cx("size-8 rounded-md text-[10px] font-bold", taken ? "cursor-not-allowed bg-slate-200 text-slate-400" : mine ? "bg-brand-700 text-white" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:ring-brand-600")}>{s}</button>
+                            className={cx("size-8 rounded-md text-[10px] font-bold", taken ? "cursor-not-allowed bg-slate-200 text-slate-500" : mine ? "bg-brand-700 text-white" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:ring-brand-600")}>{s}</button>
                           {i + 1 === map.aisleAfter && <span className="w-4" />}
                         </span>
                       );

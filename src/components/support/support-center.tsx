@@ -92,7 +92,7 @@ export function SupportCenter() {
       <Card className="p-5" data-testid="faq">
         <h2 className="font-bold">{s.faqTitle}</h2>
         <div className="relative mt-3">
-          <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <SearchIcon className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={s.faqSearch} aria-label={s.faqSearch} className="ps-9" data-testid="faq-search" />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">

@@ -43,7 +43,7 @@ function HotelCard({ offer, selected, onSelect, idx, verified }: { offer: HotelO
           {offer.amenities.slice(0, 5).map((a) => <Badge key={a}>{t.hotels.amenities[a as keyof typeof t.hotels.amenities] ?? a}</Badge>)}
           <Badge tone={offer.refundable ? "brand" : "slate"}>{offer.refundable ? t.common.refundable : t.common.nonRefundable}</Badge>
         </div>
-        <p className="ltr-nums mt-2 text-[11px] text-slate-400">{t.hotels.license} {offer.licenseNo}</p>
+        <p className="ltr-nums mt-2 text-[11px] text-slate-500">{t.hotels.license} {offer.licenseNo}</p>
         <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-3">
           <div>
             <p className="ltr-nums text-lg font-bold text-brand-800">{money(offer.totalSAR)}</p>

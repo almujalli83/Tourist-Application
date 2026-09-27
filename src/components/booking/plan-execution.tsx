@@ -89,7 +89,7 @@ function Inner() {
           <p className="flex items-center gap-2 text-lg font-bold"><Spinner className="size-5 text-brand-700" />{shifting ? x.shifting : x.working}</p>
           <ul className="space-y-2 text-sm">
             {x.workingSteps.map((s, i) => (
-              <li key={s} className={i <= stepShown ? "flex items-center gap-2 text-ink" : "flex items-center gap-2 text-slate-400"}>
+              <li key={s} className={i <= stepShown ? "flex items-center gap-2 text-ink" : "flex items-center gap-2 text-slate-500"}>
                 {i < stepShown ? <CheckIcon className="size-4 text-brand-700" /> : <span className="size-4" />}{s}
               </li>
             ))}

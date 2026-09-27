@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import { A11Y_BOOT } from "@/components/a11y-tools";
 import { AppProvider } from "@/components/app-provider";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { PrayerAlerts } from "@/components/prayer/prayer-alerts";
@@ -44,18 +45,21 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const currency = getCurrency(store.get("ta_currency")?.value ?? "SAR").code;
   const user = await currentUser();
   return (
-    <html lang={locale} dir={dir(locale)}>
+    <html lang={locale} dir={dir(locale)} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        {/* The viewer's accessibility choices, applied before the page paints. */}
+        <script dangerouslySetInnerHTML={{ __html: A11Y_BOOT }} />
       </head>
       <body className="flex min-h-dvh flex-col">
         <AppProvider locale={locale} dict={getDictionary(locale)} initialCurrency={currency} initialUser={user}>
+          <a href="#main" className="skip-link">{getDictionary(locale).a11y.skip}</a>
           <SiteHeader />
           <WeatherBanner />
-          <main className="flex-1">{children}</main>
+          <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">{children}</main>
           <SiteFooter />
           <AssistantWidget />
           <PrayerAlerts />

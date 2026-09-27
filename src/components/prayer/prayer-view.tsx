@@ -252,7 +252,7 @@ export function PrayerView() {
                   <MosqueList mosques={mosques.slice(0, 6)} title={friday ? p.mosques : ""} />
                 </>
               )}
-              <p className="text-xs text-slate-400">{p.mosquesSource}</p>
+              <p className="text-xs text-slate-500">{p.mosquesSource}</p>
             </Card>
           </div>
 

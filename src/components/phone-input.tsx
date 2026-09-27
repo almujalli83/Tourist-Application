@@ -83,7 +83,7 @@ export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id
         >
           <span className="rounded bg-brand-700 px-1 py-0.5 text-[10px] font-bold leading-none text-white">{country}</span>
           <span className="tabular-nums">+{rule.dial}</span>
-          <svg viewBox="0 0 20 20" className="size-4 text-slate-400" aria-hidden><path fill="currentColor" d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
+          <svg viewBox="0 0 20 20" className="size-4 text-slate-500" aria-hidden><path fill="currentColor" d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
         </button>
         <input
           ref={numberInput}
@@ -98,7 +98,7 @@ export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id
           aria-invalid={invalid || undefined}
           className="min-w-0 flex-1 bg-transparent px-3 text-sm tracking-wide text-ink tabular-nums placeholder:text-slate-300 focus:outline-none"
         />
-        <span className="flex shrink-0 items-center pe-3 text-xs tabular-nums text-slate-400" aria-hidden>
+        <span className="flex shrink-0 items-center pe-3 text-xs tabular-nums text-slate-500" aria-hidden>
           {national.length}/{rule.max}
         </span>
       </div>
@@ -140,7 +140,7 @@ export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id
                 </button>
               </li>
             ))}
-            {filtered.length === 0 && <li className="px-3 py-3 text-sm text-slate-400">{t.common.noResults}</li>}
+            {filtered.length === 0 && <li className="px-3 py-3 text-sm text-slate-500">{t.common.noResults}</li>}
           </ul>
         </div>
       )}

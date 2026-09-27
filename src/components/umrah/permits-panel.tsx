@@ -123,7 +123,7 @@ function BookPermit({ trip, type, onDone, onClose }: { trip: UmrahTrip; type: Pe
                 const full = x.remaining < people.length;
                 return (
                   <button key={x.id} type="button" disabled={full} aria-pressed={slot === x.id} onClick={() => setSlot(x.id)} data-testid="permit-slot"
-                    className={cx("rounded-xl px-3 py-2 text-start text-sm ring-1", slot === x.id ? "bg-brand-800 text-white ring-brand-800" : full ? "cursor-not-allowed bg-slate-100 text-slate-400 ring-slate-200" : "bg-white ring-slate-200 hover:ring-brand-600")}>
+                    className={cx("rounded-xl px-3 py-2 text-start text-sm ring-1", slot === x.id ? "bg-brand-800 text-white ring-brand-800" : full ? "cursor-not-allowed bg-slate-100 text-slate-500 ring-slate-200" : "bg-white ring-slate-200 hover:ring-brand-600")}>
                     <span className="ltr-nums block font-bold" dir="ltr">{x.start} – {x.end}</span>
                     <span className="block text-xs">{full ? s.full : fmt(s.remaining, { n: x.remaining })}</span>
                   </button>
