@@ -1592,6 +1592,15 @@ const en: Dictionary = {
       },
     },
     steps: {
+      titleLinked: "Umrah permits right here",
+      listLinked: [
+        ["Check eligibility", "The tourist visa (including the package visa) lets Muslims perform Umrah outside the Hajj-season pause."],
+        ["Choose a time in your trip", "Your trip below shows the Umrah times available in Nusuk for your days in Makkah."],
+        ["The permit is issued automatically", "It is issued through the link with Nusuk and saved as a QR code in your wallet and tourist card."],
+        ["Book the Rawdah", "If your trip includes Madinah, book your Rawdah visit on the same page."],
+      ],
+      noteLinked: "Permits are issued by Nusuk (Ministry of Hajj and Umrah) through Saudi Trip's technical link.",
+      fallback: "If the link is temporarily unavailable, you can book in Nusuk directly:",
       title: "Booking in Nusuk, step by step",
       list: [
         ["Check you can go", "The tourist visa (including the package visa) lets Muslims perform Umrah outside the Hajj-season pause."],

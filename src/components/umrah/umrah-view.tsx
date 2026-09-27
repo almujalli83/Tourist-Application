@@ -120,17 +120,17 @@ export function UmrahView() {
       )}
 
       <Card className="p-5" data-testid="umrah-steps">
-        <h2 className="text-lg font-bold">{u.steps.title}</h2>
+        <h2 className="text-lg font-bold">{data?.nusuk ? u.steps.titleLinked : u.steps.title}</h2>
         <ol className="mt-4 grid gap-3 sm:grid-cols-2">
-          {u.steps.list.map(([title, body], i) => (
+          {(data?.nusuk ? u.steps.listLinked : u.steps.list).map(([title, body], i) => (
             <li key={title} className="flex gap-3 rounded-xl bg-slate-50 p-4">
               <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-800 text-sm font-bold text-white">{i + 1}</span>
               <span><span className="block font-semibold">{title}</span><span className="mt-0.5 block text-sm text-slate-600">{body}</span></span>
             </li>
           ))}
         </ol>
-        {data && <div className="mt-4"><NusukButtons links={data.links} /></div>}
-        <p className="mt-3 text-xs text-slate-500">{u.steps.note}</p>
+        {data && !data.nusuk && <div className="mt-4"><NusukButtons links={data.links} /></div>}
+        <p className="mt-3 text-xs text-slate-500">{data?.nusuk ? u.steps.noteLinked : u.steps.note}</p>
       </Card>
 
       <Card className="p-5" data-testid="umrah-rites">
