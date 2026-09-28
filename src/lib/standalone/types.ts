@@ -24,9 +24,13 @@ export interface StayOrder {
   cancellation: { at: string; refundSAR: number; feeSAR: number } | null;
   changes: { at: string; from: { checkIn: string; checkOut: string; totalSAR: number }; to: { checkIn: string; checkOut: string; totalSAR: number }; chargedSAR: number; refundedSAR: number }[];
   loyalty?: { earnedPoints: number };
+  /** One hotel of a multi-city trip booked together (each hotel stays its own booking). */
+  trip?: StayTrip;
   createdAt: string;
   sandbox?: boolean;
 }
+
+export interface StayTrip { id: string; reference: string; index: number; count: number }
 
 export interface FlightPassenger {
   nameEn: string;

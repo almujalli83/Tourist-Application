@@ -210,7 +210,143 @@ export async function cancelStay(user: PublicUser, id: string, now = new Date())
   return strip(done!);
 }
 
+/* ---------------------------------------------------------------- multi-city trips */
+
+export const MAX_TRIP_CITIES = 5;
+
+/** A failure tied to one hotel of a trip (the page asks for another hotel in that city). */
+export class StayTripError extends StayError {
+  constructor(code: string, status: number, public leg: number) {
+    super(code, status);
+  }
+}
+
+export interface StayTripLeg { offer?: HotelOffer; city?: string; checkIn?: string; checkOut?: string; expectedTotalSAR?: number }
+
+export interface StayTripInput {
+  entry?: string;
+  rooms?: RoomOccupancy[];
+  /** Declared by Muslims staying in Makkah. */
+  umrah?: boolean;
+  lead?: { name?: string; email?: string; phone?: string };
+  requests?: string;
+  legs?: StayTripLeg[];
+  card?: CardInput;
+}
+
+/** The trip's cities in order, each checking out the day the next checks in. */
+export function validateTripLegs(input: Pick<StayTripInput, "entry" | "rooms" | "umrah" | "legs">, now = new Date()): StayQuery[] {
+  const legs = Array.isArray(input.legs) ? input.legs : [];
+  if (legs.length < 2 || legs.length > MAX_TRIP_CITIES) throw new StayError("tripCities");
+  const entry = isEntryType(input.entry) ? input.entry : undefined;
+  const qs = legs.map((l, i) => {
+    try {
+      return validateStayQuery({ city: l.city, checkIn: l.checkIn, checkOut: l.checkOut, rooms: input.rooms, entry, umrah: l.city === UMRAH_CITY && input.umrah === true }, now);
+    } catch (e) {
+      throw e instanceof StayError ? new StayTripError(e.code, e.status, i) : e;
+    }
+  });
+  for (let i = 1; i < qs.length; i++) {
+    if (qs[i].checkIn !== qs[i - 1].checkOut) throw new StayTripError("tripDates", 422, i);
+    if (qs[i].city === qs[i - 1].city) throw new StayTripError("tripSameCity", 422, i);
+  }
+  const nights = diffDays(qs[0].checkIn, qs[qs.length - 1].checkOut);
+  if (nights > MAX_NIGHTS) throw new StayError("nights");
+  if (entry === "stopover" && nights > STOPOVER.maxNights) throw new StayError("stopoverNights");
+  return qs;
+}
+
+/**
+ * Books a hotel in each city of a trip, all or nothing: one online charge for the prepaid rates
+ * (pay-at-hotel rates are not charged), then each hotel with its agent. If one cannot be confirmed,
+ * the others are cancelled and the charge refunded; the error names that hotel so the traveller can
+ * choose another in the same city and keep the rest. Each hotel then remains its own booking.
+ */
+export async function bookStayTrip(user: PublicUser, input: StayTripInput, now = new Date()): Promise<{ trip: { id: string; reference: string }; stays: StayOrder[] }> {
+  if (!isEntryType(input.entry)) throw new StayError("entry");
+  const entry = input.entry;
+  const qs = validateTripLegs(input, now);
+  const legs = input.legs!;
+  const offers = qs.map((q, i) => {
+    try {
+      const offer = checkedOffer(legs[i].offer, q);
+      if (Math.abs(offer.totalSAR - Number(legs[i].expectedTotalSAR)) > 0.01) throw new StayError("priceChanged", 409);
+      return offer;
+    } catch (e) {
+      throw e instanceof StayError ? new StayTripError(e.code, e.status, i) : e;
+    }
+  });
+  const lead = cleanLead(input.lead);
+  const requests = String(input.requests ?? "").trim().slice(0, 500);
+  const tripId = randomBytes(10).toString("hex");
+  const tripRef = `TP-${randomBytes(3).toString("hex").toUpperCase()}`;
+  const refs = qs.map(() => `ST-${randomBytes(3).toString("hex").toUpperCase()}`);
+
+  const onlineSAR = round2(offers.filter((o) => o.rate!.pay === "online").reduce((a, o) => a + o.totalSAR, 0));
+  let charge: { transactionId: string; method: string; last4: string } | null = null;
+  if (onlineSAR > 0) {
+    if (!input.card) throw new StayError("invalid_card");
+    const paid = await chargeCard(input.card, onlineSAR, now);
+    if (!paid.ok) throw new StayError(paid.code, 402);
+    charge = { transactionId: paid.transactionId, method: paid.method, last4: paid.last4 };
+  }
+
+  const confirmed: { agentId: string; confirmation: string }[] = [];
+  for (let i = 0; i < offers.length; i++) {
+    try {
+      confirmed.push({ agentId: offers[i].agentId, confirmation: await bookWithAgent(offers[i], refs[i], lead, qs[i].rooms, requests) });
+    } catch (e) {
+      // All or nothing: release the hotels already confirmed and return the money.
+      for (const c of confirmed) await agentOf(c.agentId).cancelHotel(c.confirmation).catch(() => undefined);
+      if (charge) await refundPayment(charge.transactionId, onlineSAR);
+      throw new StayTripError(e instanceof StayError ? e.code : "agentUnavailable", 502, i);
+    }
+  }
+
+  const stays: Stored[] = [];
+  for (let i = 0; i < offers.length; i++) {
+    const offer = offers[i];
+    const q = qs[i];
+    const id = randomBytes(10).toString("hex");
+    const pay = offer.rate!.pay;
+    const payment: StayOrder["payment"] = pay === "online" && charge ? { ...charge, amountSAR: offer.totalSAR, paidAt: now.toISOString() } : null;
+    const order: Stored = {
+      id, userId: user.id, reference: refs[i], confirmation: confirmed[i].confirmation, entry, hotel: unsigned(offer), rooms: q.rooms, lead, requests, pay,
+      totalSAR: offer.totalSAR, freeCancelUntil: offer.rate!.freeCancelUntil && Date.parse(offer.rate!.freeCancelUntil) > now.getTime() ? offer.rate!.freeCancelUntil : null,
+      status: "confirmed", payment, cancellation: null, changes: [], createdAt: now.toISOString(),
+      trip: { id: tripId, reference: tripRef, index: i, count: offers.length },
+      ...(agentOf(offer.agentId).sandbox ? { sandbox: true } : {}),
+    };
+    if (payment) {
+      const earned = await quietly("stay points", () => awardPurchase(user, { service: "stay", source: { kind: "stay", id, reference: refs[i] }, eligibleSAR: payment.amountSAR, availableAt: ksaDayStart(q.checkOut), cities: [q.city] }, now), 0);
+      if (earned) order.loyalty = { earnedPoints: earned };
+    }
+    await store().put(COL, id, order);
+    stays.push(order);
+  }
+
+  const atHotelSAR = round2(offers.filter((o) => o.rate!.pay === "hotel").reduce((a, o) => a + o.totalSAR, 0));
+  await notifyTravellers([user.email, ...(lead.email !== user.email ? [lead.email] : [])], {
+    subject: `Saudi Trip — your ${offers.length}-city hotel trip ${tripRef}`,
+    text: [
+      ...stays.map((o) => `${o.hotel.checkIn} → ${o.hotel.checkOut}: ${o.hotel.nameEn} (${o.hotel.city}) — ${o.pay === "online" ? "paid" : "pay at the hotel"} SAR ${o.totalSAR}, confirmation ${o.confirmation}.`),
+      ...(onlineSAR ? [`Paid online: SAR ${onlineSAR}.`] : []),
+      ...(atHotelSAR ? [`To pay at the hotels: SAR ${atHotelSAR}.`] : []),
+      "",
+      ...stays.map((o) => `${o.hotel.checkIn} ← ${o.hotel.checkOut}: ${o.hotel.nameAr} — ${o.pay === "online" ? "مدفوع" : "الدفع في الفندق"} ${o.totalSAR} ريال، رقم التأكيد ${o.confirmation}.`),
+    ].join("\n"),
+  }).catch(() => undefined);
+  return { trip: { id: tripId, reference: tripRef }, stays: stays.map(strip) };
+}
+
 /* ---------------------------------------------------------------- date changes */
+
+/** A trip's hotel may move, but not into the nights of another hotel of the same trip. */
+async function checkTripOverlap(o: Stored, checkIn: string, checkOut: string) {
+  if (!o.trip) return;
+  const others = (await store().findBy<Stored>(COL, "userId", o.userId)).filter((x) => x.id !== o.id && x.trip?.id === o.trip!.id && x.status === "confirmed");
+  if (others.some((x) => x.hotel.checkIn < checkOut && x.hotel.checkOut > checkIn)) throw new StayError("tripOverlap", 409);
+}
 
 /**
  * New dates for the same hotel, room and rate type, quoted by the agent that booked it. Allowed
@@ -222,6 +358,7 @@ export async function quoteStayChange(userId: string, id: string, dates: { check
   if (o.status !== "confirmed" || !freeCancelOpen(o, now)) throw new StayError("cannotChange", 409);
   const q = validateStayQuery({ city: o.hotel.city, checkIn: dates.checkIn, checkOut: dates.checkOut, rooms: o.rooms, entry: o.entry, umrah: o.hotel.city === UMRAH_CITY }, now);
   if (q.checkIn === o.hotel.checkIn && q.checkOut === o.hotel.checkOut) throw new StayError("sameDates");
+  await checkTripOverlap(o, q.checkIn, q.checkOut);
   const offer = await quoteHotelDates(o.hotel as HotelOffer, q.checkIn, q.checkOut);
   if (!offer) throw new StayError("noAvailability", 409);
   return { offer, differenceSAR: round2(offer.totalSAR - o.totalSAR) };
@@ -234,6 +371,7 @@ export async function changeStayDates(user: PublicUser, id: string, input: { off
   if (o.status !== "confirmed" || !freeCancelOpen(o, now)) throw new StayError("cannotChange", 409);
   const q = validateStayQuery({ city: o.hotel.city, checkIn: input.offer?.checkIn, checkOut: input.offer?.checkOut, rooms: o.rooms, entry: o.entry, umrah: o.hotel.city === UMRAH_CITY }, now);
   const offer = checkedOffer(input.offer, q);
+  await checkTripOverlap(o, q.checkIn, q.checkOut);
   if (offer.agentId !== o.hotel.agentId || offer.licenseNo !== o.hotel.licenseNo || offer.rate?.pay !== o.pay) throw new StayError("offerMismatch", 409);
   const diff = round2(offer.totalSAR - o.totalSAR);
   let chargedSAR = 0;
