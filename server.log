@@ -1,0 +1,20 @@
+   ▲ Next.js 15.5.26
+   - Local:        http://localhost:3100
+   - Network:      http://192.0.2.2:3100
+
+ ✓ Starting...
+ ✓ Ready in 734ms
+[notify] (no email provider) to=sa1790582082083@example.com subject="Saudi Trip — Confirm your email / تأكيد البريد الإلكتروني"
+[notify] (no email provider) to=sa1790582082083@example.com subject="Saudi Trip — Desert Rose Inn 2026-10-18 (RES27221888)"
+[notify] (no email provider) to=sa1790582082083@example.com subject="Saudi Trip — new hotel dates (ST-5DD859)"
+[notify] (no email provider) to=sa1790582082083@example.com subject="Saudi Trip — hotel booking cancelled (ST-5DD859)"
+[notify] (no email provider) to=sa1790582082083@example.com subject="Saudi Trip — Desert Rose Inn 2026-10-28 (WEB98669794)"
+[notify] (no email provider) to=sa1790582082083@example.com subject="Saudi Trip — e-tickets RUH-JED (FL-EC94F1)"
+[notify] (no email provider) to=sa1790582082083@example.com subject="Saudi Trip — e-tickets CAI-RUH, RUH-DXB (FL-47D982)"
+[notify] (no email provider) to=sa1790582103475@example.com subject="Saudi Trip — Confirm your email / تأكيد البريد الإلكتروني"
+[notify] (no email provider) to=sa1790582103475@example.com subject="Saudi Trip — Desert Rose Inn 2026-10-18 (RES77059725)"
+[notify] (no email provider) to=sa1790582103475@example.com subject="Saudi Trip — new hotel dates (ST-D31B54)"
+[notify] (no email provider) to=sa1790582103475@example.com subject="Saudi Trip — hotel booking cancelled (ST-D31B54)"
+[notify] (no email provider) to=sa1790582103475@example.com subject="Saudi Trip — Desert Rose Inn 2026-10-28 (WEB52687175)"
+[notify] (no email provider) to=sa1790582103475@example.com subject="Saudi Trip — e-tickets RUH-JED (FL-2CBBE1)"
+[notify] (no email provider) to=sa1790582103475@example.com subject="Saudi Trip — e-tickets CAI-RUH, RUH-DXB (FL-221110)"

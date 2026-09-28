@@ -6,7 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
 import { MAKKAH, SAUDI_CITIES, UMRAH_CITY } from "@/lib/data/cities";
 import { fmtKsa } from "@/lib/events/format";
+import { EMAIL_RE } from "@/lib/auth/validation";
 import { earnPoints } from "@/lib/loyalty/rules";
+import { validatePhone } from "@/lib/phone";
 import type { HotelOffer, RoomOccupancy } from "@/lib/types";
 import { useApp } from "../app-provider";
 import { GuestsRoomsPicker } from "../booking/guests-rooms-picker";
@@ -94,7 +96,14 @@ export function HotelsView() {
 
   const cities = [...SAUDI_CITIES, MAKKAH];
   const points = chosen && chosen.rate?.pay === "online" && user?.accountType === "individual" ? earnPoints({ service: "stay", eligibleSAR: chosen.totalSAR }) : 0;
-  const leadOk = lead.name.trim().includes(" ") && /@/.test(lead.email) && lead.phone.replace(/\D/g, "").length >= 8;
+  // The same rules as the server, shown under each field so a disabled button is never a mystery.
+  const leadErr = {
+    name: lead.name.trim().replace(/\s+/g, " ").includes(" ") ? undefined : s.errors.leadName,
+    email: EMAIL_RE.test(lead.email.trim()) ? undefined : s.errors.email,
+    phone: validatePhone(lead.phone) ? s.errors.phone : undefined,
+  };
+  const leadOk = !leadErr.name && !leadErr.email && !leadErr.phone;
+  const shownErr = (k: keyof typeof leadErr) => (lead[k].trim() ? leadErr[k] : undefined);
 
   return (
     <StandaloneShell tab="hotels" entry={entry} onEntry={setEntry}>
@@ -140,15 +149,16 @@ export function HotelsView() {
           </div>
           <Card className="h-fit space-y-4 p-5" data-testid="st-book">
             <h2 className="font-bold">{h.lead}</h2>
-            <Field label={h.leadName} required htmlFor="st-lead-name"><Input id="st-lead-name" value={lead.name} onChange={(e) => setLead({ ...lead, name: e.target.value })} autoComplete="name" data-testid="st-lead-name" /></Field>
-            <Field label={h.email} required htmlFor="st-lead-email"><Input id="st-lead-email" type="email" dir="ltr" value={lead.email} onChange={(e) => setLead({ ...lead, email: e.target.value })} autoComplete="email" /></Field>
-            <Field label={h.phone} required htmlFor="st-lead-phone"><Input id="st-lead-phone" type="tel" dir="ltr" value={lead.phone} onChange={(e) => setLead({ ...lead, phone: e.target.value })} autoComplete="tel" placeholder="+9665…" data-testid="st-lead-phone" /></Field>
+            <Field label={h.leadName} required error={shownErr("name")} htmlFor="st-lead-name"><Input id="st-lead-name" value={lead.name} onChange={(e) => setLead({ ...lead, name: e.target.value })} autoComplete="name" data-testid="st-lead-name" /></Field>
+            <Field label={h.email} required error={shownErr("email")} htmlFor="st-lead-email"><Input id="st-lead-email" data-testid="st-lead-email" type="email" dir="ltr" value={lead.email} onChange={(e) => setLead({ ...lead, email: e.target.value })} autoComplete="email" /></Field>
+            <Field label={h.phone} required error={shownErr("phone")} htmlFor="st-lead-phone"><Input id="st-lead-phone" type="tel" dir="ltr" value={lead.phone} onChange={(e) => setLead({ ...lead, phone: e.target.value })} autoComplete="tel" placeholder="+9665…" data-testid="st-lead-phone" /></Field>
             <Field label={h.requests} hint={h.requestsHint} htmlFor="st-req"><Textarea id="st-req" rows={2} value={requests} maxLength={500} onChange={(e) => setRequests(e.target.value)} /></Field>
             <div className="flex items-center justify-between border-t border-slate-100 pt-3">
               <span className="font-semibold">{h.total}</span>
               <span className="ltr-nums text-lg font-bold text-brand-800" data-testid="st-total">{money(chosen.totalSAR)}</span>
             </div>
             {points > 0 && <p className="text-sm font-medium text-gold-700">{fmt(h.earns, { n: points })}</p>}
+            {user && !leadOk && <p className="text-sm text-amber-800" role="status" data-testid="st-incomplete">{s.completeForm}</p>}
             {!user ? (
               <Link href={`/${locale}/login?next=/${locale}/hotels`} className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-700 font-semibold text-white hover:bg-brand-800">{h.signIn}</Link>
             ) : chosen.rate?.pay === "online" ? (
