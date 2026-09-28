@@ -61,6 +61,7 @@ export function EvisaAppView({ id }: { id: string }) {
               {a.issueDate && a.expiryDate && <p className="text-slate-700">{fmt(v.validity, { from: day(a.issueDate), to: day(a.expiryDate) })}</p>}
               {a.insuranceStatus && <p className="text-slate-700">{v.insurance}: {v.insuranceStatus[a.insuranceStatus as keyof typeof v.insuranceStatus] ?? a.insuranceStatus}</p>}
               <p className="mt-1 text-xs text-slate-600">{v.carry}</p>
+              <Link href={`/${locale}/account/wallet`} className="mt-2 inline-flex text-sm font-semibold text-brand-800 underline" data-testid="evisa-wallet-link">{v.inWallet}</Link>
             </div>
           )}
           {a.reason && <p className="text-red-700">{v.reason}: {a.reason}</p>}

@@ -289,15 +289,16 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         status: badge(t.standalone.flight.status[o.status], !live), amount: money(o.totalSAR),
       });
     }
+    // Tourist eVisa applications while undecided (or refused); an issued visa lives in the wallet instead.
     for (const v of visas ?? []) {
-      const approved = v.applicants.filter((a) => a.status === "approved").length;
+      if (v.status === "completed") continue;
       out.push({
         kind: "evisa", id: v.id, href: `/${locale}/account/evisa/${v.id}`,
         title: `${t.evisa.title} · ${v.applicants.map((a) => a.nameEn).join(", ")}`,
-        subtitle: `${v.reference} · ${fmt(t.evisa.arrivalOn, { date: fmtDay(v.arrivalDate, locale, { day: "numeric", month: "short", year: "numeric" }) })}${v.status === "completed" ? ` · ${fmt(t.evisa.approvedCount, { n: approved, total: v.applicants.length })}` : ""}`,
+        subtitle: `${v.reference} · ${fmt(t.evisa.arrivalOn, { date: fmtDay(v.arrivalDate, locale, { day: "numeric", month: "short", year: "numeric" }) })}`,
         at: Date.parse(`${v.arrivalDate}T00:00:00+03:00`), day: v.arrivalDate,
-        upcoming: v.status === "in_progress" || (v.status === "completed" && v.arrivalDate >= today), today: false,
-        status: <Badge tone={v.status === "failed" ? "red" : v.status === "completed" ? "brand" : "amber"}>{t.evisa.appStatus[v.status]}</Badge>, amount: money(v.totalSAR - v.refundedSAR),
+        upcoming: v.status === "in_progress", today: false,
+        status: <Badge tone={v.status === "failed" ? "red" : "amber"}>{t.evisa.appStatus[v.status]}</Badge>, amount: money(v.totalSAR - v.refundedSAR),
       });
     }
     for (const o of buses ?? []) {

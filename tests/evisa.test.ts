@@ -7,7 +7,8 @@ import type { PublicUser } from "@/lib/auth/types";
 import { auditedRequest } from "@/lib/compliance/request-audit";
 import { addDays, todayISO } from "@/lib/dates";
 import { evisaCountries, evisaEligible } from "@/lib/evisa/eligibility";
-import { applyForEvisa, evisaFeeSAR, getEvisaApplication, listEvisaApplications, validateEvisaTravellers } from "@/lib/evisa/service";
+import { applyForEvisa, evisaFeeSAR, evisaWalletId, getEvisaApplication, listEvisaApplications, validateEvisaTravellers } from "@/lib/evisa/service";
+import { walletOverview } from "@/lib/wallet";
 import { getAccount } from "@/lib/loyalty/loyalty";
 import { store } from "@/lib/store";
 import { emptyTraveller } from "@/lib/visa-validation";
@@ -59,6 +60,16 @@ describe("tourist eVisa without a package", () => {
     expect(later!.applicants.every((a) => a.status === "approved" && /^\d{10}$/.test(a.visaNumber!))).toBe(true);
     expect((await store().findBy("notifications", "userId", u.id)).length).toBe(2);
     expect((await listEvisaApplications(u.id))[0].id).toBe(app.id);
+    // Issued visas are filed in the wallet with their holders (once), not kept as bookings.
+    const wallet = await walletOverview(u.id);
+    const holders = wallet.people.filter((p) => p.documents.some((d) => d.type === "visa"));
+    expect(holders.map((p) => p.nameEn).sort()).toEqual(["AMY SMITH", "JOHN SMITH"]);
+    const visa = holders.find((p) => p.nameEn === "JOHN SMITH")!.documents[0];
+    expect(visa).toMatchObject({ id: evisaWalletId(app.id, 0), type: "visa", hasFile: true, contentType: "application/pdf", meta: { number: later!.applicants[0].visaNumber } });
+    await getEvisaApplication(u, app.id, new Date(Date.now() + 3 * 60_000));
+    expect((await store().findBy("wallet", "userId", u.id)).length).toBe(2);
+    // The encrypted holder key never leaves the server.
+    expect(JSON.stringify(later)).not.toContain("personKeyEnc");
   });
 
   it("companies apply for their clients with their own reference; a refusal is final", async () => {
