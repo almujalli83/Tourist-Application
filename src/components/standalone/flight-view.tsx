@@ -5,18 +5,19 @@ import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import { cityName, getCity } from "@/lib/data/cities";
 import { fmtDay } from "@/lib/events/format";
-import { flightAirportLegs, flightWindow, matchingStay, nextSteps } from "@/lib/standalone/next-steps";
+import { flightAirportLegs, flightStays, flightWindow, matchingStay, nextSteps, tripHotelsHref } from "@/lib/standalone/next-steps";
 import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
 import { PlaneIcon } from "../icons";
 import { ReceiptLink } from "../payments/receipt-link";
 import { PrintButton } from "../print-button";
-import { Alert, Badge, Button, Card, Spinner } from "../ui";
+import { Alert, Badge, Button, Card, cx, Spinner } from "../ui";
 import { CompleteTrip } from "./complete-trip";
 import { errText } from "./shell";
 
-interface Data { order: FlightOrder; cancel: { allowed: boolean; refundSAR: number } }
+interface Terms { allowed: boolean; refundSAR: number }
+interface Data { order: FlightOrder; cancel: Terms; segments?: Terms[] }
 
 /** Flights booked without a package: e-tickets per passenger and flight, and cancellation. */
 export function FlightView({ id }: { id: string }) {
@@ -53,6 +54,16 @@ export function FlightView({ id }: { id: string }) {
     if (!r.ok) return setErr(errText(s.errors, d.error));
     await load();
   }
+  async function cancelSegment(i: number) {
+    if (!confirm(fmt(v.segmentConfirm, { flight: o.segments[i].offer.flightNo }))) return;
+    setBusy(true);
+    setErr(null);
+    const r = await fetch(`/api/flights/${id}?segment=${i}`, { method: "DELETE" });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setErr(errText(s.errors, d.error));
+    await load();
+  }
 
   const [first, second] = o.segments;
   // The city flown to (the transit city for a stopover) and every Saudi airport end fill in the next services.
@@ -61,8 +72,14 @@ export function FlightView({ id }: { id: string }) {
   const nowKsa = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 16);
   const legs = flightAirportLegs(o).filter((l) => l.at > nowKsa);
   const upcoming = legs.length > 0;
+  // A multi-city trip: hotels in every city it stays in.
+  const nights = o.tripType === "multicity" ? flightStays(o) : [];
+  const tripHotels = nights.length > 1 ? tripHotelsHref(nights, o.entry) : null;
   const steps = trip
-    ? nextSteps(trip, { stay: !!stay, flight: true, hotelName: stay ? (ar ? stay.hotel.nameAr : stay.hotel.nameEn) : undefined }, legs)
+    ? nextSteps(trip, {
+        stay: !!stay, flight: true, hotelName: stay ? (ar ? stay.hotel.nameAr : stay.hotel.nameEn) : undefined,
+        ...(tripHotels ? { tripHotels: { href: tripHotels, count: new Set(nights.map((x) => x.city)).size } } : {}),
+      }, legs)
         // A stopover's hotel has its own button above.
         .filter((st) => !(st.key === "hotel" && o.tripType === "stopover"))
     : legs.map((leg) => ({ key: "transfer" as const, leg, href: `/transport?transfer=${leg.direction}&airport=${leg.airport}&flight=${leg.flightNo}&at=${leg.at}&pax=${Math.min(8, o.passengers.length)}#transfer` }));
@@ -77,7 +94,7 @@ export function FlightView({ id }: { id: string }) {
       {err && <Alert tone="error">{err}</Alert>}
       <p className="text-sm text-slate-600">{s.entry.types[o.entry]} · {s.flights.trip[o.tripType]}</p>
       {o.segments.map((sg, i) => (
-        <Card key={i} className="space-y-3 p-5 text-sm" data-testid="flight-segment">
+        <Card key={i} className={cx("space-y-3 p-5 text-sm", sg.cancellation && "opacity-70")} data-testid="flight-segment">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-base font-bold">
               {airport(sg.offer.from)} {ar ? "←" : "→"} {airport(sg.offer.to)}
@@ -100,6 +117,13 @@ export function FlightView({ id }: { id: string }) {
             </tbody>
           </table>
           <p className="text-xs text-slate-600">{fmt(v.airport, { h: o.scope === "domestic" ? 2 : 3 })}</p>
+          {sg.cancellation && <p className="font-semibold text-red-700" data-testid="flight-segment-cancelled">{fmt(v.segmentCancelled, { amount: money(sg.cancellation.refundSAR) })}</p>}
+          {live && data.segments?.[i]?.allowed && (
+            <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 print:hidden">
+              <Button size="sm" variant="secondary" className="text-red-700" loading={busy} onClick={() => void cancelSegment(i)} data-testid="flight-segment-cancel">{v.cancelSegment}</Button>
+              <span className="text-xs text-slate-600">{data.segments[i].refundSAR > 0 ? fmt(v.segmentRefund, { amount: money(data.segments[i].refundSAR) }) : v.segmentNoRefund}</span>
+            </div>
+          )}
         </Card>
       ))}
       <Card className="space-y-2 p-5 text-sm">

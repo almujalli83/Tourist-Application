@@ -44,7 +44,7 @@ const minutes = (at: string, delta: number) => {
 /** Every Saudi airport end of the flights: a car from the airport on landing, one to it before take-off. */
 export function flightAirportLegs(o: FlightOrder): AirportLeg[] {
   const legs: AirportLeg[] = [];
-  for (const { offer } of o.segments) {
+  for (const { offer } of o.segments.filter((sg) => !sg.cancellation)) {
     if (served(offer.from)) legs.push({ direction: "departure", airport: offer.from, flightNo: offer.flightNo, at: offer.departAt });
     if (served(offer.to)) legs.push({ direction: "arrival", airport: offer.to, flightNo: offer.flightNo, at: offer.arriveAt });
   }
@@ -100,7 +100,7 @@ export function matchingStay(w: Pick<TripWindow, "city" | "from" | "to">, stays:
   return stays.find((s) => s.status === "confirmed" && s.hotel.city === w.city && s.hotel.checkIn < w.to && s.hotel.checkOut > w.from);
 }
 
-export type StepKey = "hotel" | "flight" | "onward" | "transfer" | "rental" | "esim" | "events" | "restaurants" | "guides" | "prayer";
+export type StepKey = "hotel" | "tripHotels" | "flight" | "tripFlights" | "onward" | "transfer" | "rental" | "esim" | "events" | "restaurants" | "guides" | "prayer";
 
 export interface Step {
   key: StepKey;
@@ -109,6 +109,52 @@ export interface Step {
   leg?: AirportLeg;
   /** For onward travel: the next city and the day. */
   onward?: { to: string; date: string };
+  /** For a whole trip: how many flights or cities. */
+  count?: number;
+}
+
+/** The nights a multi-city flight booking spends in Saudi cities: from each landing to the next take-off. */
+export function flightStays(o: FlightOrder): { city: string; from: string; to: string }[] {
+  const segs = o.segments.filter((sg) => !sg.cancellation).map((sg) => sg.offer);
+  const out: { city: string; from: string; to: string }[] = [];
+  for (let i = 0; i < segs.length - 1; i++) {
+    const city = segs[i].to;
+    const from = segs[i].arriveAt.slice(0, 10);
+    const to = segs[i + 1].departAt.slice(0, 10);
+    if (getStayCity(city) && to > from) out.push({ city, from, to });
+  }
+  return out;
+}
+
+/** The multi-city hotel search for those stays (a gap before the next city counts as nights in the previous one). */
+export function tripHotelsHref(stays: { city: string; from: string; to: string }[], entry: EntryType): string | null {
+  const legs: { city: string; nights: number }[] = [];
+  stays.forEach((st, i) => {
+    const until = stays[i + 1]?.from ?? st.to;
+    const nights = Math.round((Date.parse(until) - Date.parse(st.from)) / 86_400_000);
+    if (nights < 1) return;
+    const last = legs[legs.length - 1];
+    if (last && last.city === st.city) last.nights += nights;
+    else legs.push({ city: st.city, nights });
+  });
+  if (legs.length < 2) return null;
+  const p = new URLSearchParams({ mode: "multi", entry, start: stays[0].from });
+  legs.slice(0, 5).forEach((l) => p.append("leg", `${l.city}:${Math.min(14, l.nights)}`));
+  return `/hotels?${p}`;
+}
+
+/** Flights for a multi-city hotel trip: into the first city, between the cities (Makkah via Jeddah), home from the last. */
+export function tripFlightsHref(stays: Pick<StayOrder, "hotel">[], entry: EntryType, origin: string): string | null {
+  if (stays.length < 2) return null;
+  const air = (c: string) => (c === "MKX" ? "JED" : c);
+  const legs: [string, string, string][] = [[origin, air(stays[0].hotel.city), stays[0].hotel.checkIn]];
+  for (let i = 1; i < stays.length; i++) legs.push([air(stays[i - 1].hotel.city), air(stays[i].hotel.city), stays[i].hotel.checkIn]);
+  legs.push([air(stays[stays.length - 1].hotel.city), origin, stays[stays.length - 1].hotel.checkOut]);
+  const flights = legs.filter(([a, b]) => a !== b).slice(0, 5);
+  if (flights.length < 2) return null;
+  const p = new URLSearchParams({ entry, trip: "multi" });
+  flights.forEach((l) => p.append("leg", l.join(":")));
+  return `/flights?${p}`;
 }
 
 /** Moving on to the next city of a multi-city trip: a flight between airports, else the intercity trains and buses. */
@@ -131,13 +177,19 @@ export function transferHref(leg: AirportLeg, pax: number, place?: string): stri
  */
 export function nextSteps(
   w: TripWindow,
-  have: { stay?: boolean; flight?: boolean; hotelName?: string; backDate?: string; onward?: { to: string; date: string } } = {},
+  have: {
+    stay?: boolean; flight?: boolean; hotelName?: string; backDate?: string; onward?: { to: string; date: string };
+    /** Whole-trip links (multi-city): hotels in every city, or every flight. */
+    tripHotels?: { href: string; count: number }; tripFlights?: { href: string; count: number };
+  } = {},
   legs?: AirportLeg[],
 ): Step[] {
   const steps: Step[] = [];
-  if (!have.stay) steps.push({ key: "hotel", href: `/hotels?${qs({ entry: w.entry, city: w.city, checkIn: w.from, checkOut: w.to })}` });
+  if (have.tripHotels) steps.push({ key: "tripHotels", href: have.tripHotels.href, count: have.tripHotels.count });
+  if (have.tripFlights) steps.push({ key: "tripFlights", href: have.tripFlights.href, count: have.tripFlights.count });
+  if (!have.stay && !have.tripHotels) steps.push({ key: "hotel", href: `/hotels?${qs({ entry: w.entry, city: w.city, checkIn: w.from, checkOut: w.to })}` });
   // Makkah has no airport: fly to Jeddah. A multi-city trip flies home from its last city (`backDate`).
-  if (!have.flight) steps.push({ key: "flight", href: `/flights?${qs({ entry: w.entry, to: w.city === "MKX" ? "JED" : w.city, date: w.from, back: have.backDate ?? w.to, trip: "return" })}` });
+  if (!have.flight && !have.tripFlights) steps.push({ key: "flight", href: `/flights?${qs({ entry: w.entry, to: w.city === "MKX" ? "JED" : w.city, date: w.from, back: have.backDate ?? w.to, trip: "return" })}` });
   if (have.onward) steps.push({ key: "onward", onward: have.onward, href: onwardHref(w.city, have.onward.to, have.onward.date) });
   const ends = legs ?? [w.arrival, w.departure].filter((l): l is AirportLeg => !!l);
   for (const leg of ends) steps.push({ key: "transfer", leg, href: transferHref(leg, w.pax, leg.airport === w.city ? have.hotelName : undefined) });

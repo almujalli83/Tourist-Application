@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flightAirportLegs, flightWindow, matchingFlight, matchingStay, nextSteps, stayWindow } from "@/lib/standalone/next-steps";
+import { flightAirportLegs, flightStays, flightWindow, matchingFlight, matchingStay, nextSteps, stayWindow, tripFlightsHref, tripHotelsHref } from "@/lib/standalone/next-steps";
 import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 
 const seg = (from: string, to: string, departAt: string, arriveAt: string, flightNo = "XY255") =>
@@ -76,5 +76,30 @@ describe("complete your trip", () => {
     expect(matchingStay(w, [stay({}, { status: "cancelled" })])).toBeUndefined();
     expect(matchingStay(w, [stay({ city: "RUH" })])).toBeUndefined();
     expect(matchingStay(w, [stay({ checkIn: "2026-10-11", checkOut: "2026-10-13" })])).toBeUndefined();
+  });
+
+  it("multi-city flights → the nights in each city → one multi-city hotel search", () => {
+    const o = flight({ tripType: "multicity", scope: "international", segments: [
+      seg("CAI", "RUH", "2026-11-07T02:00", "2026-11-07T05:00"), seg("RUH", "ULH", "2026-11-10T09:00", "2026-11-10T10:30"),
+      seg("ULH", "JED", "2026-11-12T12:00", "2026-11-12T13:20"), seg("JED", "CAI", "2026-11-14T20:00", "2026-11-14T22:00"),
+    ] });
+    const stays = flightStays(o);
+    expect(stays).toEqual([{ city: "RUH", from: "2026-11-07", to: "2026-11-10" }, { city: "ULH", from: "2026-11-10", to: "2026-11-12" }, { city: "JED", from: "2026-11-12", to: "2026-11-14" }]);
+    expect(tripHotelsHref(stays, "evisa")).toBe("/hotels?mode=multi&entry=evisa&start=2026-11-07&leg=RUH%3A3&leg=ULH%3A2&leg=JED%3A2");
+    // A cancelled flight drops out of the plan and the airport list.
+    const cut = { ...o, segments: o.segments.map((sg, i) => (i === 2 ? { ...sg, cancellation: { at: "", refundSAR: 0 } } : sg)) };
+    expect(flightAirportLegs(cut).some((l) => l.airport === "ULH" && l.direction === "departure")).toBe(false);
+    expect(tripHotelsHref([stays[0]], "evisa")).toBeNull();
+  });
+
+  it("multi-city hotels → every flight of the trip (Makkah via Jeddah, no flight between Jeddah and Makkah)", () => {
+    const st = (city: string, checkIn: string, checkOut: string) => stay({ city, checkIn, checkOut });
+    const href = tripFlightsHref([st("RUH", "2026-11-07", "2026-11-10"), st("JED", "2026-11-10", "2026-11-12"), st("MKX", "2026-11-12", "2026-11-14")], "evisa", "CAI")!;
+    const legs = new URLSearchParams(href.split("?")[1]).getAll("leg");
+    expect(href.startsWith("/flights?entry=evisa&trip=multi")).toBe(true);
+    expect(legs).toEqual(["CAI:RUH:2026-11-07", "RUH:JED:2026-11-10", "JED:CAI:2026-11-14"]);
+    // Residents from Riyadh: no flight from Riyadh to Riyadh.
+    const res = new URLSearchParams(tripFlightsHref([st("RUH", "2026-11-07", "2026-11-09"), st("ULH", "2026-11-09", "2026-11-11")], "resident", "RUH")!.split("?")[1]).getAll("leg");
+    expect(res).toEqual(["RUH:ULH:2026-11-09", "ULH:RUH:2026-11-11"]);
   });
 });

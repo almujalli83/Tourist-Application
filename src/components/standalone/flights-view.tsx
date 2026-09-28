@@ -12,13 +12,16 @@ import { STOPOVER, type DocType } from "@/lib/standalone/entry";
 import type { CabinClass, FlightOffer } from "@/lib/types";
 import { useApp } from "../app-provider";
 import { CountrySelect } from "../booking/country-select";
-import { PlaneIcon } from "../icons";
+import { PlaneIcon, XIcon } from "../icons";
 import { Checkout, type PaymentRef } from "../payments/checkout";
 import { PhoneInput } from "../phone-input";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
 import { errText, StandaloneShell, useEntry } from "./shell";
 
-type Trip = "oneway" | "return" | "stopover";
+type Trip = "oneway" | "return" | "stopover" | "multicity";
+interface Hop { from: string; to: string; date: string }
+const MAX_FLIGHTS = 5;
+const addDay = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 type PaxType = "adult" | "child" | "infant";
 interface Option { ref: string; nameEn: string; nationality: string; passportMasked: string; birthDate: string | null }
 interface Pax { type: PaxType; ref: string; nameEn: string; nationality: string; docType: DocType; docNo: string; birthDate: string; passportExpiry: string }
@@ -31,7 +34,7 @@ const ksaDay = (plus: number) => {
 const SAUDI = new Set(SAUDI_CITIES.map((c) => c.code));
 const blank = (type: PaxType): Pax => ({ type, ref: "", nameEn: "", nationality: "", docType: "passport", docNo: "", birthDate: "", passportExpiry: "" });
 
-/** Flights without a package: domestic, to or from the Kingdom, and stopovers of up to 96 hours. */
+/** Flights without a package: domestic, to or from the Kingdom, stopovers of up to 96 hours, and multi-city trips. */
 export function FlightsView() {
   const { t, locale, money, user } = useApp();
   const s = t.standalone;
@@ -49,6 +52,7 @@ export function FlightsView() {
   const [options, setOptions] = useState<Option[]>([]);
   const [pax, setPax] = useState<Pax[]>([blank("adult")]);
   const [contact, setContact] = useState({ email: "", phone: "" });
+  const [hops, setHops] = useState<Hop[]>([{ from: "RUH", to: "ULH", date: ksaDay(10) }, { from: "ULH", to: "JED", date: ksaDay(13) }]);
 
   // Stopover visitors fly in and out again; everyone else chooses one way or return.
   useEffect(() => {
@@ -62,6 +66,13 @@ export function FlightsView() {
     const p = new URLSearchParams(location.search);
     const known = (c: string | null) => !!c && (SAUDI.has(c) || ORIGIN_CITIES.some((o) => o.code === c));
     const day = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= ksaDay(0) ? d : null);
+    // Multi-city (flights for a multi-city hotel trip): ?trip=multi&leg=CAI:RUH:2026-11-07&leg=RUH:JED:2026-11-10
+    const hopsIn = p.getAll("leg").map((x) => x.split(":")).filter(([a, b, d]) => known(a) && known(b) && a !== b && !!day(d)).map(([a, b, d]) => ({ from: a, to: b, date: d })).slice(0, MAX_FLIGHTS);
+    if (p.get("trip") === "multi" && hopsIn.length >= 2) {
+      setTrip("multicity");
+      setHops(hopsIn);
+      return;
+    }
     const to = p.get("to");
     const from = p.get("from");
     const date = day(p.get("date"));
@@ -86,13 +97,18 @@ export function FlightsView() {
     });
   }, [counts]);
 
-  const route = trip === "stopover" ? [{ from: q.from, to: q.via, date: q.date }, { from: q.via, to: q.to, date: q.back }] : trip === "return" ? [{ from: q.from, to: q.to, date: q.date }, { from: q.to, to: q.from, date: q.back }] : [{ from: q.from, to: q.to, date: q.date }];
+  // A new plan clears the results (their lists and choices follow the route's flights).
+  useEffect(() => {
+    setLegs([]);
+    setPicked([]);
+  }, [trip, hops]);
+  const route = trip === "multicity" ? hops : trip === "stopover" ? [{ from: q.from, to: q.via, date: q.date }, { from: q.via, to: q.to, date: q.back }] : trip === "return" ? [{ from: q.from, to: q.to, date: q.date }, { from: q.to, to: q.from, date: q.back }] : [{ from: q.from, to: q.to, date: q.date }];
   const domestic = route.every((r) => SAUDI.has(r.from) && SAUDI.has(r.to));
 
   async function search(e?: React.FormEvent) {
     e?.preventDefault();
     setErr(null);
-    setPicked([null, null]);
+    setPicked(route.map(() => null));
     setLoading(true);
     const results = await Promise.all(route.map(async (r) => {
       const p = new URLSearchParams({ from: r.from, to: r.to, date: r.date, cabin: q.cabin, adults: String(counts.adults), children: String(counts.children), infants: String(counts.infants) });
@@ -106,13 +122,13 @@ export function FlightsView() {
       return null;
     });
     setLoading(false);
-    setLegs(results ? [results[0], results[1] ?? null] : [null, null]);
+    setLegs(results ?? route.map(() => null));
   }
 
   const total = picked.filter(Boolean).reduce((a, o) => a + (o?.totalSAR ?? 0), 0);
   const allPicked = route.every((_, i) => !!picked[i]);
   const points = allPicked && user?.accountType === "individual" ? earnPoints({ service: "flight", eligibleSAR: total }) : 0;
-  const titles = [f.pickOut, trip === "stopover" ? f.pickOnward : f.pickBack];
+  const titles = trip === "multicity" ? route.map((_, i) => fmt(f.legN, { n: i + 1 })) : [f.pickOut, trip === "stopover" ? f.pickOnward : f.pickBack];
   const docTypes: DocType[] = domestic ? ["passport", "nationalId", "iqama"] : ["passport"];
   const paxOk = pax.every((p) => (p.ref || (p.nameEn.trim().includes(" ") && p.nationality && p.docNo.trim().length >= 5)) && (p.birthDate || options.find((o) => o.ref === p.ref)?.birthDate) && (domestic || p.passportExpiry || p.ref.startsWith("saved:")));
   const contactErr = { email: EMAIL_RE.test(contact.email.trim()) ? undefined : s.errors.email, phone: validatePhone(contact.phone) ? s.errors.phone : undefined };
@@ -133,7 +149,27 @@ export function FlightsView() {
     }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
     if (!r?.ok) {
-      setErr(errText(s.errors, d?.error));
+      const leg = typeof d?.details?.leg === "number" ? (d.details.leg as number) : null;
+      const replace = ["agentRejected", "agentUnavailable", "offerExpired", "priceChanged"].includes(d?.error);
+      if (leg === null || leg >= route.length || !picked[leg] || !replace) {
+        setErr(errText(s.errors, d?.error));
+        return false;
+      }
+      // Only that flight is to replace: a refused flight leaves the list; an expired or changed offer is searched again.
+      const failed = picked[leg]!;
+      const where = `${failed.from} → ${failed.to}`;
+      setPicked((cur) => cur.map((x, j) => (j === leg ? null : x)));
+      if (d.error === "agentRejected" || d.error === "agentUnavailable") {
+        setLegs((cur) => cur.map((x, j) => (j === leg && x ? x.filter((o) => o.id !== failed.id) : x)));
+        setErr(fmt(f.legFailed, { n: leg + 1, route: where }));
+      } else {
+        setErr(fmt(f.legChanged, { n: leg + 1 }));
+        const r2 = route[leg];
+        const q2 = new URLSearchParams({ from: r2.from, to: r2.to, date: r2.date, cabin: q.cabin, adults: String(counts.adults), children: String(counts.children), infants: String(counts.infants) });
+        const fresh = await fetch(`/api/flights/search?${q2}`).then((x) => x.json()).catch(() => null);
+        if (fresh?.offers) setLegs((cur) => cur.map((x, j) => (j === leg ? fresh.offers : x)));
+      }
+      document.querySelector(`[data-testid="fl-leg-${leg}"]`)?.scrollIntoView({ behavior: "smooth" });
       return false;
     }
     router.push(`/${locale}/account/flights/${d.order.id}`);
@@ -155,19 +191,46 @@ export function FlightsView() {
     <StandaloneShell tab="flights" entry={entry} onEntry={setEntry}>
       <Card className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap gap-2" role="group" aria-label={f.search}>
-          {(entry === "stopover" ? (["stopover"] as Trip[]) : (["oneway", "return"] as Trip[])).map((x) => (
+          {(entry === "stopover" ? (["stopover"] as Trip[]) : (["oneway", "return", "multicity"] as Trip[])).map((x) => (
             <button key={x} type="button" aria-pressed={trip === x} onClick={() => setTrip(x)} className={cx("h-9 rounded-full px-4 text-sm font-semibold ring-1 ring-inset", trip === x ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-slate-700 ring-slate-200")} data-testid={`fl-trip-${x}`}>
               {f.trip[x]}
             </button>
           ))}
         </div>
         {trip === "stopover" && <Alert tone="info">{f.stopoverNote}</Alert>}
+        {trip === "multicity" && <p className="text-sm text-slate-600">{f.multiNote}</p>}
         <form onSubmit={search} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" noValidate>
+          {trip === "multicity" ? (
+            <div className="space-y-2 sm:col-span-2 lg:col-span-4">
+              {hops.map((h, i) => {
+                const set = (patch: Partial<Hop>) => setHops((cur) => cur.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                return (
+                  <fieldset key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 sm:grid-cols-[1fr_1fr_11rem_auto]" data-testid="fl-hop">
+                    <legend className="sr-only">{fmt(f.legN, { n: i + 1 })}</legend>
+                    <Field label={`${i + 1}. ${f.from}`} htmlFor={`fl-hop-from-${i}`}>{citySelect(`fl-hop-from-${i}`, h.from, (v) => set({ from: v }))}</Field>
+                    <Field label={f.to} htmlFor={`fl-hop-to-${i}`}>{citySelect(`fl-hop-to-${i}`, h.to, (v) => set({ to: v }))}</Field>
+                    <Field label={f.depart} htmlFor={`fl-hop-date-${i}`} className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto">
+                      <Input id={`fl-hop-date-${i}`} type="date" dir="ltr" min={i ? hops[i - 1].date : ksaDay(0)} value={h.date} onChange={(e) => set({ date: e.target.value })} data-testid={`fl-hop-date-${i}`} />
+                    </Field>
+                    <button type="button" disabled={hops.length <= 2} onClick={() => setHops((cur) => cur.filter((_, j) => j !== i))} aria-label={fmt(f.removeFlight, { n: i + 1 })}
+                      className="mb-1.5 grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30"><XIcon className="size-4" /></button>
+                  </fieldset>
+                );
+              })}
+              {hops.length < MAX_FLIGHTS && (
+                <Button type="button" variant="secondary" size="sm" data-testid="fl-hop-add" onClick={() => {
+                  const last = hops[hops.length - 1];
+                  setHops([...hops, { from: last.to, to: hops[0].from !== last.to ? hops[0].from : "RUH", date: addDay(last.date, 2) }]);
+                }}>{f.addFlight}</Button>
+              )}
+            </div>
+          ) : (<>
           <Field label={f.from} htmlFor="fl-from">{citySelect("fl-from", q.from, (v) => setQ({ ...q, from: v }), trip === "stopover" ? "abroad" : undefined)}</Field>
           {trip === "stopover" && <Field label={t.standalone.hotels.city} htmlFor="fl-via">{citySelect("fl-via", q.via, (v) => setQ({ ...q, via: v }), "saudi")}</Field>}
           <Field label={f.to} htmlFor="fl-to">{citySelect("fl-to", q.to, (v) => setQ({ ...q, to: v }), trip === "stopover" ? "abroad" : undefined)}</Field>
           <Field label={f.depart} htmlFor="fl-date"><Input id="fl-date" type="date" dir="ltr" min={ksaDay(0)} value={q.date} onChange={(e) => setQ({ ...q, date: e.target.value })} data-testid="fl-date" /></Field>
           {trip !== "oneway" && <Field label={trip === "stopover" ? f.onwardDate : f.returnDate} htmlFor="fl-back"><Input id="fl-back" type="date" dir="ltr" min={q.date} value={q.back} onChange={(e) => setQ({ ...q, back: e.target.value })} data-testid="fl-back" /></Field>}
+          </>)}
           {(["adults", "children", "infants"] as const).map((k) => (
             <Field key={k} label={f.pax[k]} htmlFor={`fl-${k}`}>
               <Select id={`fl-${k}`} value={counts[k]} onChange={(e) => setCounts({ ...counts, [k]: Number(e.target.value) })}>

@@ -47,9 +47,11 @@ export interface FlightSegment {
   /** One e-ticket per passenger, in the passengers' order. */
   tickets: string[];
   priceSAR: number;
+  /** A flight of a multi-city trip cancelled on its own. */
+  cancellation?: { at: string; refundSAR: number };
 }
 
-export type TripType = "oneway" | "return" | "stopover";
+export type TripType = "oneway" | "return" | "stopover" | "multicity";
 
 /** Flights booked without a package: domestic, or to / from the Kingdom. */
 export interface FlightOrder {

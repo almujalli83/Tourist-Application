@@ -1,7 +1,8 @@
 /**
  * Flights booked without a tourism package: domestic flights, and international flights to or from
- * the Kingdom (one way, return, or a stopover of up to 96 hours with Saudia or flynas). Offers come
- * from every agent, signed by the server; the agent issues one e-ticket per passenger per flight.
+ * the Kingdom (one way, return, a stopover of up to 96 hours with Saudia or flynas, or a multi-city
+ * trip of up to five flights). Offers come from every agent, signed by the server; the agent issues
+ * one e-ticket per passenger per flight. All the flights are issued or none.
  */
 import { randomBytes } from "node:crypto";
 import { searchFlights } from "../agents/aggregator";
@@ -33,7 +34,15 @@ export class FlightError extends Error {
   }
 }
 
+/** A failure tied to one flight of the booking (the page asks for another flight on that route). */
+export class FlightLegError extends FlightError {
+  constructor(code: string, status: number, public leg: number) {
+    super(code, status);
+  }
+}
+
 type Stored = FlightOrder & { userId: string };
+export const MAX_TRIP_FLIGHTS = 5;
 const COL = "flightOrders" as const;
 /** Online sales close this long before departure. */
 export const SALES_CLOSE_MIN = 180;
@@ -176,7 +185,13 @@ export function checkItinerary(tripType: TripType, offers: FlightOffer[], entry:
   if (ksaMs(offers[0].departAt) - now.getTime() <= SALES_CLOSE_MIN * 60_000) throw new FlightError("salesClosed", 409);
   const [a, b] = offers;
   const gapOk = (x: FlightOffer, y: FlightOffer) => ksaMs(y.departAt) - ksaMs(x.arriveAt) >= 2 * 3_600_000;
-  if (tripType === "oneway") {
+  if (tripType === "multicity") {
+    // Two to five flights, each touching the Kingdom, in time order with two hours to connect.
+    if (offers.length < 2 || offers.length > MAX_TRIP_FLIGHTS) throw new FlightError("itinerary");
+    for (let i = 1; i < offers.length; i++) if (!gapOk(offers[i - 1], offers[i])) throw new FlightLegError("itinerary", 422, i);
+    if (entry === "stopover") throw new FlightError("stopoverEntry");
+    return kinds.every((k) => k === "domestic") ? "domestic" : "international";
+  } else if (tripType === "oneway") {
     if (offers.length !== 1) throw new FlightError("itinerary");
   } else if (tripType === "return") {
     if (offers.length !== 2 || b.from !== a.to || b.to !== a.from || !gapOk(a, b)) throw new FlightError("itinerary");
@@ -196,10 +211,12 @@ export function checkItinerary(tripType: TripType, offers: FlightOffer[], entry:
 export async function bookFlights(user: PublicUser, input: FlightBookingInput, now = new Date()): Promise<FlightOrder> {
   if (!isEntryType(input.entry)) throw new FlightError("entry");
   const entry = input.entry;
-  const tripType = input.tripType === "return" || input.tripType === "stopover" ? input.tripType : input.tripType === "oneway" ? "oneway" : null;
+  const tripType = (["oneway", "return", "stopover", "multicity"] as const).find((x) => x === input.tripType);
   if (!tripType) throw new FlightError("itinerary");
   const offers = Array.isArray(input.offers) ? input.offers : [];
-  if (!offers.length || offers.length > 2 || offers.some((o) => !verifyOffer(o))) throw new FlightError("offerExpired", 409);
+  if (!offers.length || offers.length > (tripType === "multicity" ? MAX_TRIP_FLIGHTS : 2)) throw new FlightError("itinerary");
+  const expired = offers.findIndex((o) => !verifyOffer(o));
+  if (expired >= 0) throw new FlightLegError("offerExpired", 409, expired);
   const scope = checkItinerary(tripType, offers, entry, now);
   const list = Array.isArray(input.passengers) ? input.passengers : [];
   const pax = validatePax({
@@ -222,17 +239,18 @@ export async function bookFlights(user: PublicUser, input: FlightBookingInput, n
   const id = randomBytes(10).toString("hex");
   const reference = `FL-${randomBytes(3).toString("hex").toUpperCase()}`;
   const issued: { pnr: string; tickets: string[] }[] = [];
-  try {
-    for (const o of offers) {
+  for (const o of offers) {
+    try {
       issued.push(await agentOf(o.agentId).issueFlight({
         offer: o, reference, contact: { email, phone },
         passengers: passengers.map((p) => ({ nameEn: p.nameEn, type: p.type, nationality: p.nationality, docType: p.docType, docNo: p.docNo, birthDate: p.birthDate })),
       }));
+    } catch (e) {
+      // All or nothing: void the tickets already issued and return the money; name the flight that failed.
+      for (let i = 0; i < issued.length; i++) await agentOf(offers[i].agentId).cancelFlight(issued[i].pnr).catch(() => undefined);
+      await refundPayment(paid.transactionId, total);
+      throw new FlightLegError(e instanceof AgentBookingError && e.code === "rejected" ? "agentRejected" : e instanceof FlightError ? e.code : "agentUnavailable", 502, issued.length);
     }
-  } catch (e) {
-    for (let i = 0; i < issued.length; i++) await agentOf(offers[i].agentId).cancelFlight(issued[i].pnr).catch(() => undefined);
-    await refundPayment(paid.transactionId, total);
-    throw new FlightError(e instanceof AgentBookingError && e.code === "rejected" ? "agentRejected" : e instanceof FlightError ? e.code : "agentUnavailable", 502);
   }
   const order: Stored = {
     id, userId: user.id, reference, entry, tripType, scope,
@@ -271,10 +289,52 @@ export async function getFlightOrder(userId: string, id: string): Promise<Flight
   return o && o.userId === userId ? strip(o) : null;
 }
 
-/** Until 3 hours before the first flight: refundable fares are refunded in full, others not at all. */
+const active = (o: FlightOrder) => o.segments.filter((s) => !s.cancellation);
+
+/** Until 3 hours before the first remaining flight: refundable fares are refunded in full, others not at all. */
 export function flightCancelTerms(o: FlightOrder, now = new Date()): { allowed: boolean; refundSAR: number } {
-  if (o.status !== "confirmed" || ksaMs(o.segments[0].offer.departAt) - now.getTime() <= SALES_CLOSE_MIN * 60_000) return { allowed: false, refundSAR: 0 };
-  return { allowed: true, refundSAR: round2(o.segments.filter((s) => s.offer.refundable).reduce((a, s) => a + s.priceSAR, 0)) };
+  const left = active(o);
+  if (o.status !== "confirmed" || !left.length || ksaMs(left[0].offer.departAt) - now.getTime() <= SALES_CLOSE_MIN * 60_000) return { allowed: false, refundSAR: 0 };
+  return { allowed: true, refundSAR: round2(left.filter((s) => s.offer.refundable).reduce((a, s) => a + s.priceSAR, 0)) };
+}
+
+/** One flight of a multi-city trip, until 3 hours before it: its own fare back when refundable. */
+export function segmentCancelTerms(o: FlightOrder, index: number, now = new Date()): { allowed: boolean; refundSAR: number } {
+  const s = o.segments[index];
+  if (o.status !== "confirmed" || o.tripType !== "multicity" || !s || s.cancellation || ksaMs(s.offer.departAt) - now.getTime() <= SALES_CLOSE_MIN * 60_000) return { allowed: false, refundSAR: 0 };
+  return { allowed: true, refundSAR: s.offer.refundable ? s.priceSAR : 0 };
+}
+
+/** Cancels one flight of a multi-city trip; the others keep their tickets. The last one cancels the booking. */
+export async function cancelFlightSegment(user: PublicUser, id: string, index: number, now = new Date()): Promise<FlightOrder> {
+  const o = await store().get<Stored>(COL, id);
+  if (!o || o.userId !== user.id) throw new FlightError("notFound", 404);
+  const terms = segmentCancelTerms(o, index, now);
+  if (!terms.allowed) throw new FlightError("cannotCancel", 409);
+  const s = o.segments[index];
+  try {
+    await agentOf(s.offer.agentId).cancelFlight(s.pnr);
+  } catch {
+    throw new FlightError("agentUnavailable", 502);
+  }
+  if (terms.refundSAR > 0) {
+    await refundPayment(o.payment.transactionId, terms.refundSAR);
+    await quietly("flight points reversal", () => reversePurchase(user.id, [o.id], terms.refundSAR / o.payment.amountSAR, now), 0);
+  }
+  const at = now.toISOString();
+  const done = await store().update<Stored>(COL, id, (x) => {
+    const segments = x.segments.map((sg, i) => (i === index ? { ...sg, cancellation: { at, refundSAR: terms.refundSAR } } : sg));
+    const refunded = round2(segments.reduce((a, sg) => a + (sg.cancellation?.refundSAR ?? 0), 0));
+    return { ...x, segments, ...(segments.every((sg) => sg.cancellation) ? { status: "cancelled" as const, cancellation: { at, refundSAR: refunded } } : {}) };
+  });
+  await notifyTravellers([user.email], {
+    subject: `Saudi Trip — flight ${s.offer.flightNo} cancelled (${o.reference})`,
+    text: [
+      `${s.offer.flightNo} ${s.offer.from} → ${s.offer.to} ${s.offer.departAt.replace("T", " ")}: cancelled.${terms.refundSAR ? ` SAR ${terms.refundSAR} will be refunded to your card.` : " The fare was non-refundable."} Your other flights are unchanged.`,
+      `${s.offer.flightNo} ${s.offer.from} ← ${s.offer.to}: أُلغيت الرحلة.${terms.refundSAR ? ` سيُعاد ${terms.refundSAR} ريال إلى بطاقتك.` : " السعر غير قابل للاسترداد."} بقية رحلاتك دون تغيير.`,
+    ].join("\n"),
+  }).catch(() => undefined);
+  return strip(done!);
 }
 
 export async function cancelFlightOrder(user: PublicUser, id: string, now = new Date()): Promise<FlightOrder> {
@@ -283,7 +343,7 @@ export async function cancelFlightOrder(user: PublicUser, id: string, now = new 
   const terms = flightCancelTerms(o, now);
   if (!terms.allowed) throw new FlightError("cannotCancel", 409);
   try {
-    for (const s of o.segments) await agentOf(s.offer.agentId).cancelFlight(s.pnr);
+    for (const s of active(o)) await agentOf(s.offer.agentId).cancelFlight(s.pnr);
   } catch {
     throw new FlightError("agentUnavailable", 502);
   }
@@ -291,7 +351,10 @@ export async function cancelFlightOrder(user: PublicUser, id: string, now = new 
     await refundPayment(o.payment.transactionId, terms.refundSAR);
     await quietly("flight points reversal", () => reversePurchase(user.id, [o.id], terms.refundSAR / o.payment.amountSAR, now), 0);
   }
-  const done = await store().update<Stored>(COL, id, (x) => ({ ...x, status: "cancelled", cancellation: { at: now.toISOString(), refundSAR: terms.refundSAR } }));
+  const at = now.toISOString();
+  const done = await store().update<Stored>(COL, id, (x) => ({
+    ...x, status: "cancelled", cancellation: { at, refundSAR: round2(terms.refundSAR + x.segments.reduce((a, sg) => a + (sg.cancellation?.refundSAR ?? 0), 0)) },
+  }));
   await notifyTravellers([user.email], {
     subject: `Saudi Trip — flights cancelled (${o.reference})`,
     text: [`Your tickets were cancelled.${terms.refundSAR ? ` SAR ${terms.refundSAR} will be refunded to your card.` : " The fares were non-refundable."}`, `أُلغيت تذاكرك.${terms.refundSAR ? ` سيُعاد ${terms.refundSAR} ريال إلى بطاقتك.` : " الأسعار غير قابلة للاسترداد."}`].join("\n"),
@@ -331,6 +394,7 @@ export async function flightReminders(userId: string, now = new Date()): Promise
   for (const o of await listFlightOrders(userId)) {
     if (o.status !== "confirmed") continue;
     for (const [i, s] of o.segments.entries()) {
+      if (s.cancellation) continue;
       const toDep = ksaMs(s.offer.departAt) - now.getTime();
       if (toDep <= 0 || toDep > 26 * 3_600_000) continue;
       const id = `flight:${o.id}:${i}`;
