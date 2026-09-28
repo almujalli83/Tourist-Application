@@ -1,12 +1,18 @@
+import { randomBytes } from "node:crypto";
 import { addDays } from "../dates";
 import type { CabinClass } from "../types";
 import {
   ACTIVITIES, AMENITIES, CARRIERS, DISTRICTS, DOMESTIC_CARRIERS, HOTEL_BRANDS, MAKKAH_DISTRICTS, ORIGIN_BLOCK_MIN,
   ORIGIN_HOME_CARRIER, ROOM_TYPES, sandboxHotelLicense,
 } from "./mock-data";
-import type { TravelAgentProvider } from "./provider";
+import { AgentBookingError, type TravelAgentProvider } from "./provider";
 import { rng } from "./rng";
 import { CITY_CENTERS } from "../guide/centers";
+
+/** IATA ticket prefixes (the first 3 digits of an e-ticket number). */
+const AIRLINE_PREFIX: Record<string, string> = { SV: "065", XY: "593", F3: "706", RX: "224", MS: "077", EK: "176", RJ: "512", ME: "076", AT: "147", TK: "235", PK: "214", AI: "098", GA: "126" };
+const randomDigits = (n: number) => Array.from(randomBytes(n), (b) => String(b % 10)).join("");
+const randomLetters = (n: number) => Array.from(randomBytes(n), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ"[b % 24]).join("");
 
 const CABIN_FACTOR: Record<CabinClass, number> = { economy: 1, premium: 1.6, business: 2.8, first: 4.5 };
 
@@ -32,6 +38,7 @@ export function createSandboxAgent(opts: {
     id: opts.id,
     nameEn: opts.nameEn,
     nameAr: opts.nameAr,
+    sandbox: true,
 
     async searchFlights({ leg, cabin }) {
       await wait();
@@ -78,7 +85,7 @@ export function createSandboxAgent(opts: {
       return offers;
     },
 
-    async searchHotels({ city, checkIn, checkOut, rooms: occupancy }) {
+    async searchHotels({ city, checkIn, checkOut, rooms: occupancy, standalone }) {
       await wait();
       const r = rng(`${opts.id}|H|${city}|${checkIn}|${checkOut}`);
       const nights = Math.max(1, Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86_400_000));
@@ -124,7 +131,20 @@ export function createSandboxAgent(opts: {
           totalSAR: perNight * nights,
         });
       }
-      return offers;
+      if (!standalone) return offers;
+      // Standalone bookings: prepaid rates can be cancelled free until two days before arrival when
+      // refundable; many hotels also take a (slightly dearer) rate paid at the hotel, free to cancel
+      // until 18:00 the day before. A separate draw keeps the package inventory unchanged.
+      const pr = rng(`${opts.id}|HR|${city}|${checkIn}|${checkOut}`);
+      const out: ((typeof offers)[number] & { rate: { pay: "online" | "hotel"; freeCancelUntil: string | null } })[] = [];
+      for (const o of offers) {
+        out.push({ ...o, rate: { pay: "online" as const, freeCancelUntil: o.refundable ? `${addDays(checkIn, -2)}T23:59:00+03:00` : null } });
+        if (pr.next() < 0.6) {
+          const perNight = Math.round(o.pricePerNightSAR * 1.07);
+          out.push({ ...o, ref: `${o.ref}-pah`, refundable: true, pricePerNightSAR: perNight, totalSAR: perNight * o.nights, rate: { pay: "hotel" as const, freeCancelUntil: `${addDays(checkIn, -1)}T18:00:00+03:00` } });
+        }
+      }
+      return out;
     },
 
     async searchActivities({ city, from, pax }) {
@@ -183,6 +203,35 @@ export function createSandboxAgent(opts: {
       await wait();
     },
     async releaseChange() {
+      await wait();
+    },
+
+    async quoteHotelDates({ hotel, checkIn, checkOut }) {
+      await wait();
+      if (hotel.agentId !== opts.id || !hotel.rate) return null;
+      // Sandbox: the nightly price moves by up to ±8% with the dates; the same cancellation rule applies.
+      const r = rng(`${opts.id}|HQ|${hotel.licenseNo}|${checkIn}|${checkOut}`);
+      const pricePerNightSAR = Math.round(hotel.pricePerNightSAR * (0.92 + r.next() * 0.16));
+      const freeCancelUntil = hotel.rate.pay === "hotel" ? `${addDays(checkIn, -1)}T18:00:00+03:00` : hotel.refundable ? `${addDays(checkIn, -2)}T23:59:00+03:00` : null;
+      return { pricePerNightSAR, freeCancelUntil };
+    },
+
+    // Test hook: a lead guest or passenger named "SANDBOX REJECT" is refused by the agent.
+    async bookHotel({ lead }) {
+      await wait();
+      if (lead.name.toUpperCase() === "SANDBOX REJECT") throw new AgentBookingError("rejected");
+      return { confirmation: `${opts.id.slice(0, 3).toUpperCase()}${randomDigits(8)}` };
+    },
+    async cancelHotel() {
+      await wait();
+    },
+    async issueFlight({ offer, passengers }) {
+      await wait();
+      if (passengers.some((p) => p.nameEn.toUpperCase() === "SANDBOX REJECT")) throw new AgentBookingError("rejected");
+      const airline = AIRLINE_PREFIX[offer.carrierCode] ?? "999";
+      return { pnr: randomLetters(6), tickets: passengers.map(() => `${airline}${randomDigits(10)}`) };
+    },
+    async cancelFlight() {
       await wait();
     },
   };

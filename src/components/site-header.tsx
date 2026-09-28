@@ -20,9 +20,15 @@ export function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
 
+  // "Book": the tourism package with visa, and hotels and flights without a package.
+  const bookLinks = [
+    { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
+    { href: `/${locale}/hotels`, label: t.standalone.tabs.hotels },
+    { href: `/${locale}/flights`, label: t.standalone.tabs.flights },
+  ];
   const links = [
     { href: `/${locale}`, label: t.nav.home },
-    { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
+    ...bookLinks,
     { href: `/${locale}/planner`, label: t.planner.nav },
     { href: `/${locale}/events`, label: t.events.nav },
     { href: `/${locale}/restaurants`, label: t.restaurants.nav },
@@ -104,7 +110,9 @@ export function SiteHeader() {
         </Link>
 
         <nav className="hidden items-center gap-0.5 xl:flex 2xl:gap-1" data-wide>
-          {links.map((l) => (
+          {links.filter((l) => !bookLinks.includes(l) || l === bookLinks[0]).map((l) => l === bookLinks[0] ? (
+            <BookMenu key="book" label={t.standalone.navBook} links={bookLinks} activeHref={activeHref} />
+          ) : (
             <Link
               key={l.href}
               href={l.href}
@@ -198,5 +206,43 @@ export function SiteHeader() {
         </div>
       )}
     </header>
+  );
+}
+
+/** The "Book" menu of the header: package with visa, hotels, flights. */
+function BookMenu({ label, links, activeHref }: { label: string; links: { href: string; label: string }[]; activeHref: string | undefined }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const active = links.some((l) => l.href === activeHref);
+  return (
+    <div className="relative" ref={box}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu"
+        className={cx("flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-white/10 2xl:px-2.5", active && "bg-white/10 text-gold-100")} data-testid="nav-book">
+        {label}
+        <ChevronIcon className={cx("size-3.5 transition-transform", open ? "-rotate-90" : "rotate-90")} />
+      </button>
+      {open && (
+        <div role="menu" className="absolute start-0 top-11 z-50 w-64 overflow-hidden rounded-xl bg-white py-1 text-ink shadow-xl ring-1 ring-black/5">
+          {links.map((l) => (
+            <Link key={l.href} role="menuitem" href={l.href} onClick={() => setOpen(false)} className={cx("block px-4 py-2.5 text-sm font-medium hover:bg-brand-50", l.href === activeHref && "bg-brand-50 text-brand-800")}>
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

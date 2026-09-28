@@ -3,7 +3,7 @@
  * server and the checkout screens (the «you'll earn» line and the points discount).
  */
 
-export type EarnService = "package" | "event" | "train" | "esim";
+export type EarnService = "package" | "event" | "train" | "esim" | "stay" | "flight";
 export type TierId = "silver" | "gold" | "platinum";
 
 export const LOYALTY = {
@@ -14,13 +14,16 @@ export const LOYALTY = {
   redeemableOn: ["event", "train"] as EarnService[],
   /**
    * Points for each full block of riyals paid by card (visa & insurance fees are not counted):
-   * packages 2 points per 50 SAR; event tickets, train tickets and eSIMs 1 point per 20 SAR.
+   * packages 2 points per 50 SAR; event tickets, train tickets, eSIMs, hotels and flights 1 point per 20 SAR.
    */
   earnRates: {
     package: { points: 2, perSAR: 50 },
     event: { points: 1, perSAR: 20 },
     train: { points: 1, perSAR: 20 },
     esim: { points: 1, perSAR: 20 },
+    // Standalone hotels and flights, paid online (a rate paid at the hotel earns nothing here).
+    stay: { points: 1, perSAR: 20 },
+    flight: { points: 1, perSAR: 20 },
   } as Record<EarnService, { points: number; perSAR: number }>,
   /** 100 points = 5 SAR. */
   sarPerPoint: 0.05,

@@ -11,26 +11,29 @@ import type { PublicRental } from "@/lib/rentals/types";
 import type { TransitTicket } from "@/lib/transit/types";
 import { LIVE_RIDE, type PublicRide } from "@/lib/rides/types";
 import type { BusOrder } from "@/lib/buses/types";
+import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 import { fmtDay, fmtKsa, ksaDay } from "@/lib/events/format";
 import type { EventOrder } from "@/lib/events/types";
 import type { RestaurantBooking } from "@/lib/restaurants/bookings";
 import type { TrainOrder } from "@/lib/trains/orders";
 import { groupByTrip } from "@/lib/account/trips";
-import { eventRide, guideRide, packageRide, tableRide, trainRide, type RideTarget } from "@/lib/transport/booking-rides";
+import { eventRide, guideRide, inRideWindow, packageRide, tableRide, trainRide, type RideTarget } from "@/lib/transport/booking-rides";
 import { estimateRide } from "@/lib/transport/rides";
 import { STATIONS } from "@/lib/trains/network";
 import { RideMenu } from "./transport/ride-menu";
 import type { BookingRow } from "./account-view";
 import { useApp } from "./app-provider";
 import { StatusBadge } from "./booking-details";
-import { BusIcon, CalendarIcon, CarIcon, PassportIcon, PhoneIcon, TicketIcon, TrainIcon, UsersIcon } from "./icons";
+import { BusIcon, CalendarIcon, CarIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, TicketIcon, TrainIcon, UsersIcon } from "./icons";
 import { useNetwork } from "./transport/train-ticket-view";
 import { Badge, Card, cx, Spinner } from "./ui";
 
-type Kind = "package" | "event" | "train" | "table" | "esim" | "guide" | "transfer" | "rental" | "transit" | "ride" | "bus";
-const KINDS: Kind[] = ["package", "event", "train", "table", "esim", "guide", "transfer", "rental", "transit", "ride", "bus"];
+type Kind = "package" | "stay" | "flight" | "event" | "train" | "table" | "esim" | "guide" | "transfer" | "rental" | "transit" | "ride" | "bus";
+const KINDS: Kind[] = ["package", "stay", "flight", "event", "train", "table", "esim", "guide", "transfer", "rental", "transit", "ride", "bus"];
 const ICONS: Record<Kind, ReactNode> = {
   package: <PassportIcon className="size-5" />,
+  stay: <HotelIcon className="size-5" />,
+  flight: <PlaneIcon className="size-5" />,
   event: <TicketIcon className="size-5" />,
   train: <TrainIcon className="size-5" />,
   table: <CalendarIcon className="size-5" />,
@@ -42,7 +45,7 @@ const ICONS: Record<Kind, ReactNode> = {
   ride: <CarIcon className="size-5" />,
   bus: <BusIcon className="size-5" />,
 };
-const BROWSE: Record<Kind, string> = { package: "/package-visa", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim", guide: "/guides", transfer: "/transport", rental: "/transport#rental", transit: "/transport?city=RUH", ride: "/transport", bus: "/buses" };
+const BROWSE: Record<Kind, string> = { package: "/package-visa", stay: "/hotels", flight: "/flights", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim", guide: "/guides", transfer: "/transport", rental: "/transport#rental", transit: "/transport?city=RUH", ride: "/transport", bus: "/buses" };
 
 interface Item {
   kind: Kind;
@@ -86,10 +89,12 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
   const [transit, setTransit] = useState<TransitTicket[] | null>(null);
   const [rides, setRides] = useState<PublicRide[] | null>(null);
   const [buses, setBuses] = useState<BusOrder[] | null>(null);
+  const [stays, setStays] = useState<StayOrder[] | null>(null);
+  const [flights, setFlights] = useState<FlightOrder[] | null>(null);
   const [tab, setTab] = useState<"all" | Kind>("all");
 
   useEffect(() => {
-    const load = <T,>(url: string, key: "orders" | "bookings" | "transfers" | "rentals" | "tickets" | "rides", set: (v: T[]) => void) =>
+    const load = <T,>(url: string, key: "orders" | "bookings" | "transfers" | "rentals" | "tickets" | "rides" | "stays", set: (v: T[]) => void) =>
       fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).then((d) => set((d as Record<string, T[]>)[key] ?? [])).catch(() => set([]));
     void load<EventOrder>("/api/events/orders", "orders", setEvents);
     void load<TrainOrder>("/api/trains/orders", "orders", setTrains);
@@ -101,9 +106,11 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
     void load<TransitTicket>("/api/transit/tickets", "tickets", setTransit);
     void load<PublicRide>("/api/rides", "rides", setRides);
     void load<BusOrder>("/api/buses/orders", "orders", setBuses);
+    void load<StayOrder>("/api/stays", "stays", setStays);
+    void load<FlightOrder>("/api/flights", "orders", setFlights);
   }, []);
 
-  const loading = !events || !trains || !tables || !esims || !guides || !transfers || !rentals || !transit || !rides || !buses;
+  const loading = !events || !trains || !tables || !esims || !guides || !transfers || !rentals || !transit || !rides || !buses || !stays || !flights;
   const items = useMemo<Item[]>(() => {
     const now = Date.now();
     const today = ksaDay(new Date());
@@ -249,6 +256,35 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         amount: x.fareSAR != null ? money(x.fareSAR) : undefined,
       });
     }
+    for (const o of stays ?? []) {
+      const live = o.status === "confirmed";
+      const h = o.hotel;
+      const start = Date.parse(`${h.checkIn}T15:00:00+03:00`);
+      const end = Date.parse(`${h.checkOut}T12:00:00+03:00`);
+      out.push({
+        kind: "stay", id: o.id, href: `/${locale}/account/stays/${o.id}`,
+        title: `${ar ? h.nameAr : h.nameEn} · ${cityName(h.city, locale)}`,
+        subtitle: `${fmtDay(h.checkIn, locale, { day: "numeric", month: "short" })} – ${fmtDay(h.checkOut, locale, { day: "numeric", month: "short" })} · ${o.pay === "online" ? t.standalone.hotels.payOnline : t.standalone.hotels.payHotel} · ${o.confirmation}`,
+        at: start, day: h.checkIn,
+        upcoming: live && end > now, today: live && h.checkIn <= today && today <= h.checkOut,
+        status: badge(t.standalone.stay.status[o.status], !live), amount: money(o.totalSAR),
+        ride: live && typeof h.lat === "number" && typeof h.lng === "number" && inRideWindow(start, end, now) ? { to: { lat: h.lat, lng: h.lng, name: ar ? h.nameAr : h.nameEn }, purpose: "hotel" } : null,
+      });
+    }
+    for (const o of flights ?? []) {
+      const live = o.status === "confirmed";
+      const first = o.segments[0].offer;
+      const last = o.segments[o.segments.length - 1].offer;
+      const start = Date.parse(`${first.departAt}:00+03:00`);
+      out.push({
+        kind: "flight", id: o.id, href: `/${locale}/account/flights/${o.id}`,
+        title: o.segments.map((sg) => `${cityName(sg.offer.from, locale)} ${ar ? "←" : "→"} ${cityName(sg.offer.to, locale)}`).join(" · "),
+        subtitle: `${when(`${first.departAt}:00+03:00`)} · ${first.flightNo} · PNR ${o.segments.map((sg) => sg.pnr).join(", ")}`,
+        at: start, day: first.departAt.slice(0, 10),
+        upcoming: live && Date.parse(`${last.arriveAt}:00+03:00`) > now, today: live && first.departAt.slice(0, 10) === today,
+        status: badge(t.standalone.flight.status[o.status], !live), amount: money(o.totalSAR),
+      });
+    }
     for (const o of buses ?? []) {
       const live = o.status === "CONFIRMED";
       const start = Date.parse(o.trip.depart);
@@ -262,7 +298,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
       });
     }
     return out;
-  }, [packages, events, trains, tables, esims, guides, transfers, rentals, transit, rides, buses, net, locale, ar, money, t]);
+  }, [packages, events, trains, tables, esims, guides, transfers, rentals, transit, rides, buses, stays, flights, net, locale, ar, money, t]);
 
   const shown = items.filter((i) => tab === "all" || i.kind === tab);
   // "All" and "Packages" show each trip with the bookings made for it; the other tabs stay flat.
