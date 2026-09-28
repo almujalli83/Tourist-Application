@@ -11,6 +11,7 @@ import { CAR_CLASSES, DRIVING_TIPS, RENTAL_EXTRAS, type CarClass, type PublicRen
 import { AIRPORTS } from "@/lib/transport/rides";
 import { useApp } from "../app-provider";
 import { CarIcon, CheckIcon, GlobeIcon } from "../icons";
+import { PhoneInput } from "../phone-input";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
 import { CompanyBadge } from "./company-badge";
 
@@ -245,7 +246,7 @@ export function RentalSearch({ initial, bookingId, driverName: initialDriver, on
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label={r.driverName}><Input value={driverName} onChange={(e) => setDriverName(e.target.value)} dir="auto" data-testid="rental-driver" /></Field>
-                    <Field label={r.phone}><Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" data-testid="rental-phone" /></Field>
+                    <Field label={r.phone}><PhoneInput value={phone} onChange={setPhone} defaultCountry={user?.individual?.nationality || "SA"} testId="rental-phone" /></Field>
                   </div>
                   <p className="text-base font-bold">{r.grandTotal}: <span className="ltr-nums text-brand-800" data-testid="rental-total">{money(total)}</span></p>
                   <p className="text-xs text-slate-500">{r.payNote}</p>

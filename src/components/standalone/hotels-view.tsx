@@ -14,6 +14,7 @@ import { useApp } from "../app-provider";
 import { GuestsRoomsPicker } from "../booking/guests-rooms-picker";
 import { HotelIcon, MapPinIcon } from "../icons";
 import { Checkout, type PaymentRef } from "../payments/checkout";
+import { PhoneInput } from "../phone-input";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner, Stars, Textarea } from "../ui";
 import { errText, StandaloneShell, useEntry } from "./shell";
 
@@ -151,7 +152,7 @@ export function HotelsView() {
             <h2 className="font-bold">{h.lead}</h2>
             <Field label={h.leadName} required error={shownErr("name")} htmlFor="st-lead-name"><Input id="st-lead-name" value={lead.name} onChange={(e) => setLead({ ...lead, name: e.target.value })} autoComplete="name" data-testid="st-lead-name" /></Field>
             <Field label={h.email} required error={shownErr("email")} htmlFor="st-lead-email"><Input id="st-lead-email" data-testid="st-lead-email" type="email" dir="ltr" value={lead.email} onChange={(e) => setLead({ ...lead, email: e.target.value })} autoComplete="email" /></Field>
-            <Field label={h.phone} required error={shownErr("phone")} htmlFor="st-lead-phone"><Input id="st-lead-phone" type="tel" dir="ltr" value={lead.phone} onChange={(e) => setLead({ ...lead, phone: e.target.value })} autoComplete="tel" placeholder="+9665…" data-testid="st-lead-phone" /></Field>
+            <Field label={h.phone} required error={shownErr("phone")} htmlFor="st-lead-phone"><PhoneInput id="st-lead-phone" value={lead.phone} onChange={(phone) => setLead({ ...lead, phone })} defaultCountry={user?.individual?.nationality || "SA"} invalid={!!shownErr("phone")} testId="st-lead-phone" /></Field>
             <Field label={h.requests} hint={h.requestsHint} htmlFor="st-req"><Textarea id="st-req" rows={2} value={requests} maxLength={500} onChange={(e) => setRequests(e.target.value)} /></Field>
             <div className="flex items-center justify-between border-t border-slate-100 pt-3">
               <span className="font-semibold">{h.total}</span>

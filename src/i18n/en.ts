@@ -1572,7 +1572,7 @@ const en: Dictionary = {
     again: "Order another car",
     rideErrors: {
       invalidPlace: "Set the pickup and destination inside the Kingdom.", noProvider: "No ride company is available right now.", providerUnavailable: "Couldn't reach the ride company; try again shortly.",
-      providerRejected: "The company refused the request.", optionExpired: "The price changed; choose the car again.", invalidPhone: "Enter your mobile number.", rideInProgress: "You have a ride in progress; finish or cancel it first.",
+      providerRejected: "The company refused the request.", optionExpired: "The price changed; choose the car again.", invalidPhone: "Enter a valid mobile number with the country code.", rideInProgress: "You have a ride in progress; finish or cancel it first.",
       notCancellable: "The ride can't be cancelled now.", generic: "Something went wrong. Please try again.",
     },
     purpose: { hotel: "To your hotel: {place}", airport: "To the airport: {place}", venue: "To the event: {place}", restaurant: "To the restaurant: {place}", station: "To the station: {place}", meeting: "To the guide's meeting point: {place}" },
@@ -1666,7 +1666,7 @@ const en: Dictionary = {
       tooShort: "The minimum rental is one day.", tooLong: "The maximum rental is 60 days.", invalidAge: "Enter the driver's age.", invalidCountry: "Choose where the licence was issued.",
       noProvider: "No rental company serves this city right now.", providerUnavailable: "Couldn't reach the rental company; try again shortly.", providerRejected: "The rental company refused the request.",
       quoteExpired: "The offer changed; show the cars again.", driverTooYoung: "The driver is younger than this company's minimum age.", overlap: "You already have a car booked for these dates.",
-      licenceNotAccepted: "Confirm you have the required documents.", invalidDriver: "Enter the driver's name.", invalidPhone: "Enter your mobile.", bookingCancelled: "This package is cancelled.",
+      licenceNotAccepted: "Confirm you have the required documents.", invalidDriver: "Enter the driver's name.", invalidPhone: "Enter a valid mobile number with the country code.", bookingCancelled: "This package is cancelled.",
       tooLateToCancel: "Free cancellation has ended; contact the rental company.", notCancellable: "This booking can no longer be cancelled.", generic: "Something went wrong. Please try again.",
     },
     admin: {

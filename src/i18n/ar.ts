@@ -1570,7 +1570,7 @@ const ar = {
     again: "اطلب سيارة أخرى",
     rideErrors: {
       invalidPlace: "حدّد نقطة الانطلاق والوجهة داخل المملكة.", noProvider: "لا توجد شركة نقل متاحة حاليًا.", providerUnavailable: "تعذّر الوصول إلى شركة النقل؛ حاول بعد قليل.",
-      providerRejected: "رفضت الشركة الطلب.", optionExpired: "تغيّر السعر؛ اختر السيارة من جديد.", invalidPhone: "أدخل رقم جوالك.", rideInProgress: "لديك رحلة جارية؛ أنهِها أو ألغها أولًا.",
+      providerRejected: "رفضت الشركة الطلب.", optionExpired: "تغيّر السعر؛ اختر السيارة من جديد.", invalidPhone: "أدخل رقم جوال صحيحًا مع رمز الدولة.", rideInProgress: "لديك رحلة جارية؛ أنهِها أو ألغها أولًا.",
       notCancellable: "لا يمكن إلغاء الرحلة الآن.", generic: "حدث خطأ. حاول مرة أخرى.",
     },
     purpose: { hotel: "إلى فندقك: {place}", airport: "إلى المطار: {place}", venue: "إلى الفعالية: {place}", restaurant: "إلى المطعم: {place}", station: "إلى المحطة: {place}", meeting: "إلى مكان لقاء المرشد: {place}" },
@@ -1664,7 +1664,7 @@ const ar = {
       tooShort: "أقل مدة للتأجير يوم واحد.", tooLong: "أطول مدة للتأجير 60 يومًا.", invalidAge: "أدخل عمر السائق.", invalidCountry: "اختر بلد إصدار الرخصة.",
       noProvider: "لا توجد شركة تأجير تخدم هذه المدينة حاليًا.", providerUnavailable: "تعذّر الوصول إلى شركة التأجير؛ حاول بعد قليل.", providerRejected: "رفضت شركة التأجير الطلب.",
       quoteExpired: "تغيّر العرض؛ اعرض السيارات من جديد.", driverTooYoung: "عمر السائق أقل من الحد الأدنى لدى هذه الشركة.", overlap: "لديك سيارة محجوزة في هذه التواريخ.",
-      licenceNotAccepted: "أكّد أن لديك المستندات المطلوبة.", invalidDriver: "أدخل اسم السائق.", invalidPhone: "أدخل رقم جوالك.", bookingCancelled: "هذه الباقة ملغاة.",
+      licenceNotAccepted: "أكّد أن لديك المستندات المطلوبة.", invalidDriver: "أدخل اسم السائق.", invalidPhone: "أدخل رقم جوال صحيحًا مع رمز الدولة.", bookingCancelled: "هذه الباقة ملغاة.",
       tooLateToCancel: "انتهت مدة الإلغاء المجاني؛ تواصل مع شركة التأجير.", notCancellable: "لم يعد بالإمكان إلغاء هذا الحجز.", generic: "حدث خطأ. حاول مرة أخرى.",
     },
     admin: {

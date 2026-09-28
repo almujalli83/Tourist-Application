@@ -5,6 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { PublicUser } from "../auth/types";
+import { validatePhone } from "../phone";
 import { store } from "../store";
 import { RideProviderError, rideProviderById, rideProviders } from "./providers";
 import { LIVE_RIDE, RIDE_CATEGORIES, type PublicRide, type RideOption, type RidePoint } from "./types";
@@ -53,7 +54,7 @@ export async function requestRide(user: PublicUser, input: { providerId?: string
   }
   if (!option) throw new RideError("optionExpired", 409);
   const phone = String(input.phone ?? user.individual?.phone ?? user.company?.phone ?? "").replace(/[^\d+]/g, "");
-  if (phone.length < 8) throw new RideError("invalidPhone");
+  if (validatePhone(phone)) throw new RideError("invalidPhone");
   const reference = `RD-${randomBytes(3).toString("hex").toUpperCase()}`;
   let booked;
   try {

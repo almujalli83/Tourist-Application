@@ -9,7 +9,8 @@ import type { RideOption, RidePoint } from "@/lib/rides/types";
 import type { RideDestination, RideEstimate } from "@/lib/transport/rides";
 import { useApp } from "../app-provider";
 import { CarIcon, DirectionsIcon, XIcon } from "../icons";
-import { Alert, Button, cx, Field, Input, Spinner } from "../ui";
+import { PhoneInput } from "../phone-input";
+import { Alert, Button, cx, Field, Spinner } from "../ui";
 
 /** Approximate fare range and time, labelled as an estimate. */
 export function RideEstimateText({ e, className }: { e: RideEstimate; className?: string }) {
@@ -115,7 +116,7 @@ function RideSheet({ to, from, estimate, onClose }: { to: RideDestination; from:
         {options?.some((o) => o.sandbox) && <p className="mt-2 text-xs font-semibold text-amber-700">{r.sample}</p>}
         {options && options.length > 0 && (user ? (
           <div className="mt-4 space-y-3">
-            <Field label={r.phone}><Input type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} data-testid="ride-phone" /></Field>
+            <Field label={r.phone}><PhoneInput value={phone} onChange={setPhone} defaultCountry={user?.individual?.nationality || "SA"} testId="ride-phone" /></Field>
             <p className="text-xs text-slate-500">{r.payNote}</p>
             <Button className="w-full" loading={busy} disabled={!pick} onClick={() => void order()} data-testid="ride-request"><CarIcon className="size-4" />{r.request}</Button>
           </div>

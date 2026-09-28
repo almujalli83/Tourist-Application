@@ -8,6 +8,7 @@ import type { ManualInput, TransferPlan } from "@/lib/transfers/transfers";
 import { VEHICLE_CAPACITY, type Direction, type PublicTransfer, type TransferQuote, type Vehicle } from "@/lib/transfers/types";
 import { useApp } from "../app-provider";
 import { CarIcon, PlaneIcon } from "../icons";
+import { PhoneInput } from "../phone-input";
 import { Alert, Badge, Button, cx, Field, Input, Spinner, Textarea } from "../ui";
 
 export type TransferSource = { bookingId: string; direction: Direction } | { manual: ManualInput };
@@ -107,7 +108,7 @@ export function TransferRequest({ source, onDone, onCancel }: { source: Transfer
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={s.phone}><Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" /></Field>
+        <Field label={s.phone}><PhoneInput value={phone} onChange={setPhone} defaultCountry={user?.individual?.nationality || "SA"} /></Field>
         <Field label={s.notes}><Textarea rows={2} value={notes} maxLength={300} onChange={(e) => setNotes(e.target.value)} dir="auto" /></Field>
       </div>
       <p className="text-xs text-slate-500">{s.payNote}</p>
