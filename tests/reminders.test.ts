@@ -96,6 +96,17 @@ describe("trip reminders", () => {
     expect(dep[0].linesAr.join("\n")).toMatch(/كن في المطار قبل الساعة \d\d:\d\d/);
   });
 
+  it("still reminds when a traveller has no email (a child, an older booking)", async () => {
+    const b = await makeBooking("r-noemail");
+    b.applicants[1] = { ...b.applicants[1], email: undefined as unknown as string };
+    await saveBooking(b);
+    const now = at("2026-10-08T09:00:00");
+    expect((await runReminders(now)).created).toBeGreaterThanOrEqual(1);
+    const n = (await notes(b.userId, now))[0];
+    expect(n.kind).toBe("arrival");
+    expect(n.email?.to).toEqual(["t1-r-noemail@example.com"]);
+  });
+
   it("warns travellers still in the country to leave before the visa expires", async () => {
     const b = await makeBooking("v1", { applicants: (await makeBooking("v1")).applicants.map((a) => ({ ...a, visaExpiryDate: "2026-10-20" })) });
     await saveBooking(b);
