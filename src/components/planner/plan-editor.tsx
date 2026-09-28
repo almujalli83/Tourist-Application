@@ -519,7 +519,7 @@ function EntryRow({ entry: e, day, prev, editable, selected, onSelect, onMove, o
           {it.costSAR ? <p className="mt-1 text-xs text-slate-500">{fmt(p.ticketsFrom, { amount: money(it.costSAR) })} · {guests}×</p> : null}
           <div className="mt-2 flex flex-wrap items-center gap-2 print:hidden">
             {it.bookHref && (
-              <Link href={`/${locale}${it.bookHref}`} className="inline-flex h-8 items-center gap-1 rounded-lg bg-gold-500 px-3 text-xs font-semibold text-ink hover:bg-gold-600" title={p.bookHint}>
+              <Link href={`/${locale}${it.bookHref}`} className="inline-flex h-8 items-center gap-1 rounded-lg bg-gold-500 px-3 text-xs font-semibold text-white hover:bg-gold-600" title={p.bookHint}>
                 {it.kind === "event" ? p.book.event : p.book.restaurant}
               </Link>
             )}

@@ -154,7 +154,7 @@ export function WizardShell({ step, title, subtitle, children, sidebar = true, s
       <BackLink href={backHref} className="-ms-2.5 mb-3" />
       <Stepper current={planMode ? planStep : step} labels={planMode ? t.planner.exec.steps : undefined} />
       {onChangeStep && (
-        <Link href={`/${locale}/package-visa/plan`} className="mt-4 inline-flex h-10 items-center rounded-lg bg-gold-500 px-4 text-sm font-semibold text-ink hover:bg-gold-600" data-testid="back-to-plan-summary">{t.planner.exec.backToSummary}</Link>
+        <Link href={`/${locale}/package-visa/plan`} className="mt-4 inline-flex h-10 items-center rounded-lg bg-gold-500 px-4 text-sm font-semibold text-white hover:bg-gold-600" data-testid="back-to-plan-summary">{t.planner.exec.backToSummary}</Link>
       )}
       <div className="mt-6 flex flex-col gap-1">
         <h1 className="text-xl font-bold text-ink sm:text-2xl">{title}</h1>
