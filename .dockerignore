@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+data/*.json
+.env*
+.vitest-db*.json
+coverage
+tests
+*.tsbuildinfo

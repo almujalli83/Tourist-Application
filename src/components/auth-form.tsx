@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fmt } from "@/i18n";
 import type { PublicUser } from "@/lib/auth/types";
+import { PrivacyNotice } from "./privacy-notice";
 import { useApp } from "./app-provider";
 import { PhoneInput, phoneHint } from "./phone-input";
 import { CountrySelect } from "./booking/country-select";
@@ -185,6 +186,7 @@ export function AuthForm({ initialMode = "login", onSuccess, compact, referralCo
         </div>
       )}
       {errText && <Alert tone="error">{errText}</Alert>}
+      {mode === "register" && <PrivacyNotice />}
       <Button type="submit" className="w-full" loading={busy}>{mode === "login" ? a.submitLogin : a.submitRegister}</Button>
     </form>
     <div className="flex items-center gap-3 text-xs text-slate-500" aria-hidden><span className="h-px flex-1 bg-slate-200" />{a.or}<span className="h-px flex-1 bg-slate-200" /></div>

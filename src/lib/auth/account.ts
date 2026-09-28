@@ -17,7 +17,8 @@ import { revokeAllTripShares } from "../family/share";
 import { removeUserIdentities } from "./identities";
 import { hashPassword, verifyPassword } from "./password";
 import { linkVerifiedPhone } from "./signin";
-import { knownDevice, deviceKeyOf, revokeAllSessions, type LoginMethod } from "./sessions";
+import { audit, auditOfUser } from "../compliance/audit";
+import { describeDevice, knownDevice, deviceKeyOf, revokeAllSessions, type LoginMethod } from "./sessions";
 import { clearSessionCookie, setSessionCookie } from "./session";
 import { checkCode, sendCode, SmsError } from "./sms";
 import { clearHits, clientIp, hit, lockedFor, RULES } from "./throttle";
@@ -75,8 +76,15 @@ const link = (req: Request | undefined, locale: Locale, path: string) => `${site
 
 /* ---------------------------------------------------------------- sign-in */
 
+/** Sign-in events for the audit log (the request hook runs before the user is known). */
+function authEvent(action: string, req: Request | undefined, who: { id?: string; email?: string } = {}, status = 200) {
+  const ua = req?.headers.get("user-agent") ?? "";
+  return audit({ action, actorId: who.id ?? null, actorEmail: who.email ?? null, role: "user", status, ip: req ? clientIp(req) : null, device: ua ? describeDevice(ua) : null });
+}
+
 async function startSession(u: StoredUser, method: LoginMethod, remember: boolean, req?: Request): Promise<PublicUser> {
   const ua = req?.headers.get("user-agent") ?? "";
+  await authEvent(`signin.${method}`, req, u);
   const known = method === "register" || (await knownDevice(u.id, deviceKeyOf(ua)));
   const s = await setSessionCookie(u.id, { remember, method });
   if (!known) {
@@ -101,6 +109,7 @@ export async function login(input: { email?: unknown; password?: unknown; rememb
   if (!ok) {
     await hit(`login:${email}`, RULES.login);
     await hit(ipKey, RULES.loginIp);
+    await authEvent("signin.failed", req, { id: u?.id, email }, 401);
     throw new AccountError("invalid");
   }
   await clearHits(`login:${email}`);
@@ -117,6 +126,7 @@ export async function completeMfa(ticket: unknown, code: unknown, req: Request):
   const u = await mustUser(t.userId);
   if (!u.mfa || !(await checkSecondFactor(u, code))) {
     await hit(`mfa:${t.userId}`, RULES.code);
+    await authEvent("signin.mfaFailed", req, u, 401);
     throw new AccountError("wrongCode");
   }
   if (!(await consumeToken("mfaLogin", String(ticket)))) throw new AccountError("expired");
@@ -147,6 +157,7 @@ export async function loginVerified(u: StoredUser, method: LoginMethod, req: Req
 /* ---------------------------------------------------------------- registration */
 
 export async function afterRegister(u: StoredUser, locale: Locale, req: Request): Promise<PublicUser> {
+  await authEvent("signup", req, u, 201);
   await setSessionCookie(u.id, { method: "register" });
   await sendEmailVerification(u.id, locale, req).catch(() => undefined);
   return toPublicUser(u);
@@ -374,7 +385,7 @@ export async function newRecovery(userId: string, code: unknown): Promise<string
 const USER_COLLECTIONS: Collection[] = [
   "bookings", "travellers", "wallet", "favorites", "eventOrders", "trainOrders", "restaurantBookings", "esimOrders", "chats", "tripPlans",
   "notifications", "reviews", "supportTickets", "alertPrefs", "loyalty", "guideBookings", "umrahPermits", "transfers", "rentals",
-  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions", "userIdentities", "tripShares",
+  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions", "userIdentities", "tripShares", "consents",
 ];
 const HIDDEN = /^(passwordHash|mfa|hash|secret|token|enc|file|key|deviceKey|providerToken|cardToken|gatewayToken)$/i;
 
@@ -399,6 +410,8 @@ export async function exportData(userId: string): Promise<Record<string, unknown
     }
     if (rows.length) out[c] = scrub(rows);
   }
+  const events = await auditOfUser(userId);
+  if (events.length) out.securityEvents = events.map((e) => ({ at: e.at, action: e.action, status: e.status, ip: e.ip, device: e.device }));
   return out;
 }
 
@@ -420,7 +433,7 @@ export async function deleteAccount(userId: string, password: unknown, code: unk
     await deleteWalletDocument(userId, r.id).catch(() => undefined);
     await store().delete("wallet", r.id);
   }
-  for (const c of ["travellers", "favorites", "alertPrefs", "notifications", "savedCards", "chats", "tripPlans"] as Collection[]) {
+  for (const c of ["travellers", "favorites", "alertPrefs", "notifications", "savedCards", "chats", "tripPlans", "consents"] as Collection[]) {
     for (const r of await store().findBy<{ id: string; file?: unknown }>(c, "userId", userId)) await store().delete(c, r.id);
   }
   await revokeAllSessions(userId);

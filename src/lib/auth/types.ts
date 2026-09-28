@@ -37,6 +37,8 @@ export interface StoredUser {
   /** Accounts created with Google, Apple, Nafath or a mobile number have no password until they set one. */
   hasPassword?: boolean;
   deletedAt?: string;
+  /** The privacy notice version the user last acknowledged. */
+  privacy?: { version: string; at: string };
 }
 
 export type PublicUser = Omit<StoredUser, "passwordHash" | "mfa"> & { isAdmin?: boolean; isMinistry?: boolean; mfaEnabled?: boolean };

@@ -6,7 +6,7 @@ import { fmt } from "@/i18n";
 import type { operationsOverview } from "@/lib/admin";
 import { useApp } from "./app-provider";
 import { AdminMetroSync } from "./metro/metro-panel";
-import { ChatIcon, GiftIcon, MapPinIcon, RefreshIcon, StarIcon, TicketIcon, UsersIcon, KaabaIcon, CarIcon, HeadphonesIcon } from "./icons";
+import { ChatIcon, GiftIcon, MapPinIcon, RefreshIcon, StarIcon, TicketIcon, UsersIcon, KaabaIcon, CarIcon, HeadphonesIcon, ShieldIcon } from "./icons";
 import { StatusBadge } from "./booking-details";
 import { Alert, Badge, Button, Card, Spinner } from "./ui";
 
@@ -92,6 +92,9 @@ export function AdminOperations() {
           </Link>
           <Link href={`/${locale}/admin/audio`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
             <HeadphonesIcon className="size-4" />{t.audio.admin.nav}
+          </Link>
+          <Link href={`/${locale}/admin/compliance`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50" data-testid="admin-compliance-link">
+            <ShieldIcon className="size-4" />{t.compliance.nav}
           </Link>
           <Link href={`/${locale}/indicators`} className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
             <StarIcon className="size-4" />{t.indicators.nav}

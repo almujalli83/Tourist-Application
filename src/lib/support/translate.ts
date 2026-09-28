@@ -5,6 +5,7 @@
  * Returns null when the text can't be translated: the original is always shown.
  */
 import { aiConfigured } from "../assistant/claude";
+import { crossBorderAllowed } from "../compliance/residency";
 import { translateText, type Lang } from "../assistant/translate";
 
 const MYMEMORY_MAX = 480;
@@ -57,6 +58,6 @@ export async function translateSupport(text: string, from: Lang, to: Lang): Prom
       return null;
     }
   }
-  if (process.env.SUPPORT_TRANSLATE === "off") return null;
+  if (process.env.SUPPORT_TRANSLATE === "off" || !crossBorderAllowed("translate")) return null;
   return myMemory(text, from, to);
 }

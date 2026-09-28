@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { fmt } from "@/i18n";
@@ -446,6 +447,10 @@ function DataSection({ err }: { err: ErrFn }) {
   return (
     <Section icon={<TrashIcon className="size-5" />} title={s.title} testId="sec-data">
       <p className="text-sm text-slate-600">{s.intro}</p>
+      <p className="text-sm text-slate-600" data-testid="sec-privacy">
+        {user.privacy && <>{fmt(t.privacy.accepted, { version: user.privacy.version, date: fmtDay(user.privacy.at.slice(0, 10), locale, { day: "numeric", month: "long", year: "numeric" }) })}{" "}</>}
+        <Link href={`/${locale}/privacy`} className="font-semibold text-brand-700 underline">{t.privacy.readPolicy}</Link>
+      </p>
       <div className="flex flex-wrap gap-2">
         <a href="/api/account/export" download className="inline-flex h-9 items-center rounded-lg bg-white px-3 text-sm font-semibold text-brand-800 ring-1 ring-brand-700/25 hover:bg-brand-50" data-testid="sec-export">{s.export}</a>
         {!open && <Button size="sm" variant="secondary" className="text-red-700" onClick={() => setOpen(true)} data-testid="sec-delete">{s.delete}</Button>}

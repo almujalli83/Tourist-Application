@@ -5,6 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { del, get, put } from "@vercel/blob";
+import { crossBorderAllowed } from "./compliance/residency";
 import { decryptBytes, encryptBytes } from "./data-crypto";
 import { store } from "./store";
 
@@ -17,7 +18,8 @@ export interface StoredFileRef {
   size: number;
 }
 
-export const blobConfigured = () => !!process.env.BLOB_READ_WRITE_TOKEN?.trim();
+/** New files go to Vercel Blob when configured and allowed (files already there stay readable). */
+export const blobConfigured = () => !!process.env.BLOB_READ_WRITE_TOKEN?.trim() && crossBorderAllowed("blob");
 
 async function putBlob(pathname: string, body: Buffer): Promise<{ url: string; access: "public" | "private" }> {
   // The store may be public or private; the content is encrypted either way.
