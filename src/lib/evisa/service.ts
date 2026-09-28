@@ -5,17 +5,22 @@
  * One payment for the visa & insurance fee of every traveller; each traveller is one application
  * to the eVisa channel. Passport images and photos are sent to the channel only, never stored.
  * The fee is a government fee: no reward points, and no refund once the application is submitted
- * (an application the channel couldn't take is refunded).
+ * (an application the channel couldn't take is refunded). An issued visa goes to the account's
+ * wallet (with the traveller's other documents); only undecided applications stay in "My bookings".
  */
 import { randomBytes } from "node:crypto";
 import type { PublicUser } from "../auth/types";
+import { decryptJson, encryptJson } from "../data-crypto";
 import { PACKAGE_LIMITS, VISA_INSURANCE_FEE_SAR } from "../config";
 import { addDays, isValidISODate, todayISO } from "../dates";
 import { notifyTravellers } from "../notify";
 import { chargeCard, refundPayment, type CardInput } from "../payment";
 import type { AppNotification } from "../reminders/reminders";
+import { getUserById } from "../repo";
+import { passportKey } from "../saved-travellers-repo";
 import { store } from "../store";
 import type { Traveller } from "../types";
+import { addIssuedDocument } from "../wallet";
 import { validateEvisaTravellers } from "./validate";
 export { validateEvisaTravellers } from "./validate";
 import { evisaProvider, EvisaProviderError, type EvisaDecision, type EvisaPayload } from "./provider";
@@ -52,6 +57,8 @@ export interface EvisaApplicant {
   insuranceStatus: string | null;
   reason: string | null;
   refundedSAR: number;
+  /** Stored only (the encrypted nationality + passport key): files the issued visa with its holder in the wallet. */
+  personKeyEnc?: string;
 }
 
 export interface EvisaApplication {
@@ -75,7 +82,8 @@ export interface EvisaApplication {
 type Stored = EvisaApplication & { userId: string };
 const COL = "evisaApps" as const;
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const strip = ({ userId: _u, ...a }: Stored): EvisaApplication => a; // eslint-disable-line @typescript-eslint/no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const strip = ({ userId: _u, ...a }: Stored): EvisaApplication => ({ ...a, applicants: a.applicants.map(({ personKeyEnc: _k, ...x }) => x) });
 const mask = (p: string) => (p.length > 4 ? `${"•".repeat(p.length - 4)}${p.slice(-4)}` : p);
 const orNull = (s: string) => (s.trim() ? s.trim() : null);
 const FINAL: ApplicantStatus[] = ["approved", "rejected", "failed", "not_submitted"];
@@ -141,6 +149,7 @@ export async function applyForEvisa(user: PublicUser, input: EvisaInput, now = n
     passportMasked: mask(t.passportNo.trim().toUpperCase()), email: t.email.trim(), sponsorIndex: t.sponsorIndex, companionType: t.sponsorIndex !== null ? t.companionType || null : null,
     applicationRef: null, status: "not_submitted", error: null, submittedAt: null,
     visaNumber: null, issueDate: null, expiryDate: null, insuranceStatus: null, reason: null, refundedSAR: 0,
+    personKeyEnc: encryptJson({ key: passportKey(t) }),
   }));
   // Sponsors first, so each dependent can name its sponsor's application.
   const order = travellers.map((_, i) => i).sort((a, b) => Number(travellers[a].sponsorIndex !== null) - Number(travellers[b].sponsorIndex !== null));
@@ -195,11 +204,14 @@ export async function listEvisaApplications(userId: string): Promise<EvisaApplic
 }
 
 /** The application, with each pending decision asked of the channel again. */
-export async function getEvisaApplication(user: PublicUser, id: string, now = new Date()): Promise<EvisaApplication | null> {
+export async function getEvisaApplication(user: Pick<PublicUser, "id" | "email">, id: string, now = new Date()): Promise<EvisaApplication | null> {
   const app = await store().get<Stored>(COL, id);
   if (!app || app.userId !== user.id) return null;
   const pending = app.applicants.filter((a) => a.applicationRef && !FINAL.includes(a.status));
-  if (!pending.length) return strip(app);
+  if (!pending.length) {
+    await fileIssuedVisas(app);
+    return strip(app);
+  }
   const provider = evisaProvider();
   const updates = new Map<string, Awaited<ReturnType<typeof provider.status>>>();
   for (const a of pending) {
@@ -221,19 +233,61 @@ export async function getEvisaApplication(user: PublicUser, id: string, now = ne
     const status = applicants.every((a) => FINAL.includes(a.status)) ? (applicants.some((a) => a.status === "approved") ? "completed" : "failed") : x.status;
     return { ...x, applicants, status, lastCheckedAt: now.toISOString() };
   });
+  await fileIssuedVisas(done!);
   for (const a of decided) await notifyDecision(user, done!, a, now);
   return strip(done!);
 }
 
-async function notifyDecision(user: PublicUser, app: Stored, a: EvisaApplicant, now: Date) {
+/** Wallet document id of an issued visa (one per traveller of an application). */
+export const evisaWalletId = (appId: string, index: number) => `evisa-${appId}-${index}`;
+
+/** The holder's key in the wallet (nationality + passport number), from the stored encrypted copy. */
+export function applicantPersonKey(a: Pick<EvisaApplicant, "personKeyEnc">): string | null {
+  return a.personKeyEnc ? decryptJson<{ key: string }>(a.personKeyEnc)?.key ?? null : null;
+}
+
+/** Puts every issued visa of the application in the wallet, once (a visa the user deleted there is not added again). */
+async function fileIssuedVisas(app: Stored): Promise<void> {
+  const provider = evisaProvider();
+  for (const [i, a] of app.applicants.entries()) {
+    const key = a.status === "approved" && a.visaNumber && a.applicationRef ? applicantPersonKey(a) : null;
+    if (!key) continue;
+    const id = evisaWalletId(app.id, i);
+    if (await store().get("wallet", id)) continue;
+    const pdf = await provider.document(a.applicationRef!, { nameEn: a.nameEn, nationality: a.nationality, visaNumber: a.visaNumber!, issueDate: a.issueDate, expiryDate: a.expiryDate }).catch(() => null);
+    if (!pdf) continue; // tried again on the next visit
+    const [nationality, ...rest] = key.split(":");
+    await addIssuedDocument(app.userId, {
+      id, person: { nationality, passportNo: rest.join(":"), nameEn: a.nameEn }, type: "visa", title: `Tourist eVisa · ${app.reference}`,
+      bookingId: null, applicationNo: a.applicationRef, data: pdf, contentType: "application/pdf",
+      meta: { number: a.visaNumber!, ...(a.issueDate ? { issueDate: a.issueDate } : {}), ...(a.expiryDate ? { expiryDate: a.expiryDate } : {}), ...(a.insuranceStatus ? { status: a.insuranceStatus } : {}) },
+    }).catch(() => false);
+  }
+}
+
+/**
+ * For the wallet: asks the channel about undecided applications and files every issued visa, so the
+ * wallet is current even if the traveller never opened the application page.
+ */
+export async function syncEvisaWallet(userId: string, now = new Date()): Promise<void> {
+  const apps = await store().findBy<Stored>(COL, "userId", userId);
+  if (!apps.length) return;
+  const user = await getUserById(userId);
+  if (!user) return;
+  for (const app of apps) {
+    if (app.status !== "failed") await getEvisaApplication({ id: userId, email: user.email }, app.id, now).catch(() => null);
+  }
+}
+
+async function notifyDecision(user: Pick<PublicUser, "id" | "email">, app: Stored, a: EvisaApplicant, now: Date) {
   const ok = a.status === "approved";
   const doc: AppNotification = {
     id: `evisa:${app.id}:${a.applicationRef}`, userId: user.id, kind: "evisa", bookingId: "", reference: app.reference, createdAt: now.toISOString(),
-    href: `/account/evisa/${app.id}`, readAt: null, deletedAt: null, email: null,
+    href: ok ? "/account/wallet" : `/account/evisa/${app.id}`, readAt: null, deletedAt: null, email: null,
     titleAr: ok ? `صدرت التأشيرة السياحية — ${a.nameEn}` : `رُفض طلب التأشيرة — ${a.nameEn}`,
     titleEn: ok ? `Tourist eVisa issued — ${a.nameEn}` : `eVisa application refused — ${a.nameEn}`,
-    linesAr: ok ? [`رقم التأشيرة ${a.visaNumber} · صالحة حتى ${a.expiryDate}`, "احمل التأشيرة مع جواز السفر عند السفر."] : [a.reason ? `السبب: ${a.reason}` : "لم تُذكر الأسباب.", "يمكنك التقديم عبر باقة سياحية أو التواصل مع الدعم."],
-    linesEn: ok ? [`Visa number ${a.visaNumber} · valid until ${a.expiryDate}`, "Carry the eVisa with your passport when you travel."] : [a.reason ? `Reason: ${a.reason}` : "No reason given.", "You can apply through a tourism package or contact support."],
+    linesAr: ok ? [`رقم التأشيرة ${a.visaNumber} · صالحة حتى ${a.expiryDate}`, "حُفظت التأشيرة في المحفظة؛ احملها مع جواز السفر عند السفر."] : [a.reason ? `السبب: ${a.reason}` : "لم تُذكر الأسباب.", "يمكنك التقديم عبر باقة سياحية أو التواصل مع الدعم."],
+    linesEn: ok ? [`Visa number ${a.visaNumber} · valid until ${a.expiryDate}`, "Saved in your wallet; carry it with your passport when you travel."] : [a.reason ? `Reason: ${a.reason}` : "No reason given.", "You can apply through a tourism package or contact support."],
   };
   if (!(await store().insert("notifications", doc.id, doc))) return;
   await notifyTravellers([...new Set([user.email, a.email])], { subject: `Saudi Trip — ${doc.titleEn} / ${doc.titleAr}`, text: [doc.titleEn, ...doc.linesEn, "", doc.titleAr, ...doc.linesAr].join("\n") }).catch(() => undefined);

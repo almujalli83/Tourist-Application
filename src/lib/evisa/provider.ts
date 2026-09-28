@@ -6,10 +6,12 @@
  * channel's specification when the agreement is signed):
  *   POST {url}/applications        { reference, applicant, travel, security, insurance } → { applicationRef, status }
  *   GET  {url}/applications/{ref}  → { status, visaNumber?, issueDate?, expiryDate?, insuranceStatus?, reason? }
+ *   GET  {url}/applications/{ref}/document → the issued eVisa (PDF)
  * Sandbox (no URL configured): applications are approved about a minute after submission; an
  * applicant named "SANDBOX REJECT" is refused (for tests).
  */
 import { createHash } from "node:crypto";
+import { simplePdf } from "../simple-pdf";
 
 export type EvisaDecision = "submitted" | "in_review" | "approved" | "rejected";
 
@@ -42,6 +44,8 @@ export interface EvisaProvider {
   sandbox: boolean;
   submit(p: EvisaPayload): Promise<{ applicationRef: string; status: EvisaDecision }>;
   status(ref: string, submittedAt: string, now: Date): Promise<EvisaState>;
+  /** The issued eVisa as a PDF (for the traveller's wallet). */
+  document(ref: string, holder: { nameEn: string; nationality: string; visaNumber: string; issueDate: string | null; expiryDate: string | null }): Promise<Buffer | null>;
 }
 
 const DECISIONS: EvisaDecision[] = ["submitted", "in_review", "approved", "rejected"];
@@ -76,6 +80,14 @@ function apiProvider(url: string, token: string): EvisaProvider {
         insuranceStatus: r.insuranceStatus ?? null, reason: r.reason ?? null,
       };
     },
+    async document(ref) {
+      try {
+        const res = await fetch(`${base}/applications/${encodeURIComponent(ref)}/document`, { headers: { ...headers, accept: "application/pdf" }, signal: AbortSignal.timeout(20_000) });
+        return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
+      } catch {
+        return null;
+      }
+    },
   };
 }
 
@@ -99,6 +111,19 @@ const sandboxProvider: EvisaProvider = {
     const expiry = new Date(issued.getTime() + 365 * 86_400_000);
     const digits = String(parseInt(createHash("sha256").update(ref).digest("hex").slice(0, 10), 16)).slice(0, 10).padStart(10, "0");
     return { status: "approved", visaNumber: digits, issueDate: issued.toISOString().slice(0, 10), expiryDate: expiry.toISOString().slice(0, 10), insuranceStatus: "ISSUED", reason: null };
+  },
+  async document(ref, h) {
+    return simplePdf([
+      { text: "SANDBOX SPECIMEN - NOT AN OFFICIAL DOCUMENT", size: 16, bold: true },
+      { text: " " },
+      { text: "Kingdom of Saudi Arabia - Tourist eVisa (multiple entry)", size: 14, bold: true },
+      { text: `Name: ${h.nameEn}` },
+      { text: `Nationality: ${h.nationality}` },
+      { text: `Visa number: ${h.visaNumber}` },
+      { text: `Application: ${ref}` },
+      { text: `Issued: ${h.issueDate ?? "-"}   Expires: ${h.expiryDate ?? "-"}` },
+      { text: "Medical insurance included." },
+    ]);
   },
 };
 

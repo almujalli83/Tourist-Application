@@ -115,6 +115,18 @@ export async function walletPeople(userId: string, bookings?: StoredBooking[]): 
       people.set(key, p);
     }
   }
+  // Holders of a tourist eVisa issued without a package (their visa is filed here).
+  const visas = await store().findBy<{ applicants: { status: string; nameEn: string; nationality: string; passportMasked: string; personKeyEnc?: string }[] }>("evisaApps", "userId", userId);
+  for (const v of visas) {
+    for (const a of v.applicants) {
+      const key = a.status === "approved" && a.personKeyEnc ? decryptJson<{ key: string }>(a.personKeyEnc)?.key : null;
+      if (!key || people.has(key)) continue;
+      people.set(key, {
+        key, nameEn: a.nameEn, nationality: a.nationality, passportNoMasked: mask(key.split(":").slice(1).join(":")), savedTravellerId: null,
+        hasSavedPassportImage: false, hasSavedPhoto: false, passportExpiryDate: null, bookings: [],
+      });
+    }
+  }
   return [...people.values()].sort((x, y) => x.nameEn.localeCompare(y.nameEn));
 }
 
