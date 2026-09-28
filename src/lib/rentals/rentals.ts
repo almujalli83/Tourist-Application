@@ -10,6 +10,7 @@ import type { StoredBooking } from "../bookings/types";
 import { cityName, getStayCity } from "../data/cities";
 import { getCountry } from "../data/countries";
 import { notifyTravellers } from "../notify";
+import { validatePhone } from "../phone";
 import type { AppNotification } from "../reminders/reminders";
 import { getUserById, listBookingsByUser } from "../repo";
 import { store } from "../store";
@@ -139,7 +140,7 @@ export async function requestRental(user: PublicUser, input: RentalRequestInput,
   const driverName = String(input.driverName ?? "").trim().slice(0, 80) || (user.individual?.fullName ?? user.company?.contactPerson ?? "");
   if (!driverName) throw new RentalError("invalidDriver");
   const phone = String(input.phone ?? user.individual?.phone ?? user.company?.phone ?? "").replace(/[^\d+]/g, "");
-  if (phone.length < 8) throw new RentalError("invalidPhone");
+  if (validatePhone(phone)) throw new RentalError("invalidPhone");
   const reference = `CR-${randomBytes(3).toString("hex").toUpperCase()}`;
   let booked;
   try {

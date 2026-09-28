@@ -10,6 +10,7 @@ import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
 import { ReviewsSection, RatingBadge, useSummaries } from "../reviews/shared";
 import { ShieldIcon } from "../icons";
+import { PhoneInput } from "../phone-input";
 import { Alert, Badge, Button, Card, Field, Input, Select, Textarea } from "../ui";
 import { ContactButtons, GuideAvatar, LanguageChips, langLabel } from "./guide-card";
 
@@ -78,7 +79,7 @@ function RequestForm({ g }: { g: PublicGuide }) {
           <Input type="number" min={1} max={30} value={v.people} onChange={(e) => setV({ ...v, people: Number(e.target.value) })} />
         </Field>
         <Field label={f.phone}>
-          <Input type="tel" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} dir="ltr" />
+          <PhoneInput value={v.phone} onChange={(phone) => setV({ ...v, phone })} defaultCountry={user?.individual?.nationality || "SA"} />
         </Field>
       </div>
       <Field label={f.notes}>

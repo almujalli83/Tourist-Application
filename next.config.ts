@@ -47,7 +47,12 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "4mb" },
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    // Routes that set their own stricter CSP (sandboxed SVG logos) keep it; everything else gets the site policy.
+    const [cspHeader, ...rest] = securityHeaders;
+    return [
+      { source: "/:path*", headers: rest },
+      { source: "/:path((?!api/rentals/logo/).*)", headers: [cspHeader] },
+    ];
   },
 };
 

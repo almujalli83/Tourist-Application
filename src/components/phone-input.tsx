@@ -10,12 +10,13 @@ import { cx, useFieldId } from "./ui";
  * Mobile number field: a single control with a searchable country-code picker and the national
  * number (digits only, limited to the country's length). Emits E.164 ("+9665XXXXXXXX") or "".
  */
-export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id }: {
+export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id, testId }: {
   value: string;
   onChange: (e164: string) => void;
   defaultCountry?: string;
   invalid?: boolean;
   id?: string;
+  testId?: string;
 }) {
   const { locale, t } = useApp();
   const fieldId = useFieldId();
@@ -96,6 +97,7 @@ export function PhoneInput({ value, onChange, defaultCountry = "SA", invalid, id
           placeholder={"0".repeat(rule.min)}
           onChange={(e) => onChange(formatE164(country, cleanNational(e.target.value).slice(0, rule.max)))}
           aria-invalid={invalid || undefined}
+          data-testid={testId}
           className="min-w-0 flex-1 bg-transparent px-3 text-sm tracking-wide text-ink tabular-nums placeholder:text-slate-300 focus:outline-none"
         />
         <span className="flex shrink-0 items-center pe-3 text-xs tabular-nums text-slate-500" aria-hidden>

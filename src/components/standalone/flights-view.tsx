@@ -14,6 +14,7 @@ import { useApp } from "../app-provider";
 import { CountrySelect } from "../booking/country-select";
 import { PlaneIcon } from "../icons";
 import { Checkout, type PaymentRef } from "../payments/checkout";
+import { PhoneInput } from "../phone-input";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Spinner } from "../ui";
 import { errText, StandaloneShell, useEntry } from "./shell";
 
@@ -224,7 +225,7 @@ export function FlightsView() {
           <Card className="h-fit space-y-4 p-5" data-testid="fl-book">
             <h2 className="font-bold">{f.contact}</h2>
             <Field label={t.standalone.hotels.email} required error={contact.email.trim() ? contactErr.email : undefined} htmlFor="fl-email"><Input id="fl-email" type="email" dir="ltr" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></Field>
-            <Field label={t.standalone.hotels.phone} required error={contact.phone.trim() ? contactErr.phone : undefined} htmlFor="fl-phone"><Input id="fl-phone" type="tel" dir="ltr" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} placeholder="+9665…" data-testid="fl-phone" /></Field>
+            <Field label={t.standalone.hotels.phone} required error={contact.phone.trim() ? contactErr.phone : undefined} htmlFor="fl-phone"><PhoneInput id="fl-phone" value={contact.phone} onChange={(phone) => setContact({ ...contact, phone })} defaultCountry={user?.individual?.nationality || "SA"} invalid={!!(contact.phone && contactErr.phone)} testId="fl-phone" /></Field>
             <div className="flex items-center justify-between border-t border-slate-100 pt-3">
               <span className="font-semibold">{f.total}</span>
               <span className="ltr-nums text-lg font-bold text-brand-800" data-testid="fl-total">{money(total)}</span>

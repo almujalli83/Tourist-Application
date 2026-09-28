@@ -43,6 +43,7 @@ describe("ride lifecycle (sandbox)", () => {
     const u = user("rd-1");
     const o = (await rideOptions({ pickup, dropoff })).find((x) => x.providerId === "careem" && x.category === "economy")!;
     await expect(requestRide(u, { providerId: "careem", optionId: "forged", pickup, dropoff }, now)).rejects.toMatchObject({ code: "optionExpired" });
+    await expect(requestRide(u, { providerId: "careem", optionId: o.optionId, pickup, dropoff, phone: "+966544444111111" }, now)).rejects.toMatchObject({ code: "invalidPhone" });
     const r = await requestRide(u, { providerId: "careem", optionId: o.optionId, pickup, dropoff }, now);
     expect(r).toMatchObject({ status: "searching", providerNameAr: "كريم", product: "Go", minSAR: o.minSAR, sandbox: true });
     expect(JSON.stringify(r)).not.toContain("+966500000000");
