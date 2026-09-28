@@ -43,11 +43,12 @@ async function deliver(msg: Pick<OutboxMessage, "to" | "subject" | "text">): Pro
 
 /** Emails the travellers and records the message; returns the outbox entry. */
 export async function notifyTravellers(
-  emails: string[],
+  emails: (string | null | undefined)[],
   message: { subject: string; text: string },
   meta: { bookingId?: string; redact?: string[] } = {},
 ): Promise<OutboxMessage | null> {
-  const to = [...new Set(emails.map((e) => e.trim()).filter(Boolean))];
+  // A traveller without an email (a child, an older booking) is skipped, not an error.
+  const to = [...new Set(emails.map((e) => (e ?? "").trim()).filter(Boolean))];
   if (!to.length) return null;
   const result = await deliver({ to, ...message });
   // Secrets (sign-in links) are sent but never kept in the back-office record.

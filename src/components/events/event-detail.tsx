@@ -156,12 +156,12 @@ export function EventDetail({ id }: { id: string }) {
         <div className="p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-wide opacity-90">{ev.categories[event.category]}</p>
           <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{ar ? event.titleAr : event.titleEn}</h1>
-          <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm opacity-90">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm opacity-90">
             <span className="inline-flex items-center gap-1"><MapPinIcon className="size-4" />{ar ? event.venueAr : event.venueEn}{city && ` · ${ar ? city.ar : city.en}`}</span>
             <RideMenu to={{ lat: event.lat, lng: event.lng, name: ar ? event.venueAr : event.venueEn }} />
             <span className="inline-flex items-center gap-1"><ClockIcon className="size-4" />{fmt(d.durationValue, { n: event.durationMins })}</span>
             <span className="inline-flex items-center gap-1"><TicketIcon className="size-4" />{fmt(ev.via, { provider: ev.providers[event.provider] })}</span>
-          </p>
+          </div>
           <RatingBadge summary={verified} light className="mt-2" />
         </div>
       </div>

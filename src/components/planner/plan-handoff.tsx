@@ -36,7 +36,7 @@ export function PlannerBanner() {
         <p className="font-bold text-ink">{b.title}</p>
         <p className="text-sm text-slate-600">{b.desc}</p>
       </div>
-      <Link href={`/${locale}/planner`} className="inline-flex h-10 shrink-0 items-center rounded-lg bg-gold-500 px-4 text-sm font-semibold text-ink hover:bg-gold-600">{b.cta}</Link>
+      <Link href={`/${locale}/planner`} className="inline-flex h-10 shrink-0 items-center rounded-lg bg-gold-500 px-4 text-sm font-semibold text-white hover:bg-gold-600">{b.cta}</Link>
     </div>
   );
 }
