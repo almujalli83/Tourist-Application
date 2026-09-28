@@ -85,7 +85,7 @@ const en: Dictionary = {
     cards: {
       events: { title: "Event booking", desc: "Tickets for concerts, shows, matches and experiences in the Saudi seasons, kept in My bookings." },
       transport: { title: "Transport & mobility", desc: "Trains, buses and metro, ride ordering, airport transfers and car rental." },
-      audio: { title: "Audio guide to tourist sites", desc: "Narrated tours of the main sights in your language, on site and offline." },
+      audio: { title: "Audio guide to tourist sites", desc: "Narrated tours of the main sights in your language, on site and offline.", shortTitle: "Audio guide", shortDesc: "For tourist sites: narrated tours of the main sights in your language, on site and offline." },
     },
     howTitle: "How it works",
     how: [
