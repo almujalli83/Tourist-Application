@@ -2,12 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Dictionary } from "@/i18n";
-import type { Locale } from "@/i18n/config";
+import type { Locale, UiLang } from "@/i18n/config";
 import type { PublicUser } from "@/lib/auth/types";
 import { formatMoney, setLiveRates } from "@/lib/currency";
 
 interface AppCtx {
   locale: Locale;
+  /** The interface language (Arabic, English, or a translation over the English pages). */
+  uiLang: UiLang;
   t: Dictionary;
   currency: string;
   setCurrency: (c: string) => void;
@@ -20,8 +22,8 @@ interface AppCtx {
 
 const Ctx = createContext<AppCtx | null>(null);
 
-export function AppProvider({ locale, dict, initialCurrency, initialUser, children }: {
-  locale: Locale; dict: Dictionary; initialCurrency: string; initialUser: PublicUser | null; children: ReactNode;
+export function AppProvider({ locale, uiLang, dict, initialCurrency, initialUser, children }: {
+  locale: Locale; uiLang: UiLang; dict: Dictionary; initialCurrency: string; initialUser: PublicUser | null; children: ReactNode;
 }) {
   const [currency, setCurrencyState] = useState(initialCurrency);
   const [user, setUser] = useState(initialUser);
@@ -54,7 +56,7 @@ export function AppProvider({ locale, dict, initialCurrency, initialUser, childr
   }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const money = useCallback((sar: number) => formatMoney(sar, currency, locale), [currency, locale, fx]);
-  const value = useMemo(() => ({ locale, t: dict, currency, setCurrency, money, fx, user, setUser }), [locale, dict, currency, setCurrency, money, fx, user]);
+  const value = useMemo(() => ({ locale, uiLang, t: dict, currency, setCurrency, money, fx, user, setUser }), [locale, uiLang, dict, currency, setCurrency, money, fx, user]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

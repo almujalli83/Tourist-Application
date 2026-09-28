@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getDictionary } from "@/i18n";
 import type { Locale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 import { cityName } from "@/lib/data/cities";
 import { fmtDay } from "@/lib/events/format";
 import { verifyLicense } from "@/lib/guides/guides";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function VerifyGuidePage({ params }: { params: Promise<{ locale: Locale; license: string }> }) {
   const { locale, license: raw } = await params;
   const license = decodeURIComponent(raw).slice(0, 40);
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   const v = t.guides.verify;
   const r = await verifyLicense(license);
   const ok = r.result === "valid";

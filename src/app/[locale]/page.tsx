@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, ShieldIcon, KaabaIcon, TicketIcon, UserIcon, UsersIcon } from "@/components/icons";
 import { PrayerHomeCard } from "@/components/prayer/prayer-home-card";
-import { getDictionary } from "@/i18n";
 import type { Locale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 
 export default async function HomePage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   const howIcons = [CalendarIcon, PlaneIcon, HotelIcon, PassportIcon, ShieldIcon];
   const trustIcons = [ShieldIcon, CheckIcon, BuildingIcon];
 

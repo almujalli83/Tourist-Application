@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { TrainsView } from "@/components/transport/trains-view";
-import { getDictionary } from "@/i18n";
 import { isLocale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   return { title: t.trains.title, description: t.trains.subtitle };
 }
 

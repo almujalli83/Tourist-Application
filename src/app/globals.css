@@ -118,5 +118,6 @@ html[data-a11y-contrast] :is(.bg-slate-50, .bg-slate-100) { background-color: #f
 html[data-a11y-contrast] :where(a, button):not(:disabled) { text-decoration-thickness: 2px; }
 html[data-a11y-grayscale] body { filter: grayscale(1); }
 /* With larger text the full header no longer fits: use the compact (menu) header at every width. */
-html[data-a11y-text] header :is(.xl\:flex, .xl\:block, .\32xl\:flex) { display: none !important; }
-html[data-a11y-text] header .xl\:hidden { display: block !important; }
+/* The same for interface translations, whose menu labels are longer. */
+:is(html[data-a11y-text], html:not([lang="ar"]):not([lang="en"])) header [data-wide] { display: none !important; }
+:is(html[data-a11y-text], html:not([lang="ar"]):not([lang="en"])) header [data-compact] { display: block !important; }
