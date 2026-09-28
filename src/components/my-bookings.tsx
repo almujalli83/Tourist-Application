@@ -11,6 +11,7 @@ import type { PublicRental } from "@/lib/rentals/types";
 import type { TransitTicket } from "@/lib/transit/types";
 import { LIVE_RIDE, type PublicRide } from "@/lib/rides/types";
 import type { BusOrder } from "@/lib/buses/types";
+import type { EvisaApplication } from "@/lib/evisa/service";
 import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 import { fmtDay, fmtKsa, ksaDay } from "@/lib/events/format";
 import type { EventOrder } from "@/lib/events/types";
@@ -28,10 +29,11 @@ import { BusIcon, CalendarIcon, CarIcon, HotelIcon, PassportIcon, PhoneIcon, Pla
 import { useNetwork } from "./transport/train-ticket-view";
 import { Badge, Card, cx, Spinner } from "./ui";
 
-type Kind = "package" | "stay" | "flight" | "event" | "train" | "table" | "esim" | "guide" | "transfer" | "rental" | "transit" | "ride" | "bus";
-const KINDS: Kind[] = ["package", "stay", "flight", "event", "train", "table", "esim", "guide", "transfer", "rental", "transit", "ride", "bus"];
+type Kind = "package" | "evisa" | "stay" | "flight" | "event" | "train" | "table" | "esim" | "guide" | "transfer" | "rental" | "transit" | "ride" | "bus";
+const KINDS: Kind[] = ["package", "evisa", "stay", "flight", "event", "train", "table", "esim", "guide", "transfer", "rental", "transit", "ride", "bus"];
 const ICONS: Record<Kind, ReactNode> = {
   package: <PassportIcon className="size-5" />,
+  evisa: <PassportIcon className="size-5" />,
   stay: <HotelIcon className="size-5" />,
   flight: <PlaneIcon className="size-5" />,
   event: <TicketIcon className="size-5" />,
@@ -45,7 +47,7 @@ const ICONS: Record<Kind, ReactNode> = {
   ride: <CarIcon className="size-5" />,
   bus: <BusIcon className="size-5" />,
 };
-const BROWSE: Record<Kind, string> = { package: "/package-visa", stay: "/hotels", flight: "/flights", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim", guide: "/guides", transfer: "/transport", rental: "/transport#rental", transit: "/transport?city=RUH", ride: "/transport", bus: "/buses" };
+const BROWSE: Record<Kind, string> = { package: "/package-visa", evisa: "/evisa", stay: "/hotels", flight: "/flights", event: "/events", train: "/trains", table: "/restaurants", esim: "/esim", guide: "/guides", transfer: "/transport", rental: "/transport#rental", transit: "/transport?city=RUH", ride: "/transport", bus: "/buses" };
 
 interface Item {
   kind: Kind;
@@ -91,10 +93,11 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
   const [buses, setBuses] = useState<BusOrder[] | null>(null);
   const [stays, setStays] = useState<StayOrder[] | null>(null);
   const [flights, setFlights] = useState<FlightOrder[] | null>(null);
+  const [visas, setVisas] = useState<EvisaApplication[] | null>(null);
   const [tab, setTab] = useState<"all" | Kind>("all");
 
   useEffect(() => {
-    const load = <T,>(url: string, key: "orders" | "bookings" | "transfers" | "rentals" | "tickets" | "rides" | "stays", set: (v: T[]) => void) =>
+    const load = <T,>(url: string, key: "orders" | "bookings" | "transfers" | "rentals" | "tickets" | "rides" | "stays" | "applications", set: (v: T[]) => void) =>
       fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).then((d) => set((d as Record<string, T[]>)[key] ?? [])).catch(() => set([]));
     void load<EventOrder>("/api/events/orders", "orders", setEvents);
     void load<TrainOrder>("/api/trains/orders", "orders", setTrains);
@@ -108,9 +111,10 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
     void load<BusOrder>("/api/buses/orders", "orders", setBuses);
     void load<StayOrder>("/api/stays", "stays", setStays);
     void load<FlightOrder>("/api/flights", "orders", setFlights);
+    void load<EvisaApplication>("/api/evisa", "applications", setVisas);
   }, []);
 
-  const loading = !events || !trains || !tables || !esims || !guides || !transfers || !rentals || !transit || !rides || !buses || !stays || !flights;
+  const loading = !events || !trains || !tables || !esims || !guides || !transfers || !rentals || !transit || !rides || !buses || !stays || !flights || !visas;
   const items = useMemo<Item[]>(() => {
     const now = Date.now();
     const today = ksaDay(new Date());
@@ -285,6 +289,17 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         status: badge(t.standalone.flight.status[o.status], !live), amount: money(o.totalSAR),
       });
     }
+    for (const v of visas ?? []) {
+      const approved = v.applicants.filter((a) => a.status === "approved").length;
+      out.push({
+        kind: "evisa", id: v.id, href: `/${locale}/account/evisa/${v.id}`,
+        title: `${t.evisa.title} · ${v.applicants.map((a) => a.nameEn).join(", ")}`,
+        subtitle: `${v.reference} · ${fmt(t.evisa.arrivalOn, { date: fmtDay(v.arrivalDate, locale, { day: "numeric", month: "short", year: "numeric" }) })}${v.status === "completed" ? ` · ${fmt(t.evisa.approvedCount, { n: approved, total: v.applicants.length })}` : ""}`,
+        at: Date.parse(`${v.arrivalDate}T00:00:00+03:00`), day: v.arrivalDate,
+        upcoming: v.status === "in_progress" || (v.status === "completed" && v.arrivalDate >= today), today: false,
+        status: <Badge tone={v.status === "failed" ? "red" : v.status === "completed" ? "brand" : "amber"}>{t.evisa.appStatus[v.status]}</Badge>, amount: money(v.totalSAR - v.refundedSAR),
+      });
+    }
     for (const o of buses ?? []) {
       const live = o.status === "CONFIRMED";
       const start = Date.parse(o.trip.depart);
@@ -298,7 +313,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
       });
     }
     return out;
-  }, [packages, events, trains, tables, esims, guides, transfers, rentals, transit, rides, buses, stays, flights, net, locale, ar, money, t]);
+  }, [packages, events, trains, tables, esims, guides, transfers, rentals, transit, rides, buses, stays, flights, visas, net, locale, ar, money, t]);
 
   const shown = items.filter((i) => tab === "all" || i.kind === tab);
   // "All" and "Packages" show each trip with the bookings made for it; the other tabs stay flat.

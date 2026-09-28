@@ -72,6 +72,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
               <p className="mt-0.5 text-sm text-slate-600">{t.standalone.intro}</p>
             </div>
           </Link>
+          <Link href={`/${locale}/evisa`} className="group flex items-center gap-4 rounded-2xl border border-brand-600/40 bg-white p-5 transition hover:shadow-md" data-testid="evisa-service">
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-700 text-white"><PassportIcon className="size-5" /></div>
+            <div className="flex-1">
+              <p className="font-semibold text-ink">{t.evisa.title}</p>
+              <p className="mt-0.5 text-sm text-slate-600">{t.evisa.serviceCard}</p>
+            </div>
+          </Link>
           <Link href={`/${locale}/planner`} className="group flex items-center gap-4 rounded-2xl border border-gold-500/40 bg-gold-50 p-5 transition hover:shadow-md">
             <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-gold-500 text-ink"><CalendarIcon className="size-5" /></div>
             <div className="flex-1">
@@ -116,18 +123,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
               </div>
             </Link>
           ))}
-          {t.home.comingServices.map((s) => {
-            const Icon = PassportIcon; // the tourist eVisa on its own
-            return (
-              <div key={s} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white/60 p-5">
-                <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"><Icon className="size-5" /></div>
-                <div className="flex-1">
-                  <p className="font-semibold text-slate-700">{s}</p>
-                  <span className="mt-1 inline-block rounded bg-gold-50 px-2 py-0.5 text-xs font-semibold text-gold-700">{t.common.comingSoon}</span>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
 

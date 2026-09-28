@@ -61,6 +61,7 @@ export function StandaloneShell({ tab, entry, onEntry, children }: { tab: "hotel
         </Select>
         <p className="text-sm text-slate-600">
           {s.entry.hints[entry]}{" "}
+          {entry === "evisa" && <><Link href={`/${locale}/evisa`} className="font-semibold text-brand-700 underline" data-testid="sa-evisa-link">{s.entry.evisaLink}</Link>{" "}</>}
           {(entry === "evisa" || entry === "arrival") && <Link href={`/${locale}/package-visa`} className="font-semibold text-brand-700 underline">{s.entry.packageLink}</Link>}
         </p>
       </Card>

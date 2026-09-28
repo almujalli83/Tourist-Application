@@ -1,6 +1,6 @@
 /**
  * Which API requests are audited automatically (by handle()): every back-office and ministry
- * request, and every change to an account (plus the data copy). The actor is read before the
+ * request, every change to an account (plus the data copy), and every tourist eVisa application. The actor is read before the
  * handler runs, so an account deletion is still attributed to its owner.
  */
 import { currentSession } from "../auth/session";
@@ -13,6 +13,8 @@ export function auditedRequest(method: string, path: string): boolean {
   if (path.startsWith("/api/account/")) return method !== "GET" || path === "/api/account/export";
   if (path.startsWith("/api/auth/password/") || path === "/api/auth/logout") return method !== "GET";
   if (path.startsWith("/api/family") || path.startsWith("/api/travellers")) return method !== "GET";
+  // Tourist eVisa applications carry passport data, photos and questionnaires.
+  if (path === "/api/evisa") return method === "POST";
   return false;
 }
 

@@ -19,9 +19,9 @@ import { useTravellerValidation } from "./travellers-step";
 import { travellerTypeLabel } from "./traveller-label";
 import { WizardShell } from "./wizard-shell";
 
-function PrivacyPolicy() {
+/** MT's privacy policy, declarations and the disclaimer to accept (packages and the tourist eVisa). */
+export function PrivacyPolicy({ accepted: disclaimerAccepted, onChange: setDisclaimer }: { accepted: boolean; onChange: (v: boolean) => void }) {
   const { t, locale } = useApp();
-  const { disclaimerAccepted, setDisclaimer } = useBooking();
   const [policy, setPolicy] = useState<PrivacyPolicyResponse | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -48,7 +48,7 @@ function PrivacyPolicy() {
         {acks.map((a) => <li key={a.acknowledgmentId} className="rounded-lg border border-slate-200 p-3">{a.acknowledgmentDetails}</li>)}
       </ul>
       <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg bg-gold-50 p-3 text-sm font-medium text-ink ring-1 ring-gold-500/30">
-        <input type="checkbox" className="mt-0.5 size-5 accent-brand-700" checked={disclaimerAccepted} onChange={(e) => setDisclaimer(e.target.checked)} />
+        <input type="checkbox" className="mt-0.5 size-5 accent-brand-700" checked={disclaimerAccepted} onChange={(e) => setDisclaimer(e.target.checked)} data-testid="privacy-accept" />
         <span>{disclaimer}</span>
       </label>
     </Card>
@@ -235,7 +235,7 @@ export function ReviewStep() {
 
         <PackageRequirements state={check} />
 
-        <PrivacyPolicy />
+        <PrivacyPolicy accepted={booking.disclaimerAccepted} onChange={booking.setDisclaimer} />
 
         {!user ? (
           <Card className="p-5 sm:p-6">

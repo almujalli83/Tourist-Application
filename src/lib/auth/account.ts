@@ -385,7 +385,7 @@ export async function newRecovery(userId: string, code: unknown): Promise<string
 const USER_COLLECTIONS: Collection[] = [
   "bookings", "travellers", "wallet", "favorites", "eventOrders", "trainOrders", "restaurantBookings", "esimOrders", "chats", "tripPlans",
   "notifications", "reviews", "supportTickets", "alertPrefs", "loyalty", "guideBookings", "umrahPermits", "transfers", "rentals",
-  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions", "userIdentities", "tripShares", "consents", "stays", "flightOrders",
+  "transitOrders", "transitTickets", "transitTopups", "rides", "busOrders", "paymentIntents", "savedCards", "sessions", "userIdentities", "tripShares", "consents", "stays", "flightOrders", "evisaApps",
 ];
 const HIDDEN = /^(passwordHash|mfa|hash|secret|token|enc|file|key|deviceKey|providerToken|cardToken|gatewayToken)$/i;
 
@@ -432,6 +432,9 @@ export async function deleteAccount(userId: string, password: unknown, code: unk
   const stays = await store().findBy<{ status: string; hotel: { checkOut: string } }>("stays", "userId", userId);
   const flights = await store().findBy<{ status: string; segments: { offer: { arriveAt: string } }[] }>("flightOrders", "userId", userId);
   if (stays.some((s) => s.status === "confirmed" && s.hotel.checkOut >= today) || flights.some((f) => f.status === "confirmed" && f.segments.some((x) => x.offer.arriveAt.slice(0, 10) >= today))) throw new AccountError("activeTrip");
+  // A tourist eVisa still being decided, or for a trip still ahead.
+  const visas = await store().findBy<{ status: string; arrivalDate: string }>("evisaApps", "userId", userId);
+  if (visas.some((v) => v.status === "in_progress" || (v.status === "completed" && v.arrivalDate >= today))) throw new AccountError("activeTrip");
 
   for (const r of await store().findBy<{ id: string }>("wallet", "userId", userId)) {
     await deleteWalletDocument(userId, r.id).catch(() => undefined);
