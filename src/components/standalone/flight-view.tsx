@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import { cityName, getCity } from "@/lib/data/cities";
 import { fmtDay } from "@/lib/events/format";
-import { flightAirportLegs, flightStays, flightWindow, matchingStay, nextSteps, tripHotelsHref } from "@/lib/standalone/next-steps";
+import { flightAirportLegs, flightStays, flightWindow, matchingStay, nextSteps, tripHotelSteps } from "@/lib/standalone/next-steps";
 import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
@@ -72,13 +72,13 @@ export function FlightView({ id }: { id: string }) {
   const nowKsa = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 16);
   const legs = flightAirportLegs(o).filter((l) => l.at > nowKsa);
   const upcoming = legs.length > 0;
-  // A multi-city trip: hotels in every city it stays in.
-  const nights = o.tripType === "multicity" ? flightStays(o) : [];
-  const tripHotels = nights.length > 1 ? tripHotelsHref(nights, o.entry) : null;
+  // A multi-city trip: hotels for every city it stays in, except those already booked here.
+  const hotels = o.tripType === "multicity" ? tripHotelSteps(flightStays(o), o.entry, stays) : null;
+  const booked = o.tripType === "multicity" ? flightStays(o).map((n) => matchingStay(n, stays)).filter((x): x is StayOrder => !!x) : stay ? [stay] : [];
   const steps = trip
     ? nextSteps(trip, {
         stay: !!stay, flight: true, hotelName: stay ? (ar ? stay.hotel.nameAr : stay.hotel.nameEn) : undefined,
-        ...(tripHotels ? { tripHotels: { href: tripHotels, count: new Set(nights.map((x) => x.city)).size } } : {}),
+        ...(hotels ? { hotels } : {}),
       }, legs)
         // A stopover's hotel has its own button above.
         .filter((st) => !(st.key === "hotel" && o.tripType === "stopover"))
@@ -143,7 +143,7 @@ export function FlightView({ id }: { id: string }) {
           testId="flight-complete"
           steps={steps}
           city={trip?.city} from={trip?.from} to={trip?.to}
-          have={stay ? [{ label: fmt(s.next.yourHotel, { city: cityName(stay.hotel.city, locale), name: ar ? stay.hotel.nameAr : stay.hotel.nameEn }), href: `/account/stays/${stay.id}` }] : []}
+          have={[...new Map(booked.map((x) => [x.id, x])).values()].map((x) => ({ label: fmt(s.next.yourHotel, { city: cityName(x.hotel.city, locale), name: ar ? x.hotel.nameAr : x.hotel.nameEn }), href: `/account/stays/${x.id}` }))}
         />
       )}
       {live && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flightAirportLegs, flightStays, flightWindow, matchingFlight, matchingStay, nextSteps, stayWindow, tripFlightsHref, tripHotelsHref } from "@/lib/standalone/next-steps";
+import { flightAirportLegs, flightStays, flightWindow, matchingFlight, matchingStay, nextSteps, stayWindow, tripFlightsHref, tripHotelSteps, tripHotelsHref } from "@/lib/standalone/next-steps";
 import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 
 const seg = (from: string, to: string, departAt: string, arriveAt: string, flightNo = "XY255") =>
@@ -101,5 +101,26 @@ describe("complete your trip", () => {
     // Residents from Riyadh: no flight from Riyadh to Riyadh.
     const res = new URLSearchParams(tripFlightsHref([st("RUH", "2026-11-07", "2026-11-09"), st("ULH", "2026-11-09", "2026-11-11")], "resident", "RUH")!.split("?")[1]).getAll("leg");
     expect(res).toEqual(["RUH:ULH:2026-11-09", "ULH:RUH:2026-11-11"]);
+  });
+
+  it("a visitor's loop Riyadh → AlUla → Jeddah → Riyadh stays in all three cities; booked cities drop out", () => {
+    const o = flight({ tripType: "multicity", entry: "evisa", segments: [
+      seg("RUH", "ULH", "2026-10-08T19:45", "2026-10-08T21:06"), seg("ULH", "JED", "2026-10-11T08:30", "2026-10-11T09:57"), seg("JED", "RUH", "2026-10-13T14:15", "2026-10-13T15:28"),
+    ] });
+    const nights = flightStays(o);
+    expect(nights.map((n) => `${n.city} ${n.from}→${n.to}`)).toEqual(["ULH 2026-10-08→2026-10-11", "JED 2026-10-11→2026-10-13", "RUH 2026-10-13→2026-10-16"]);
+    const all = tripHotelSteps(nights, "evisa");
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ key: "tripHotels", count: 3, cities: ["ULH", "JED", "RUH"] });
+    // AlUla already booked: Jeddah then Riyadh remain, still one multi-city search.
+    const withUlh = tripHotelSteps(nights, "evisa", [stay({ city: "ULH", checkIn: "2026-10-08", checkOut: "2026-10-11" })]);
+    expect(withUlh).toHaveLength(1);
+    expect(withUlh[0]).toMatchObject({ key: "tripHotels", cities: ["JED", "RUH"] });
+    expect(withUlh[0].href).toContain("start=2026-10-11&leg=JED%3A2&leg=RUH%3A3");
+    // Jeddah booked: AlUla and Riyadh no longer follow on — one hotel link each.
+    const withJed = tripHotelSteps(nights, "evisa", [stay({ city: "JED", checkIn: "2026-10-11", checkOut: "2026-10-13" })]);
+    expect(withJed.map((x) => `${x.key}:${x.stay?.city}`)).toEqual(["hotel:ULH", "hotel:RUH"]);
+    // Residents fly home: no hotel after the last flight.
+    expect(flightStays({ ...o, entry: "resident" }).map((n) => n.city)).toEqual(["ULH", "JED"]);
   });
 });

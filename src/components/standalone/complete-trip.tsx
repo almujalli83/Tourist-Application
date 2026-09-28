@@ -37,7 +37,9 @@ export function CompleteTrip({ steps, city, from, to, have, testId }: {
     if (s.key === "transfer" && s.leg) return fmt(s.leg.direction === "arrival" ? n.transferArrival : n.transferDeparture, { airport: cityName(s.leg.airport, locale), time: when(s.leg.at), flight: s.leg.flightNo });
     if (s.key === "transfer") return fmt(n.transferCity, { city: place });
     if (s.key === "onward" && s.onward) return fmt(n.onward, { city: cityName(s.onward.to, locale), date: day(s.onward.date) });
-    if (s.key === "tripHotels" || s.key === "tripFlights") return fmt(n[s.key], { n: s.count ?? 0 });
+    if (s.key === "tripHotels") return fmt(n.tripHotels, { cities: new Intl.ListFormat(locale, { type: "conjunction" }).format((s.cities ?? []).map((c) => cityName(c, locale))), n: s.count ?? 0 });
+    if (s.key === "tripFlights") return fmt(n.tripFlights, { n: s.count ?? 0 });
+    if (s.key === "hotel" && s.stay) return fmt(n.hotel, { city: cityName(s.stay.city, locale), from: day(s.stay.from), to: day(s.stay.to) });
     if (s.key === "hotel") return fmt(n.hotel, { city: place, from: from ? day(from) : "", to: to ? day(to) : "" });
     return fmt(n[s.key as Exclude<StepKey, "transfer" | "hotel" | "onward" | "tripHotels" | "tripFlights">], { city: place });
   };

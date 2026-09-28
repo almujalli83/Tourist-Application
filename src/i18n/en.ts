@@ -3105,8 +3105,8 @@ const en: Dictionary = {
       guides: "Licensed tour guide in {city}",
       prayer: "Prayer times and qibla",
       onward: "Travel on to {city} on {date}",
-      tripFlights: "Flights for the whole trip ({n} flights)",
-      tripHotels: "Hotels in every city of the trip ({n} cities)",
+      tripFlights: "Flights for the whole trip, between all its cities",
+      tripHotels: "Hotels in {cities}",
     },
     completeForm: "Complete the required details above (marked in red) to enable the confirm button.",
     entry: {

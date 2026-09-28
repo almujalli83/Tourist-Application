@@ -109,21 +109,55 @@ export interface Step {
   leg?: AirportLeg;
   /** For onward travel: the next city and the day. */
   onward?: { to: string; date: string };
-  /** For a whole trip: how many flights or cities. */
+  /** For a whole trip: how many flights or cities, and which cities. */
   count?: number;
+  cities?: string[];
+  /** For a hotel in one city of a multi-city trip: its own city and nights. */
+  stay?: Night;
 }
 
-/** The nights a multi-city flight booking spends in Saudi cities: from each landing to the next take-off. */
-export function flightStays(o: FlightOrder): { city: string; from: string; to: string }[] {
+export interface Night { city: string; from: string; to: string }
+
+/**
+ * The nights a multi-city flight booking spends in Saudi cities: from each landing to the next
+ * take-off, and — for visitors (not residents or citizens, who fly home) — a few nights after the
+ * last flight lands in the Kingdom.
+ */
+export function flightStays(o: FlightOrder): Night[] {
   const segs = o.segments.filter((sg) => !sg.cancellation).map((sg) => sg.offer);
-  const out: { city: string; from: string; to: string }[] = [];
+  const out: Night[] = [];
   for (let i = 0; i < segs.length - 1; i++) {
     const city = segs[i].to;
     const from = segs[i].arriveAt.slice(0, 10);
     const to = segs[i + 1].departAt.slice(0, 10);
     if (getStayCity(city) && to > from) out.push({ city, from, to });
   }
+  const last = segs[segs.length - 1];
+  if (last && getStayCity(last.to) && o.entry !== "resident" && o.entry !== "citizen") {
+    const from = last.arriveAt.slice(0, 10);
+    out.push({ city: last.to, from, to: addDaysISO(from, ONE_WAY_NIGHTS) });
+  }
   return out;
+}
+
+/**
+ * Hotel links for those nights, leaving out cities already booked here: each run of cities that
+ * follow on is one multi-city search; a city on its own is a single-hotel search.
+ */
+export function tripHotelSteps(nights: Night[], entry: EntryType, booked: StayOrder[] = []): Step[] {
+  const open = nights.filter((n) => !matchingStay(n, booked));
+  const runs: Night[][] = [];
+  for (const n of open) {
+    const run = runs[runs.length - 1];
+    if (run && run[run.length - 1].to === n.from) run.push(n);
+    else runs.push([n]);
+  }
+  return runs.map((run) => {
+    const href = run.length > 1 ? tripHotelsHref(run, entry) : null;
+    if (href) return { key: "tripHotels" as const, href, count: new Set(run.map((n) => n.city)).size, cities: [...new Set(run.map((n) => n.city))] };
+    const n = run[0];
+    return { key: "hotel" as const, href: `/hotels?${qs({ entry, city: n.city, checkIn: n.from, checkOut: n.to })}`, stay: n };
+  });
 }
 
 /** The multi-city hotel search for those stays (a gap before the next city counts as nights in the previous one). */
@@ -180,14 +214,14 @@ export function nextSteps(
   have: {
     stay?: boolean; flight?: boolean; hotelName?: string; backDate?: string; onward?: { to: string; date: string };
     /** Whole-trip links (multi-city): hotels in every city, or every flight. */
-    tripHotels?: { href: string; count: number }; tripFlights?: { href: string; count: number };
+    hotels?: Step[]; tripFlights?: { href: string; count: number };
   } = {},
   legs?: AirportLeg[],
 ): Step[] {
   const steps: Step[] = [];
-  if (have.tripHotels) steps.push({ key: "tripHotels", href: have.tripHotels.href, count: have.tripHotels.count });
+  if (have.hotels) steps.push(...have.hotels);
   if (have.tripFlights) steps.push({ key: "tripFlights", href: have.tripFlights.href, count: have.tripFlights.count });
-  if (!have.stay && !have.tripHotels) steps.push({ key: "hotel", href: `/hotels?${qs({ entry: w.entry, city: w.city, checkIn: w.from, checkOut: w.to })}` });
+  if (!have.stay && !have.hotels) steps.push({ key: "hotel", href: `/hotels?${qs({ entry: w.entry, city: w.city, checkIn: w.from, checkOut: w.to })}` });
   // Makkah has no airport: fly to Jeddah. A multi-city trip flies home from its last city (`backDate`).
   if (!have.flight && !have.tripFlights) steps.push({ key: "flight", href: `/flights?${qs({ entry: w.entry, to: w.city === "MKX" ? "JED" : w.city, date: w.from, back: have.backDate ?? w.to, trip: "return" })}` });
   if (have.onward) steps.push({ key: "onward", onward: have.onward, href: onwardHref(w.city, have.onward.to, have.onward.date) });
