@@ -20,9 +20,10 @@ export function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
 
-  // "Book": the tourism package with visa, and hotels and flights without a package.
+  // "Book": the tourism package with visa, the tourist eVisa, and hotels and flights without a package.
   const bookLinks = [
     { href: `/${locale}/package-visa`, label: t.nav.packageVisa },
+    { href: `/${locale}/evisa`, label: t.evisa.nav },
     { href: `/${locale}/hotels`, label: t.standalone.tabs.hotels },
     { href: `/${locale}/flights`, label: t.standalone.tabs.flights },
   ];
