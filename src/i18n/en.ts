@@ -85,7 +85,7 @@ const en: Dictionary = {
     cards: {
       events: { title: "Event booking", desc: "Tickets for concerts, shows, matches and experiences in the Saudi seasons, kept in My bookings." },
       transport: { title: "Transport & mobility", desc: "Trains, buses and metro, ride ordering, airport transfers and car rental." },
-      audio: { title: "Audio guide", desc: "Narrated tours of the main sights in your language, on site and offline." },
+      audio: { title: "Audio guide to tourist sites", desc: "Narrated tours of the main sights in your language, on site and offline." },
     },
     howTitle: "How it works",
     how: [
@@ -1890,8 +1890,8 @@ const en: Dictionary = {
     charged: "Charged in Saudi riyals: {amount}",
   },
   audio: {
-    nav: "Audio guide",
-    title: "Audio guide",
+    nav: "Audio guide to tourist sites",
+    title: "Audio guide to tourist sites",
     subtitle: "Narrated tours of the main landmarks in your language: listen on site, get the right clip suggested as you arrive, and download a tour to listen offline.",
     allCities: "All cities",
     city: "City",
