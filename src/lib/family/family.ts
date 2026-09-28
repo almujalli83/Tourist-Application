@@ -8,6 +8,8 @@ import { AccountError } from "../auth/account";
 import { consumeToken, issueToken, peekToken } from "../auth/tokens";
 import { EMAIL_RE } from "../auth/validation";
 import type { StoredBooking } from "../bookings/types";
+import type { EvisaApplication } from "../evisa/service";
+import type { FlightOrder, StayOrder } from "../standalone/types";
 import { notifyTravellers } from "../notify";
 import { getUserById } from "../repo";
 import { getSavedTraveller, listSavedTravellers } from "../saved-travellers-repo";
@@ -223,9 +225,13 @@ export async function onAccountDeleted(userId: string): Promise<void> {
 /* ---------------------------------------------------------------- shared data */
 
 export interface FamilyTrip {
+  /** A tourism package, or a hotel, flights or tourist eVisa booked without one. */
+  kind: "package" | "stay" | "flight" | "evisa";
   memberName: string;
   mine: boolean;
   bookingId: string;
+  /** In-app link (without the locale) for the member's own trips. */
+  href: string;
   reference: string;
   cities: string[];
   departureDate: string;
@@ -236,7 +242,11 @@ export interface FamilyTrip {
   hotels: { city: string; nameAr: string; nameEn: string; checkIn: string; checkOut: string }[];
 }
 
-/** Trips of the members who share them (current and upcoming first, then the last past ones). */
+/**
+ * Trips of the members who share them (current and upcoming first, then the last past ones):
+ * packages, and hotels, flights and tourist eVisas booked without a package. Only what a
+ * companion needs is shown — no passport numbers, visa numbers or prices.
+ */
 export async function familyTrips(userId: string, today = new Date().toISOString().slice(0, 10)): Promise<FamilyTrip[]> {
   const f = await familyOf(userId);
   if (!f) return [];
@@ -247,11 +257,39 @@ export async function familyTrips(userId: string, today = new Date().toISOString
     for (const b of bookings) {
       if (b.status === "CANCELLED" || b.mt?.packageStatus === "CANCELLED") continue;
       out.push({
+        kind: "package", href: `/account/bookings/${b.id}`,
         memberName: m.name, mine: m.userId === userId, bookingId: b.id, reference: b.reference,
         cities: b.criteria.stays.map((s) => s.city), departureDate: b.criteria.departureDate, returnDate: b.criteria.returnDate,
         travellers: b.applicants.length, status: b.mt?.packageStatus ?? b.status,
         flights: b.flights.map((x) => ({ kind: x.kind, flightNo: x.flightNo, from: x.from, to: x.to, departAt: x.departAt, arriveAt: x.arriveAt })),
         hotels: b.hotels.map((h) => ({ city: h.city, nameAr: h.nameAr, nameEn: h.nameEn, checkIn: h.checkIn, checkOut: h.checkOut })),
+      });
+    }
+    const base = { memberName: m.name, mine: m.userId === userId };
+    for (const o of await store().findBy<StayOrder>("stays", "userId", m.userId)) {
+      if (o.status !== "confirmed") continue;
+      const h = o.hotel;
+      out.push({
+        ...base, kind: "stay", href: `/account/stays/${o.id}`, bookingId: o.id, reference: o.reference, cities: [h.city], departureDate: h.checkIn, returnDate: h.checkOut,
+        travellers: o.rooms.reduce((a, r) => a + r.adults + r.childAges.length, 0), status: o.status, flights: [],
+        hotels: [{ city: h.city, nameAr: h.nameAr, nameEn: h.nameEn, checkIn: h.checkIn, checkOut: h.checkOut }],
+      });
+    }
+    for (const o of await store().findBy<FlightOrder>("flightOrders", "userId", m.userId)) {
+      const segs = o.segments.filter((sg) => !sg.cancellation).map((sg) => sg.offer);
+      if (o.status !== "confirmed" || !segs.length) continue;
+      out.push({
+        ...base, kind: "flight", href: `/account/flights/${o.id}`, bookingId: o.id, reference: o.reference,
+        cities: [segs[0].from, ...segs.map((x) => x.to)], departureDate: segs[0].departAt.slice(0, 10), returnDate: segs[segs.length - 1].arriveAt.slice(0, 10),
+        travellers: o.passengers.length, status: o.status, hotels: [],
+        flights: segs.map((x) => ({ kind: x.kind, flightNo: x.flightNo, from: x.from, to: x.to, departAt: x.departAt, arriveAt: x.arriveAt })),
+      });
+    }
+    for (const v of await store().findBy<EvisaApplication>("evisaApps", "userId", m.userId)) {
+      if (v.status === "failed") continue;
+      out.push({
+        ...base, kind: "evisa", href: v.status === "completed" ? "/account/wallet" : `/account/evisa/${v.id}`, bookingId: v.id, reference: v.reference,
+        cities: [], departureDate: v.arrivalDate, returnDate: v.arrivalDate, travellers: v.applicants.length, status: v.status, flights: [], hotels: [],
       });
     }
   }

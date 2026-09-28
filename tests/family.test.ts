@@ -108,6 +108,41 @@ describe("family", () => {
     expect(fam.id).toBeTruthy();
   });
 
+  it("shares hotels, flights and tourist eVisas booked without a package", async () => {
+    const head = await user("Hamad");
+    const son = await user("Khalid");
+    const quiet = await user("Salem");
+    await createFamily(head.id, "Group");
+    await inviteMember(head.id, { email: son.email, name: "Khalid", relation: "son" }, "en", req);
+    await acceptInvite(son.id, tokenFor(son.email), { shareTrips: true });
+    await inviteMember(head.id, { email: quiet.email, name: "Salem", relation: "friend" }, "en", req);
+    await acceptInvite(quiet.id, tokenFor(quiet.email), { shareTrips: false });
+    const hotel = { city: "AUH", nameAr: "فندق", nameEn: "Hotel", checkIn: "2099-05-02", checkOut: "2099-05-06" };
+    const leg = (from: string, to: string, day: string) => ({ kind: "outbound", flightNo: "SV1", from, to, departAt: `${day}T08:00`, arriveAt: `${day}T10:00` });
+    for (const u of [son, quiet]) {
+      await store().put("stays", `s-${u.id}`, { id: `s-${u.id}`, userId: u.id, reference: "ST-1", status: "confirmed", hotel, rooms: [{ adults: 2, childAges: [5] }] });
+      await store().put("stays", `sc-${u.id}`, { id: `sc-${u.id}`, userId: u.id, reference: "ST-2", status: "cancelled", hotel, rooms: [{ adults: 1, childAges: [] }] });
+      await store().put("flightOrders", `f-${u.id}`, {
+        id: `f-${u.id}`, userId: u.id, reference: "FL-1", status: "confirmed", passengers: [{}, {}],
+        segments: [{ offer: leg("CAI", "RUH", "2099-05-01") }, { offer: leg("RUH", "JED", "2099-05-03") }, { offer: leg("JED", "CAI", "2099-05-08"), cancellation: { at: "x" } }],
+      });
+      await store().put("evisaApps", `v-${u.id}`, { id: `v-${u.id}`, userId: u.id, reference: "EV-1", status: "completed", arrivalDate: "2099-05-01", applicants: [{}] });
+      await store().put("evisaApps", `vf-${u.id}`, { id: `vf-${u.id}`, userId: u.id, reference: "EV-2", status: "failed", arrivalDate: "2099-05-01", applicants: [{}] });
+    }
+    const trips = await familyTrips(head.id, "2099-01-01");
+    expect(trips.map((x) => x.kind).sort()).toEqual(["evisa", "flight", "stay"]);
+    expect(trips.every((x) => x.memberName === "Khalid" && !x.mine)).toBe(true);
+    expect(trips.find((x) => x.kind === "stay")).toMatchObject({ href: `/account/stays/s-${son.id}`, cities: ["AUH"], travellers: 3, departureDate: "2099-05-02" });
+    // A cancelled leg drops out of the trip.
+    expect(trips.find((x) => x.kind === "flight")).toMatchObject({ cities: ["CAI", "RUH", "JED"], departureDate: "2099-05-01", returnDate: "2099-05-03", travellers: 2 });
+    expect(trips.find((x) => x.kind === "flight")!.flights).toHaveLength(2);
+    // An issued visa lives in the wallet; nothing sensitive is copied.
+    const visa = trips.find((x) => x.kind === "evisa")!;
+    expect(visa).toMatchObject({ href: "/account/wallet", cities: [] });
+    expect(JSON.stringify(visa)).not.toMatch(/passport/i);
+    expect(await familyTrips(quiet.id, "2099-01-01")).toHaveLength(6); // own 3 + Khalid's 3
+  });
+
   it("hands the family over when the head deletes the account", async () => {
     const head = await user("Majed");
     const bro = await user("Turki");

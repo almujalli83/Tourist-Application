@@ -128,12 +128,19 @@ export function FamilyView() {
               {!data.trips.length && <p className="text-sm text-slate-600">{f.tripsEmpty}</p>}
               <ul className="space-y-3">
                 {data.trips.map((tr) => (
-                  <li key={tr.bookingId} className={cx("rounded-xl border p-4", tr.returnDate < today ? "border-slate-200 bg-slate-50" : "border-brand-200 bg-white")} data-testid="family-trip">
+                  <li key={`${tr.kind}-${tr.bookingId}`} className={cx("rounded-xl border p-4", tr.returnDate < today ? "border-slate-200 bg-slate-50" : "border-brand-200 bg-white")} data-testid="family-trip" data-kind={tr.kind}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-ink">{fmt(f.by, { name: tr.mine ? f.you : tr.memberName })} · {tr.cities.map((c) => cityName(c, locale)).join(locale === "ar" ? " ← " : " → ")}</p>
-                      <Badge tone={tr.returnDate < today ? "slate" : "brand"}>{tr.returnDate < today ? f.past : f.upcoming}</Badge>
+                      <p className="font-semibold text-ink">
+                        {fmt(f.by, { name: tr.mine ? f.you : tr.memberName })} · {tr.kind === "evisa" ? t.evisa.title : tr.cities.map((c) => cityName(c, locale)).join(locale === "ar" ? " ← " : " → ")}
+                      </p>
+                      <span className="flex flex-wrap gap-1.5">
+                        <Badge tone="slate">{t.account.all.kinds[tr.kind]}</Badge>
+                        <Badge tone={tr.returnDate < today ? "slate" : "brand"}>{tr.kind === "evisa" ? t.evisa.appStatus[tr.status as keyof typeof t.evisa.appStatus] ?? tr.status : tr.returnDate < today ? f.past : f.upcoming}</Badge>
+                      </span>
                     </div>
-                    <p className="mt-1 text-sm text-slate-600">{day(tr.departureDate)} — {day(tr.returnDate)} · {fmt(f.travellers, { n: tr.travellers })}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {tr.kind === "evisa" ? fmt(t.evisa.arrivalOn, { date: day(tr.departureDate) }) : tr.departureDate === tr.returnDate ? day(tr.departureDate) : `${day(tr.departureDate)} — ${day(tr.returnDate)}`} · {fmt(f.travellers, { n: tr.travellers })}
+                    </p>
                     <div className="mt-2 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">
                       {tr.flights.map((fl) => (
                         <span key={fl.flightNo + fl.departAt} className="inline-flex items-center gap-1"><PlaneIcon className="size-3.5" />{fmt(f.flight, { no: fl.flightNo })} · {fl.from}→{fl.to} · {fl.departAt.replace("T", " ")}</span>
@@ -142,7 +149,7 @@ export function FamilyView() {
                         <span key={h.nameEn + h.checkIn} className="inline-flex items-center gap-1"><HotelIcon className="size-3.5" />{locale === "ar" ? h.nameAr : h.nameEn}</span>
                       ))}
                     </div>
-                    {tr.mine && <Link href={`/${locale}/account/bookings/${tr.bookingId}`} className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:underline">{f.open}</Link>}
+                    {tr.mine && <Link href={`/${locale}${tr.href}`} className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:underline">{f.open}</Link>}
                   </li>
                 ))}
               </ul>
