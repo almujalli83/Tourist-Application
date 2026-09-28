@@ -82,7 +82,12 @@ const en: Dictionary = {
     servicesTitle: "Saudi Trip services",
     servicesSubtitle: "We are rolling out services one by one to cover your entire journey",
     packageVisaDesc: "An all-inclusive tourism package with visa and insurance, connected to travel agents and the Ministry of Tourism eVisa platform.",
-    comingServices: ["Tourist eVisa", "Event booking", "Transport & mobility"],
+    comingServices: ["Tourist eVisa"],
+    cards: {
+      events: { title: "Event booking", desc: "Tickets for concerts, shows, matches and experiences in the Saudi seasons, kept in My bookings." },
+      transport: { title: "Transport & mobility", desc: "Trains, buses and metro, ride ordering, airport transfers and car rental." },
+      audio: { title: "Audio guide", desc: "Narrated tours of the main sights in your language, on site and offline." },
+    },
     howTitle: "How it works",
     how: [
       { t: "Plan your trip", d: "Departure city, destination cities, dates and travellers." },
@@ -1885,8 +1890,8 @@ const en: Dictionary = {
     charged: "Charged in Saudi riyals: {amount}",
   },
   audio: {
-    nav: "Audio guides",
-    title: "Audio guides",
+    nav: "Audio guide",
+    title: "Audio guide",
     subtitle: "Narrated tours of the main landmarks in your language: listen on site, get the right clip suggested as you arrive, and download a tour to listen offline.",
     allCities: "All cities",
     city: "City",
@@ -3497,6 +3502,7 @@ const en: Dictionary = {
     support: "Support",
     privacy: "Privacy",
     terms: "Terms & conditions",
+    groups: { services: "Services", help: "Help", legal: "Legal & privacy" },
   },
 };
 

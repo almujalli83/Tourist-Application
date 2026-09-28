@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, ShieldIcon, KaabaIcon, TicketIcon, UserIcon, UsersIcon } from "@/components/icons";
+import { BuildingIcon, BusIcon, CalendarIcon, CheckIcon, ClockIcon, HeadphonesIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, ShieldIcon, KaabaIcon, TicketIcon, UserIcon, UsersIcon } from "@/components/icons";
 import { PrayerHomeCard } from "@/components/prayer/prayer-home-card";
 import type { Locale } from "@/i18n/config";
 import { pageDictionary } from "@/i18n/server";
@@ -107,8 +107,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
               <p className="mt-0.5 text-sm text-slate-600">{t.guides.serviceCard}</p>
             </div>
           </Link>
-          {t.home.comingServices.map((s, i) => {
-            const Icon = [PassportIcon, TicketIcon, PlaneIcon, UserIcon][i] ?? TicketIcon;
+          {([["events", TicketIcon], ["transport", BusIcon], ["audio", HeadphonesIcon]] as const).map(([key, Icon]) => (
+            <Link key={key} href={`/${locale}/${key}`} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:shadow-md" data-testid={`${key}-service`}>
+              <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><Icon className="size-5" /></div>
+              <div className="flex-1">
+                <p className="font-semibold text-ink">{t.home.cards[key].title}</p>
+                <p className="mt-0.5 text-sm text-slate-600">{t.home.cards[key].desc}</p>
+              </div>
+            </Link>
+          ))}
+          {t.home.comingServices.map((s) => {
+            const Icon = PassportIcon; // the tourist eVisa on its own
             return (
               <div key={s} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white/60 p-5">
                 <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"><Icon className="size-5" /></div>
