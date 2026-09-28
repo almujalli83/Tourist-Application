@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
-import { cityName } from "@/lib/data/cities";
+import { cityName, ORIGIN_CITIES } from "@/lib/data/cities";
 import { fmtDay, fmtKsa } from "@/lib/events/format";
-import { matchingFlight, nextSteps, stayWindow } from "@/lib/standalone/next-steps";
+import { matchingFlight, nextSteps, stayWindow, tripFlightsHref } from "@/lib/standalone/next-steps";
 import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 import type { HotelOffer } from "@/lib/types";
 import { useApp } from "../app-provider";
@@ -23,7 +23,7 @@ interface Data { stay: StayOrder; cancel: { allowed: boolean; refundSAR: number;
 
 /** A hotel booked without a package: the voucher, cancellation, date changes and "complete your trip". */
 export function StayView({ id }: { id: string }) {
-  const { t, locale, money } = useApp();
+  const { t, locale, money, user } = useApp();
   const s = t.standalone;
   const v = s.stay;
   const ar = locale === "ar";
@@ -91,6 +91,10 @@ export function StayView({ id }: { id: string }) {
   // A multi-city trip: the other hotels, the next city, and the flight home from the last one.
   const tripStays = o.trip ? siblings.filter((x) => x.trip?.id === o.trip!.id).sort((a, b) => a.trip!.index - b.trip!.index) : [];
   const nextStay = tripStays.find((x) => x.trip!.index === o.trip!.index + 1 && x.status === "confirmed");
+  // Flights for the whole trip: from the traveller's country (or home in the Kingdom) and back.
+  const origin = o.entry === "citizen" || o.entry === "resident" ? "RUH" : ORIGIN_CITIES.find((c) => c.country === user?.individual?.nationality)?.code ?? ORIGIN_CITIES[0].code;
+  const liveTrip = tripStays.filter((x) => x.status === "confirmed");
+  const tripFlights = liveTrip.length > 1 && !flight ? tripFlightsHref(liveTrip, o.entry, origin) : null;
   const lastOut = tripStays.filter((x) => x.status === "confirmed").reduce((d, x) => (x.hotel.checkOut > d ? x.hotel.checkOut : d), h.checkOut);
 
   return (
@@ -193,6 +197,7 @@ export function StayView({ id }: { id: string }) {
           steps={nextSteps(trip, {
             stay: true, flight: !!flight || (o.trip?.index ?? 0) > 0, hotelName: ar ? h.nameAr : h.nameEn,
             ...(o.trip ? { backDate: lastOut } : {}),
+            ...(tripFlights ? { tripFlights: { href: tripFlights, count: new URLSearchParams(tripFlights.split("?")[1]).getAll("leg").length } } : {}),
             ...(nextStay ? { onward: { to: nextStay.hotel.city, date: nextStay.hotel.checkIn } } : {}),
           })}
           city={h.city} from={h.checkIn} to={h.checkOut}

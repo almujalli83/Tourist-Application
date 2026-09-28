@@ -8,7 +8,7 @@ import type { PublicUser } from "@/lib/auth/types";
 import { addDays } from "@/lib/dates";
 import { getAccount, ksaDate } from "@/lib/loyalty/loyalty";
 import { stopoverProblem, validDocNo } from "@/lib/standalone/entry";
-import { bookFlights, cancelFlightOrder, checkItinerary, flightCancelTerms, flightReminders, legKind, paxTypeOk, searchStandaloneFlights } from "@/lib/standalone/flights";
+import { bookFlights, cancelFlightOrder, cancelFlightSegment, checkItinerary, flightCancelTerms, FlightLegError, flightReminders, legKind, paxTypeOk, searchStandaloneFlights, segmentCancelTerms } from "@/lib/standalone/flights";
 import { AgentBookingError } from "@/lib/agents/provider";
 import { AGENTS } from "@/lib/agents/registry";
 import { bookStay, bookStayTrip, cancelStay, changeStayDates, quoteStayChange, searchStays, stayCancelTerms, stayReminders, StayTripError, validateStayQuery, validateTripLegs } from "@/lib/standalone/stays";
@@ -289,5 +289,81 @@ describe("multi-city hotel trips", () => {
     legs[1].expectedTotalSAR = legs[1].offer.totalSAR - 10;
     const err = await bookStayTrip(user(), { entry: "evisa", rooms, lead, legs, card }).catch((e) => e);
     expect(err).toMatchObject({ code: "priceChanged", leg: 1 });
+  });
+});
+
+describe("multi-city flights", () => {
+  const pax = { adults: 1, children: 0, infants: 0 };
+  const visitor = { type: "adult", nameEn: "John Smith", nationality: "GB", docType: "passport", docNo: "123456789", birthDate: "1985-03-02", passportExpiry: "2035-01-01" };
+  const contact = { email: "a@example.com", phone: "+966501234567" };
+  /** Cairo → Riyadh → AlUla → Jeddah → Cairo, a few days apart; refundable fares when offered. */
+  async function trip(start = 30) {
+    const route = [["CAI", "RUH", 0], ["RUH", "ULH", 3], ["ULH", "JED", 5], ["JED", "CAI", 8]] as const;
+    return Promise.all(route.map(async ([from, to, d]) => {
+      const res = await searchStandaloneFlights({ from, to, date: addDays(today(), start + d), pax, cabin: "economy" });
+      return res.offers.find((o) => o.refundable) ?? res.offers[0];
+    }));
+  }
+  const sum = (offers: FlightOffer[]) => Math.round(offers.reduce((a, o) => a + o.totalSAR, 0) * 100) / 100;
+
+  it("checks the order, the connections and the number of flights", async () => {
+    const offers = await trip();
+    expect(checkItinerary("multicity", offers, "evisa")).toBe("international");
+    expect(() => checkItinerary("multicity", offers.slice(0, 1), "evisa")).toThrow("itinerary");
+    expect(() => checkItinerary("multicity", [offers[1], offers[0]], "evisa")).toThrow("itinerary");
+    expect(() => checkItinerary("multicity", offers, "stopover")).toThrow("stopoverEntry");
+    const tooSoon = { ...offers[1], departAt: offers[0].arriveAt };
+    let leg = -1;
+    try {
+      checkItinerary("multicity", [offers[0], tooSoon], "evisa");
+    } catch (e) {
+      leg = (e as FlightLegError).leg;
+    }
+    expect(leg).toBe(1);
+  });
+
+  it("issues every flight with one payment; each flight can then be cancelled on its own", async () => {
+    const u = user();
+    const offers = await trip();
+    const order = await bookFlights(u, { entry: "evisa", tripType: "multicity", offers, passengers: [visitor], contact, expectedTotalSAR: sum(offers), card });
+    expect(order).toMatchObject({ tripType: "multicity", scope: "international", status: "confirmed" });
+    expect(order.segments).toHaveLength(4);
+    expect(new Set(order.segments.map((sg) => sg.pnr)).size).toBe(4);
+    // Whole-booking terms still work; one flight alone:
+    const t1 = segmentCancelTerms(order, 1);
+    expect(t1).toEqual({ allowed: true, refundSAR: offers[1].refundable ? order.segments[1].priceSAR : 0 });
+    const after = await cancelFlightSegment(u, order.id, 1);
+    expect(after.status).toBe("confirmed");
+    expect(after.segments[1].cancellation?.refundSAR).toBe(t1.refundSAR);
+    expect(after.segments.filter((sg) => !sg.cancellation)).toHaveLength(3);
+    await expect(cancelFlightSegment(u, order.id, 1)).rejects.toThrow("cannotCancel");
+    // The rest: the booking ends cancelled with every refund counted.
+    const all = await cancelFlightOrder(u, order.id);
+    expect(all.status).toBe("cancelled");
+    const refundable = order.segments.filter((sg) => sg.offer.refundable).reduce((a, sg) => a + sg.priceSAR, 0);
+    expect(all.cancellation!.refundSAR).toBeCloseTo(refundable, 2);
+  });
+
+  it("all or nothing: a flight that can't be ticketed voids the others and names it", async () => {
+    const u = user();
+    const offers = await trip(35);
+    const spies = AGENTS.map((a) => {
+      const real = a.issueFlight.bind(a);
+      return vi.spyOn(a, "issueFlight").mockImplementation(async (b) => (b.offer.from === "ULH" ? Promise.reject(new AgentBookingError("rejected")) : real(b)));
+    });
+    const cancels = AGENTS.map((a) => vi.spyOn(a, "cancelFlight"));
+    const err = await bookFlights(u, { entry: "evisa", tripType: "multicity", offers, passengers: [visitor], contact, expectedTotalSAR: sum(offers), card }).catch((e) => e);
+    expect(err).toBeInstanceOf(FlightLegError);
+    expect(err).toMatchObject({ code: "agentRejected", leg: 2 });
+    expect(cancels.reduce((a, c) => a + c.mock.calls.length, 0)).toBe(2);
+    expect(await store().findBy("flightOrders", "userId", u.id)).toHaveLength(0);
+    [...spies, ...cancels].forEach((x) => x.mockRestore());
+  });
+
+  it("only multi-city trips cancel one flight at a time", async () => {
+    const u = user();
+    const offers = (await trip(40)).slice(0, 1);
+    const order = await bookFlights(u, { entry: "evisa", tripType: "oneway", offers, passengers: [visitor], contact, expectedTotalSAR: sum(offers), card });
+    expect(segmentCancelTerms(order, 0).allowed).toBe(false);
   });
 });

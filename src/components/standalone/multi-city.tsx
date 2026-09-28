@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/i18n";
 import { cityName, MAKKAH, SAUDI_CITIES, UMRAH_CITY } from "@/lib/data/cities";
 import { fmtDay, fmtKsa } from "@/lib/events/format";
@@ -49,6 +49,15 @@ export function MultiCityHotels({ entry }: { entry: EntryType }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const form = useLeadForm();
+  // From a multi-city flight booking: ?mode=multi&start=2026-11-07&leg=RUH:3&leg=ULH:2
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const from = p.get("start");
+    const known = new Set([...SAUDI_CITIES, MAKKAH].map((c) => c.code));
+    const list = p.getAll("leg").map((x) => x.split(":")).filter(([c, n]) => known.has(c) && Number(n) >= 1 && Number(n) <= 14).map(([c, n]) => ({ city: c, nights: Number(n) })).slice(0, MAX_CITIES);
+    if (from && /^\d{4}-\d{2}-\d{2}$/.test(from) && from >= ksaToday()) setStart(from);
+    if (list.length >= 2) setLegs(list);
+  }, []);
 
   const dates = useMemo(() => {
     let d = start;
