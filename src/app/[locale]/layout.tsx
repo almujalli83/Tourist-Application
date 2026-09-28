@@ -6,6 +6,7 @@ import { A11Y_BOOT } from "@/components/a11y-tools";
 import { AppProvider } from "@/components/app-provider";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { PrayerAlerts } from "@/components/prayer/prayer-alerts";
+import { PrivacyBanner } from "@/components/privacy-banner";
 import { SosButton } from "@/components/emergency/sos-button";
 import { WeatherBanner } from "@/components/alerts/weather-banner";
 import { SiteFooter } from "@/components/site-footer";
@@ -61,6 +62,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
         <AppProvider locale={locale} uiLang={uiLang} dict={dict} initialCurrency={currency} initialUser={user}>
           <a href="#main" className="skip-link">{dict.a11y.skip}</a>
           <SiteHeader />
+          <PrivacyBanner />
           <WeatherBanner />
           <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">{children}</main>
           <SiteFooter />

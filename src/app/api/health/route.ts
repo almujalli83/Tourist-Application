@@ -1,5 +1,7 @@
 import { AGENTS } from "@/lib/agents/registry";
 import { mtConfig, VISA_INSURANCE_FEE_SAR } from "@/lib/config";
+import { residencyMode } from "@/lib/compliance/residency";
+import { blobConfigured } from "@/lib/files";
 import { json } from "@/lib/http";
 import { ensureSecrets, secretSource } from "@/lib/secrets";
 import { databaseUrl } from "@/lib/store";
@@ -27,7 +29,8 @@ export async function GET() {
       sessionSecret: !secretError && source !== "missing",
       sessionSecretSource: secretError ? "database-error" : source,
       dataEncryptionKey: !!process.env.DATA_ENCRYPTION_KEY?.trim(),
-      fileStorage: process.env.BLOB_READ_WRITE_TOKEN?.trim() ? "vercel-blob" : "database",
+      fileStorage: blobConfigured() ? "vercel-blob" : "database",
+      dataResidency: residencyMode(),
       centralPlatform: process.env.CENTRAL_PLATFORM_URL?.trim() && process.env.CENTRAL_PLATFORM_TOKEN?.trim() ? "live" : "sandbox",
       emailProvider: !!(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_FROM?.trim()),
       adminEmails: (process.env.ADMIN_EMAILS ?? "").split(",").filter((e) => e.trim()).length,

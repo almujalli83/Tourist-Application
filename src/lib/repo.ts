@@ -1,6 +1,7 @@
 /** Repositories over the document store (users, bookings, sandbox MT state). */
 import type { StoredUser } from "./auth/types";
 import type { StoredBooking } from "./bookings/types";
+import { recordPrivacyAck } from "./compliance/consent";
 import { store } from "./store";
 
 export interface SandboxPackage {
@@ -21,12 +22,17 @@ export async function getUserByEmail(email: string) {
   return ref ? getUserById(ref.userId) : null;
 }
 
-/** Creates a user; returns null when the email is already registered. */
+/**
+ * Creates a user; returns null when the email is already registered. Every sign-up form shows
+ * the privacy notice, so its acknowledgement is recorded with the account.
+ */
 export async function createUser(user: StoredUser): Promise<StoredUser | null> {
   const s = store();
   if (!(await s.insert("userEmails", user.email.toLowerCase(), { userId: user.id }))) return null;
-  await s.put("users", user.id, user);
-  return user;
+  const privacy = await recordPrivacyAck(user.id, "signup");
+  const withAck = { ...user, privacy };
+  await s.put("users", user.id, withAck);
+  return withAck;
 }
 
 export function updateUser(id: string, fn: (u: StoredUser) => StoredUser) {

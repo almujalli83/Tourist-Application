@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { fmt } from "@/i18n";
+import { PrivacyNotice } from "./privacy-notice";
 import { useApp } from "./app-provider";
 import { CountrySelect } from "./booking/country-select";
 import { CheckIcon, Logo } from "./icons";
@@ -56,6 +57,7 @@ function Inner() {
       </Field>
       <Field label={a.nationality}><CountrySelect value={f.nationality} onChange={(v) => setF({ ...f, nationality: v })} /></Field>
       {err && <Alert tone="error">{err}</Alert>}
+      <PrivacyNotice />
       <Button type="submit" className="w-full" loading={busy} data-testid="cs-submit">{a.createAccount}</Button>
     </form>
   );

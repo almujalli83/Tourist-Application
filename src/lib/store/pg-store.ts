@@ -70,6 +70,11 @@ export function createPgStore(url: string): DocStore {
       const rows = await sql`select data from documents where collection = ${col} order by updated_at desc limit ${limit}`;
       return rows.map((r) => r.data) as never;
     },
+    async entries(col) {
+      await init();
+      const rows = await sql`select id, data from documents where collection = ${col}`;
+      return rows.map((r) => ({ id: r.id as string, doc: r.data })) as never;
+    },
     async delete(col, id) {
       await init();
       const rows = await sql`delete from documents where collection = ${col} and id = ${id} returning id`;

@@ -5,8 +5,10 @@
  * with ASSISTANT_MODEL. Refusals fall back server-side to another model ("default" routing).
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { crossBorderAllowed } from "../compliance/residency";
 
-export const aiConfigured = () => !!(process.env.ANTHROPIC_API_KEY?.trim() || process.env.ANTHROPIC_AUTH_TOKEN?.trim());
+/** Also off when data must stay in the Kingdom (DATA_RESIDENCY=ksa) unless allowed. */
+export const aiConfigured = () => !!(process.env.ANTHROPIC_API_KEY?.trim() || process.env.ANTHROPIC_AUTH_TOKEN?.trim()) && crossBorderAllowed("ai");
 export const aiModel = () => process.env.ASSISTANT_MODEL?.trim() || "claude-opus-5";
 
 let client: Anthropic | null = null;

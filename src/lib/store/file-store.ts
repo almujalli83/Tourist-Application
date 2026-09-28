@@ -61,6 +61,7 @@ export function createFileStore(file: string): DocStore {
         return clone(c[id]) as never;
       }, true),
     list: (col, limit = 500) => run((d) => Object.values(d[col] ?? {}).slice(-limit).reverse().map(clone) as never, false),
+    entries: (col) => run((d) => Object.entries(d[col] ?? {}).map(([id, doc]) => ({ id, doc: clone(doc) })) as never, false),
     delete: (col, id) =>
       run((d) => {
         const c = d[col] ?? {};
