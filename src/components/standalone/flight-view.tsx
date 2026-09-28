@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
-import { getCity } from "@/lib/data/cities";
+import { cityName, getCity } from "@/lib/data/cities";
 import { fmtDay } from "@/lib/events/format";
-import type { FlightOrder } from "@/lib/standalone/types";
+import { flightAirportLegs, flightWindow, matchingStay, nextSteps } from "@/lib/standalone/next-steps";
+import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
 import { PlaneIcon } from "../icons";
 import { ReceiptLink } from "../payments/receipt-link";
 import { PrintButton } from "../print-button";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
+import { CompleteTrip } from "./complete-trip";
 import { errText } from "./shell";
 
 interface Data { order: FlightOrder; cancel: { allowed: boolean; refundSAR: number } }
@@ -25,6 +27,10 @@ export function FlightView({ id }: { id: string }) {
   const [data, setData] = useState<Data | null | "missing">(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [stays, setStays] = useState<StayOrder[]>([]);
+  useEffect(() => {
+    fetch("/api/stays", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { stays: [] })).then((d) => setStays(d.stays ?? [])).catch(() => undefined);
+  }, []);
   const load = () => fetch(`/api/flights/${id}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : "missing")).then(setData).catch(() => setData("missing"));
   useEffect(() => void load(), [id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (data === "missing") return <Alert tone="error">{s.errors.notFound}</Alert>;
@@ -49,6 +55,17 @@ export function FlightView({ id }: { id: string }) {
   }
 
   const [first, second] = o.segments;
+  // The city flown to (the transit city for a stopover) and every Saudi airport end fill in the next services.
+  const trip = flightWindow(o);
+  const stay = trip ? matchingStay(trip, stays) : undefined;
+  const nowKsa = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 16);
+  const legs = flightAirportLegs(o).filter((l) => l.at > nowKsa);
+  const upcoming = legs.length > 0;
+  const steps = trip
+    ? nextSteps(trip, { stay: !!stay, flight: true, hotelName: stay ? (ar ? stay.hotel.nameAr : stay.hotel.nameEn) : undefined }, legs)
+        // A stopover's hotel has its own button above.
+        .filter((st) => !(st.key === "hotel" && o.tripType === "stopover"))
+    : legs.map((leg) => ({ key: "transfer" as const, leg, href: `/transport?transfer=${leg.direction}&airport=${leg.airport}&flight=${leg.flightNo}&at=${leg.at}&pax=${Math.min(8, o.passengers.length)}#transfer` }));
   return (
     <div className="space-y-4" data-testid="flight-view">
       <BackLink href={`/${locale}/account`} label={t.account.title} />
@@ -97,6 +114,14 @@ export function FlightView({ id }: { id: string }) {
           )}
         </div>
       </Card>
+      {live && upcoming && (
+        <CompleteTrip
+          testId="flight-complete"
+          steps={steps}
+          city={trip?.city} from={trip?.from} to={trip?.to}
+          have={stay ? [{ label: fmt(s.next.yourHotel, { city: cityName(stay.hotel.city, locale), name: ar ? stay.hotel.nameAr : stay.hotel.nameEn }), href: `/account/stays/${stay.id}` }] : []}
+        />
+      )}
       {live && (
         <Card className="space-y-2 p-5 text-sm print:hidden">
           {data.cancel.allowed ? (

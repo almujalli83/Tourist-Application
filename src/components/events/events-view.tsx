@@ -13,7 +13,7 @@ import { CalendarIcon, MapPinIcon, SearchIcon, TicketIcon } from "../icons";
 import { Alert, Badge, Card, cx, Spinner } from "../ui";
 
 export type EventSummary = EventItem & { minPriceSAR: number };
-type When = "any" | "today" | "weekend" | "week" | "trip";
+type When = "any" | "today" | "weekend" | "week" | "trip" | "dates";
 interface Trip { cities: string[]; from: string; to: string }
 
 /** Accent colour per category (event cards without a season colour). */
@@ -33,6 +33,8 @@ export function EventsView() {
   const [when, setWhen] = useState<When>("any");
   const [category, setCategory] = useState<EventCategory | "all">("all");
   const [q, setQ] = useState("");
+  // Dates given in the link ("complete your trip" from a hotel or flight booking).
+  const [dates, setDates] = useState<[string, string] | null>(null);
   const today = ksaDay(new Date());
 
   useEffect(() => {
@@ -41,6 +43,12 @@ export function EventsView() {
     if (s) setSeason(s);
     const c = params.get("city");
     if (c) setCity(c.toUpperCase());
+    const from = params.get("from") ?? "";
+    const to = params.get("to") ?? "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && to >= from) {
+      setDates([from, to]);
+      setWhen("dates");
+    }
     fetch("/api/events", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setData)
@@ -64,8 +72,9 @@ export function EventsView() {
     if (when === "weekend") return weekendRange(today);
     if (when === "week") return [today, addDaysISO(today, 7)];
     if (when === "trip" && data?.trip) return [data.trip.from, data.trip.to];
+    if (when === "dates" && dates) return dates;
     return null;
-  }, [when, today, data?.trip]);
+  }, [when, today, data?.trip, dates]);
 
   const results = useMemo(() => {
     if (!data) return null;
@@ -157,8 +166,8 @@ export function EventsView() {
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {(["any", "today", "weekend", "week", ...(data.trip ? ["trip" as const] : [])] as When[]).map((w) => (
-            <Chip key={w} active={when === w} onClick={() => setWhen(w)}>{ev.when[w]}</Chip>
+          {(["any", "today", "weekend", "week", ...(data.trip ? ["trip" as const] : []), ...(dates ? ["dates" as const] : [])] as When[]).map((w) => (
+            <Chip key={w} active={when === w} onClick={() => setWhen(w)}>{w === "dates" && dates ? fmt(ev.when.dates, { from: fmtDay(dates[0], locale, { day: "numeric", month: "short" }), to: fmtDay(dates[1], locale, { day: "numeric", month: "short" }) }) : ev.when[w]}</Chip>
           ))}
         </div>
         {when === "trip" && data.trip && (

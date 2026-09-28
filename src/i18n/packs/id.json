@@ -780,6 +780,7 @@
  "events.when.any": "Kapan saja",
  "events.when.today": "Hari ini",
  "events.when.trip": "Selama perjalanan saya",
+ "events.when.dates": "Selama menginap ({from} – {to})",
  "events.when.week": "7 hari ke depan",
  "events.when.weekend": "Akhir pekan ini",
  "family.active": "Bergabung",
