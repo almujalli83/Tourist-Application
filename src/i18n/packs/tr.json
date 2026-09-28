@@ -780,6 +780,7 @@
  "events.when.any": "Her zaman",
  "events.when.today": "Bugün",
  "events.when.trip": "Seyahatim sırasında",
+ "events.when.dates": "Konaklamanız boyunca ({from} – {to})",
  "events.when.week": "Önümüzdeki 7 gün",
  "events.when.weekend": "Bu hafta sonu",
  "family.active": "Katıldı",

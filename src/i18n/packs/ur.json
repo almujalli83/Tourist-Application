@@ -780,6 +780,7 @@
  "events.when.any": "کسی بھی وقت",
  "events.when.today": "آج",
  "events.when.trip": "میرے سفر کے دوران",
+ "events.when.dates": "آپ کے قیام کے دوران ({from} – {to})",
  "events.when.week": "اگلے 7 دن",
  "events.when.weekend": "اس ویک اینڈ",
  "family.active": "شامل",

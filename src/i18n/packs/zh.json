@@ -780,6 +780,7 @@
  "events.when.any": "任何时间",
  "events.when.today": "今天",
  "events.when.trip": "在我的行程期间",
+ "events.when.dates": "您的住宿期间（{from} – {to}）",
  "events.when.week": "未来7天",
  "events.when.weekend": "本周末",
  "family.active": "已加入",

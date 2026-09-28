@@ -57,6 +57,23 @@ export function FlightsView() {
       setQ((x) => ({ ...x, from: SAUDI.has(x.from) ? "CAI" : x.from, via: SAUDI.has(x.via) ? x.via : "RUH", to: SAUDI.has(x.to) ? "DXB" : x.to, back: ksaDay(12) }));
     } else if (trip === "stopover") setTrip("oneway");
   }, [entry]); // eslint-disable-line react-hooks/exhaustive-deps
+  // "Complete your trip" from a hotel booking: ?to=JED&date=…&back=…&trip=return
+  useEffect(() => {
+    const p = new URLSearchParams(location.search);
+    const known = (c: string | null) => !!c && (SAUDI.has(c) || ORIGIN_CITIES.some((o) => o.code === c));
+    const day = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= ksaDay(0) ? d : null);
+    const to = p.get("to");
+    const from = p.get("from");
+    const date = day(p.get("date"));
+    const back = day(p.get("back"));
+    if (!known(to) && !date) return;
+    if (p.get("trip") === "return" && back) setTrip("return");
+    setQ((x) => {
+      const dest = known(to) ? to! : x.to;
+      const origin = known(from) && from !== dest ? from! : x.from !== dest ? x.from : dest === "RUH" ? "JED" : "RUH";
+      return { ...x, to: dest, from: origin, ...(date ? { date } : {}), ...(back && (!date || back > date) ? { back } : {}) };
+    });
+  }, []);
   useEffect(() => {
     if (!user) return;
     setContact((c) => ({ email: c.email || user.email, phone: c.phone || user.individual?.phone || user.company?.phone || "" }));

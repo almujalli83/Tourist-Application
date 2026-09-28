@@ -780,6 +780,7 @@
  "events.when.any": "À tout moment",
  "events.when.today": "Aujourd'hui",
  "events.when.trip": "Pendant mon voyage",
+ "events.when.dates": "Pendant votre séjour ({from} – {to})",
  "events.when.week": "7 prochains jours",
  "events.when.weekend": "Ce week-end",
  "family.active": "A rejoint",

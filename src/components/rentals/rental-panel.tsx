@@ -19,6 +19,15 @@ export function RentalPanel({ city }: { city: string }) {
   const r = t.rentals;
   const [done, setDone] = useState<PublicRental | null>(null);
   const [key, setKey] = useState(0);
+  // "Complete your trip" links bring the stay's pickup and return times: ?pickupAt=…&returnAt=…#rental
+  const [times, setTimes] = useState<Pick<RentalQuery, "pickupAt" | "returnAt"> | null>(null);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const ok = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v);
+    const pickupAt = p.get("pickupAt");
+    const returnAt = p.get("returnAt");
+    if (ok(pickupAt) && ok(returnAt) && returnAt! > pickupAt!) setTimes({ pickupAt: pickupAt!, returnAt: returnAt! });
+  }, []);
   return (
     <section id="rental" className="grid gap-4 lg:grid-cols-3" data-testid="rental-panel">
       <Card className="space-y-4 p-5 lg:col-span-2">
@@ -33,7 +42,7 @@ export function RentalPanel({ city }: { city: string }) {
             <button type="button" className="ms-3 text-xs underline" onClick={() => { setDone(null); setKey(key + 1); }}>{r.search}</button>
           </Alert>
         ) : (
-          <RentalSearch key={`${city}-${key}`} initial={{ city, dropoffCity: city }} onDone={setDone} />
+          <RentalSearch key={`${city}-${key}-${times?.pickupAt ?? ""}`} initial={{ city, dropoffCity: city, ...(times ?? {}) }} onDone={setDone} />
         )}
       </Card>
       <DrivingTips />

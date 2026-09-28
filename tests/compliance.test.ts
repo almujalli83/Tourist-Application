@@ -201,8 +201,13 @@ describe("data residency", () => {
 describe("security headers and disclosure", () => {
   it("sends a CSP and the standard security headers on every path", async () => {
     const rules = await nextConfig.headers!();
-    const h = Object.fromEntries(rules[0].headers.map((x) => [x.key, x.value]));
+    const h = Object.fromEntries(rules.flatMap((r) => r.headers.map((x) => [x.key, x.value])));
     expect(rules[0].source).toBe("/:path*");
+    // The CSP rule covers every path except the sandboxed SVG logos, which set a stricter one.
+    const csp = rules.find((r) => r.headers.some((x) => x.key === "Content-Security-Policy"))!;
+    const pattern = new RegExp(`^${csp.source.replace("/:path", "/")}$`);
+    expect(["/", "/ar", "/ar/hotels", "/api/rentals"].every((p) => pattern.test(p))).toBe(true);
+    expect(pattern.test("/api/rentals/logo/avis")).toBe(false);
     expect(h["Content-Security-Policy"]).toMatch(/frame-ancestors 'self'/);
     expect(h["Content-Security-Policy"]).toMatch(/object-src 'none'/);
     expect(h["Strict-Transport-Security"]).toMatch(/max-age=\d{8}/);

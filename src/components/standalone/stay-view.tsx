@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
 import { fmtDay, fmtKsa } from "@/lib/events/format";
-import type { StayOrder } from "@/lib/standalone/types";
+import { matchingFlight, nextSteps, stayWindow } from "@/lib/standalone/next-steps";
+import type { FlightOrder, StayOrder } from "@/lib/standalone/types";
 import type { HotelOffer } from "@/lib/types";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
@@ -14,6 +14,7 @@ import { Checkout, type PaymentRef } from "../payments/checkout";
 import { ReceiptLink } from "../payments/receipt-link";
 import { PrintButton } from "../print-button";
 import { RideMenu } from "../transport/ride-menu";
+import { CompleteTrip } from "./complete-trip";
 import { Alert, Badge, Button, Card, Field, Input, Spinner, Stars } from "../ui";
 import { errText } from "./shell";
 
@@ -31,8 +32,12 @@ export function StayView({ id }: { id: string }) {
   const [changing, setChanging] = useState(false);
   const [dates, setDates] = useState({ checkIn: "", checkOut: "" });
   const [quote, setQuote] = useState<{ offer: HotelOffer; differenceSAR: number } | null>(null);
+  const [flights, setFlights] = useState<FlightOrder[]>([]);
   const load = () => fetch(`/api/stays/${id}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : "missing")).then(setData).catch(() => setData("missing"));
   useEffect(() => void load(), [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetch("/api/flights", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { orders: [] })).then((d) => setFlights(d.orders ?? [])).catch(() => undefined);
+  }, []);
   if (data === "missing") return <Alert tone="error">{s.errors.notFound}</Alert>;
   if (!data) return <div className="grid h-40 place-items-center text-brand-700"><Spinner className="size-6" /></div>;
   const o = data.stay;
@@ -76,10 +81,10 @@ export function StayView({ id }: { id: string }) {
     return true;
   }
 
-  const links = [
-    { key: "transfer", href: `/transport?city=${h.city}` }, { key: "rental", href: `/transport?city=${h.city}#rental` }, { key: "events", href: `/events?city=${h.city}` },
-    { key: "restaurants", href: `/restaurants?city=${h.city}` }, { key: "guides", href: `/guides?city=${h.city}` }, { key: "esim", href: "/esim" }, { key: "prayer", href: "/prayer" },
-  ] as const;
+  // The stay's city and dates (and its flights, when booked here) fill in the next services.
+  const trip = stayWindow(o, flights);
+  const flight = matchingFlight(trip, flights);
+  const route = (f: FlightOrder) => f.segments.map((sg) => `${sg.offer.from}–${sg.offer.to}`).join(" · ");
 
   return (
     <div className="space-y-4" data-testid="stay-view">
@@ -157,13 +162,13 @@ export function StayView({ id }: { id: string }) {
         </Card>
       )}
 
-      {live && (
-        <Card className="space-y-3 p-5 print:hidden" data-testid="stay-complete">
-          <h2 className="font-bold">{v.complete}</h2>
-          <div className="flex flex-wrap gap-2">
-            {links.map((l) => <Link key={l.key} href={`/${locale}${l.href}`} className="inline-flex h-9 items-center rounded-lg bg-white px-3 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">{v.completeLinks[l.key]}</Link>)}
-          </div>
-        </Card>
+      {live && h.checkOut > new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10) && (
+        <CompleteTrip
+          testId="stay-complete"
+          steps={nextSteps(trip, { stay: true, flight: !!flight, hotelName: ar ? h.nameAr : h.nameEn })}
+          city={h.city} from={h.checkIn} to={h.checkOut}
+          have={flight ? [{ label: fmt(s.next.yourFlight, { ref: flight.reference, route: route(flight) }), href: `/account/flights/${flight.id}` }] : []}
+        />
       )}
     </div>
   );
