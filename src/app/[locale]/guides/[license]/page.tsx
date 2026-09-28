@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { GuideProfile } from "@/components/guides/guide-profile";
-import { getDictionary } from "@/i18n";
 import type { Locale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 import { getGuide } from "@/lib/guides/guides";
 import { guideQrSvg } from "@/lib/guides/qr";
 
@@ -13,7 +13,7 @@ export default async function GuidePage({ params }: { params: Promise<{ locale: 
   const g = await getGuide(license);
   if (!g) {
     // Unknown or no longer licensed: hidden; the licence check tells which.
-    const t = getDictionary(locale);
+    const t = await pageDictionary(locale);
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center" data-testid="guide-unavailable">
         <p className="text-lg font-bold">{t.guides.errors.guideUnavailable}</p>

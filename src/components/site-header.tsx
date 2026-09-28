@@ -5,8 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CURRENCIES } from "@/lib/currency";
 import { A11yTools } from "./a11y-tools";
+import { LanguageMenu } from "./language-menu";
 import { useApp } from "./app-provider";
-import { ChevronIcon, GlobeIcon, Logo, MenuIcon, UserIcon, XIcon } from "./icons";
+import { ChevronIcon, Logo, MenuIcon, UserIcon, XIcon } from "./icons";
 import { PointsChip } from "./loyalty/points-chip";
 import { NotificationBell } from "./notification-bell";
 import { cx } from "./ui";
@@ -18,8 +19,6 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
-  const otherLocale = locale === "ar" ? "en" : "ar";
-  const switchHref = pathname.replace(/^\/(ar|en)(?=\/|$)/, `/${otherLocale}`);
 
   const links = [
     { href: `/${locale}`, label: t.nav.home },
@@ -104,7 +103,7 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-0.5 xl:flex 2xl:gap-1">
+        <nav className="hidden items-center gap-0.5 xl:flex 2xl:gap-1" data-wide>
           {links.map((l) => (
             <Link
               key={l.href}
@@ -120,17 +119,12 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 xl:flex">
+          <div className="hidden items-center gap-2 xl:flex" data-wide>
             {currencySelect}
-            <Link href={switchHref} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-medium hover:bg-white/10 2xl:px-3" hrefLang={otherLocale} aria-label={t.nav.language}>
-              <GlobeIcon className="size-4" />
-              <span className="hidden 2xl:inline">{t.nav.language}</span>
-              <span className="2xl:hidden">{otherLocale === "en" ? "EN" : "ع"}</span>
-            </Link>
           </div>
           {user && <PointsChip className="hidden sm:flex xl:hidden" />}
           {user && <NotificationBell />}
-          <div className="hidden xl:block">
+          <div className="hidden xl:block" data-wide>
             {user ? (
               <div className="relative" ref={accountRef}>
                 <button
@@ -168,8 +162,9 @@ export function SiteHeader() {
               </Link>
             )}
           </div>
+          <LanguageMenu />
           <A11yTools />
-          <div className="xl:hidden">
+          <div className="xl:hidden" data-compact>
             <button className="grid size-10 place-items-center rounded-md hover:bg-white/10" onClick={() => setOpen((o) => !o)} aria-label={t.nav.menu} aria-expanded={open}>
               {open ? <XIcon className="size-6" /> : <MenuIcon className="size-6" />}
             </button>
@@ -178,7 +173,7 @@ export function SiteHeader() {
       </div>
 
       {open && (
-        <div className="border-t border-white/10 bg-brand-900 px-4 pb-4 xl:hidden">
+        <div className="border-t border-white/10 bg-brand-900 px-4 pb-4 xl:hidden" data-compact>
           <nav className="flex flex-col py-2">
             {links.map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="rounded-md px-3 py-3 text-base font-medium hover:bg-white/10">
@@ -199,10 +194,6 @@ export function SiteHeader() {
           </nav>
           <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-3">
             {currencySelect}
-            <Link href={switchHref} onClick={() => setOpen(false)} className="flex h-9 items-center gap-1.5 rounded-md bg-white/10 px-3 text-sm font-medium">
-              <GlobeIcon className="size-4" />
-              {t.nav.language}
-            </Link>
           </div>
         </div>
       )}

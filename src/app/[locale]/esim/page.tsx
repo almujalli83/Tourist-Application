@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { EsimView } from "@/components/esim/esim-view";
-import { getDictionary } from "@/i18n";
 import { isLocale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   return { title: t.esim.title, description: t.esim.subtitle };
 }
 

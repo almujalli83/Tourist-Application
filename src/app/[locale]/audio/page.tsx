@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { AudioTours } from "@/components/audio/audio-tours";
-import { getDictionary } from "@/i18n";
 import { isLocale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   return { title: t.audio.title, description: t.audio.subtitle };
 }
 

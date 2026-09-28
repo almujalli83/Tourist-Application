@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { PrintButton } from "@/components/print-button";
-import { fmt, getDictionary } from "@/i18n";
+import { fmt } from "@/i18n";
 import type { Locale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 import { currentUser } from "@/lib/auth/session";
 import { getBooking } from "@/lib/bookings/service";
 import { cityName } from "@/lib/data/cities";
@@ -19,7 +20,7 @@ export default async function BookingDocumentsPage({ params, searchParams }: {
   if (!user) redirect(`/${locale}/login?next=/${locale}/account/wallet`);
   const b = await getBooking(user.id, bookingId);
   if (!b) notFound();
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   const d = t.wallet.doc;
   const { person } = await searchParams;
   const passengers = b.applicants.filter((a) => !person || passportKey(a) === person);

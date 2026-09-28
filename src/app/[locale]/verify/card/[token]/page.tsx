@@ -1,6 +1,7 @@
-import { getDictionary } from "@/i18n";
+
 import { fmt } from "@/i18n";
 import type { Locale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 import { verifyCardToken } from "@/lib/card/card";
 import { countryName } from "@/lib/data/countries";
 import { fmtDay, fmtKsa } from "@/lib/events/format";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 /** Public page opened by scanning a digital tourist card: the result and the minimum data. */
 export default async function VerifyCardPage({ params }: { params: Promise<{ locale: Locale; token: string }> }) {
   const { locale, token } = await params;
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   const v = t.card.verify;
   const r = await verifyCardToken(token);
   const ok = r.result === "valid";

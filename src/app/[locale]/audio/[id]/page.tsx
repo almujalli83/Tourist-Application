@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { TourPlayer } from "@/components/audio/tour-player";
-import { getDictionary } from "@/i18n";
 import { isLocale } from "@/i18n/config";
+import { pageDictionary } from "@/i18n/server";
 import { getTour } from "@/lib/audio/tours";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; id: string }> }): Promise<Metadata> {
   const { locale, id } = await params;
   if (!isLocale(locale)) return {};
-  const t = getDictionary(locale);
+  const t = await pageDictionary(locale);
   const tour = await getTour(id).catch(() => null);
   if (!tour || tour.status !== "published") return { title: t.audio.title };
   return { title: `${locale === "ar" ? tour.titleAr : tour.titleEn} — ${t.audio.title}`, description: locale === "ar" ? tour.summaryAr : tour.summaryEn };
