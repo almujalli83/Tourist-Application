@@ -13,6 +13,8 @@ export interface HotelSearchRequest {
   pax: PaxCount;
   /** Rooms to book and their guests (adults 18+, children's ages). */
   rooms: RoomOccupancy[];
+  /** Standalone booking (no package): pay-at-hotel rates may be offered besides prepaid ones. */
+  standalone?: boolean;
 }
 
 export interface ActivitySearchRequest {
@@ -20,6 +22,29 @@ export interface ActivitySearchRequest {
   from: string;
   to: string;
   pax: PaxCount;
+}
+
+export interface HotelBookRequest {
+  offer: HotelOffer;
+  /** Our booking reference, sent to the agent. */
+  reference: string;
+  lead: { name: string; email: string; phone: string };
+  rooms: RoomOccupancy[];
+  requests: string;
+}
+
+export interface FlightIssueRequest {
+  offer: FlightOffer;
+  reference: string;
+  passengers: { nameEn: string; type: "adult" | "child" | "infant"; nationality: string; docType: string; docNo: string; birthDate: string }[];
+  contact: { email: string; phone: string };
+}
+
+/** A booking the agent refused (no availability, fare gone…) or couldn't process. */
+export class AgentBookingError extends Error {
+  constructor(public code: "rejected" | "unavailable") {
+    super(code);
+  }
 }
 
 /** Offers returned by a provider before the aggregator stamps them with agent info. */
@@ -35,6 +60,8 @@ export interface TravelAgentProvider {
   id: string;
   nameEn: string;
   nameAr: string;
+  /** Generated test inventory (bookings and tickets are not real). */
+  sandbox?: boolean;
   searchFlights(req: FlightSearchRequest): Promise<(RawFlight & { ref: string })[]>;
   searchHotels(req: HotelSearchRequest): Promise<(RawHotel & { ref: string })[]>;
   searchActivities(req: ActivitySearchRequest): Promise<(RawActivity & { ref: string })[]>;
@@ -49,6 +76,14 @@ export interface TravelAgentProvider {
   requestChange(req: AgentChangeRequest): Promise<{ approved: true; reference: string } | { approved: false; reason: string }>;
   confirmChange(reference: string): Promise<void>;
   releaseChange(reference: string): Promise<void>;
+  /** The same hotel, room and rate on other dates (standalone date changes); null when unavailable. */
+  quoteHotelDates(req: { hotel: HotelOffer; checkIn: string; checkOut: string }): Promise<{ pricePerNightSAR: number; freeCancelUntil: string | null } | null>;
+  /** Standalone hotel booking: the agent's confirmation number. */
+  bookHotel(req: HotelBookRequest): Promise<{ confirmation: string }>;
+  cancelHotel(confirmation: string): Promise<void>;
+  /** Standalone flight: issues the e-tickets (one per passenger) under one PNR. */
+  issueFlight(req: FlightIssueRequest): Promise<{ pnr: string; tickets: string[] }>;
+  cancelFlight(pnr: string): Promise<void>;
 }
 
 export interface AgentChangeRequest {

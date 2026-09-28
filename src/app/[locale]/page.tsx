@@ -65,6 +65,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
             </div>
             <span className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-brand-700 text-sm font-semibold text-white group-hover:bg-brand-800">{t.home.startNow}</span>
           </Link>
+          <Link href={`/${locale}/hotels`} className="group flex items-center gap-4 rounded-2xl border border-brand-600/40 bg-white p-5 transition hover:shadow-md" data-testid="standalone-service">
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-700 text-white"><HotelIcon className="size-5" /></div>
+            <div className="flex-1">
+              <p className="font-semibold text-ink">{t.standalone.title}</p>
+              <p className="mt-0.5 text-sm text-slate-600">{t.standalone.intro}</p>
+            </div>
+          </Link>
           <Link href={`/${locale}/planner`} className="group flex items-center gap-4 rounded-2xl border border-gold-500/40 bg-gold-50 p-5 transition hover:shadow-md">
             <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-gold-500 text-ink"><CalendarIcon className="size-5" /></div>
             <div className="flex-1">

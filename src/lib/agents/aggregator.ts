@@ -110,6 +110,27 @@ export async function quoteHotelExtension(hotel: HotelOffer, newCheckOut: string
   });
 }
 
+/** The same hotel, room and rate on new dates, quoted by the agent that booked it (signed offer). */
+export async function quoteHotelDates(hotel: HotelOffer, checkIn: string, checkOut: string): Promise<HotelOffer | null> {
+  const agent = AGENTS.find((a) => a.id === hotel.agentId);
+  if (!agent || !hotel.rate) return null;
+  const quote = await withTimeout(agent.quoteHotelDates({ hotel, checkIn, checkOut })).catch(() => null);
+  if (!quote) return null;
+  const nights = Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86_400_000);
+  if (nights < 1) return null;
+  const base = hotel.id.replace(/^HD:/, "").split("|dates:")[0];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { sig, expiresAt, ...rest } = hotel;
+  return sign({
+    ...rest,
+    id: `HD:${base}|dates:${checkIn}:${checkOut}`,
+    checkIn, checkOut, nights,
+    pricePerNightSAR: quote.pricePerNightSAR,
+    totalSAR: Math.round(quote.pricePerNightSAR * nights * 100) / 100,
+    rate: { pay: hotel.rate.pay, freeCancelUntil: quote.freeCancelUntil },
+  });
+}
+
 /** Change fee (all tickets) for moving a ticket to another date or route, per the issuing agent. */
 export function flightChangeFee(offer: FlightOffer, pax: PaxCount): number {
   const agent = AGENTS.find((a) => a.id === offer.agentId);

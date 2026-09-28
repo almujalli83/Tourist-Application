@@ -102,6 +102,11 @@ export interface HotelOffer extends TravelAgentRef {
   totalSAR: number;
   /** Traveller mix the price was quoted for ("adults-children-infants"). */
   forPax: string;
+  /**
+   * Standalone bookings: how the rate is paid — online now, or at the hotel on arrival — and until
+   * when it can be cancelled free (ISO time, Saudi time zone). Package rates have no `rate` (prepaid).
+   */
+  rate?: { pay: "online" | "hotel"; freeCancelUntil: string | null };
 }
 
 export type ActivityKind = "event" | "tour" | "restaurant";
