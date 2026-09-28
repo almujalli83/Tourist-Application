@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
+import { EMAIL_RE } from "@/lib/auth/validation";
 import { ORIGIN_CITIES, SAUDI_CITIES } from "@/lib/data/cities";
 import { earnPoints } from "@/lib/loyalty/rules";
+import { validatePhone } from "@/lib/phone";
 import { STOPOVER, type DocType } from "@/lib/standalone/entry";
 import type { CabinClass, FlightOffer } from "@/lib/types";
 import { useApp } from "../app-provider";
@@ -95,7 +97,8 @@ export function FlightsView() {
   const titles = [f.pickOut, trip === "stopover" ? f.pickOnward : f.pickBack];
   const docTypes: DocType[] = domestic ? ["passport", "nationalId", "iqama"] : ["passport"];
   const paxOk = pax.every((p) => (p.ref || (p.nameEn.trim().includes(" ") && p.nationality && p.docNo.trim().length >= 5)) && (p.birthDate || options.find((o) => o.ref === p.ref)?.birthDate) && (domestic || p.passportExpiry || p.ref.startsWith("saved:")));
-  const contactOk = /@/.test(contact.email) && contact.phone.replace(/\D/g, "").length >= 8;
+  const contactErr = { email: EMAIL_RE.test(contact.email.trim()) ? undefined : s.errors.email, phone: validatePhone(contact.phone) ? s.errors.phone : undefined };
+  const contactOk = !contactErr.email && !contactErr.phone;
 
   async function pay(payment: PaymentRef | undefined): Promise<boolean> {
     setErr(null);
@@ -220,13 +223,14 @@ export function FlightsView() {
           </Card>
           <Card className="h-fit space-y-4 p-5" data-testid="fl-book">
             <h2 className="font-bold">{f.contact}</h2>
-            <Field label={t.standalone.hotels.email} htmlFor="fl-email"><Input id="fl-email" type="email" dir="ltr" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></Field>
-            <Field label={t.standalone.hotels.phone} htmlFor="fl-phone"><Input id="fl-phone" type="tel" dir="ltr" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} placeholder="+9665…" data-testid="fl-phone" /></Field>
+            <Field label={t.standalone.hotels.email} required error={contact.email.trim() ? contactErr.email : undefined} htmlFor="fl-email"><Input id="fl-email" type="email" dir="ltr" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></Field>
+            <Field label={t.standalone.hotels.phone} required error={contact.phone.trim() ? contactErr.phone : undefined} htmlFor="fl-phone"><Input id="fl-phone" type="tel" dir="ltr" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} placeholder="+9665…" data-testid="fl-phone" /></Field>
             <div className="flex items-center justify-between border-t border-slate-100 pt-3">
               <span className="font-semibold">{f.total}</span>
               <span className="ltr-nums text-lg font-bold text-brand-800" data-testid="fl-total">{money(total)}</span>
             </div>
             {points > 0 && <p className="text-sm font-medium text-gold-700">{fmt(f.earns, { n: points })}</p>}
+            {user && (!paxOk || !contactOk) && <p className="text-sm text-amber-800" role="status" data-testid="fl-incomplete">{s.completeForm}</p>}
             {!user ? (
               <Link href={`/${locale}/login?next=/${locale}/flights`} className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-700 font-semibold text-white hover:bg-brand-800">{f.signIn}</Link>
             ) : (
