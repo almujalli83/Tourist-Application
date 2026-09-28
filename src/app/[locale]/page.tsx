@@ -114,15 +114,29 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
               <p className="mt-0.5 text-sm text-slate-600">{t.guides.serviceCard}</p>
             </div>
           </Link>
-          {([["events", TicketIcon], ["transport", BusIcon], ["audio", HeadphonesIcon]] as const).map(([key, Icon]) => (
-            <Link key={key} href={`/${locale}/${key}`} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:shadow-md" data-testid={`${key}-service`}>
-              <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><Icon className="size-5" /></div>
-              <div className="flex-1">
-                <p className="font-semibold text-ink">{t.home.cards[key].title}</p>
-                <p className="mt-0.5 text-sm text-slate-600">{t.home.cards[key].desc}</p>
-              </div>
-            </Link>
-          ))}
+          {([["events", TicketIcon], ["transport", BusIcon], ["audio", HeadphonesIcon]] as const).map(([key, Icon]) => {
+            const c = t.home.cards[key];
+            // A long name has a short form below xl, where the cards are narrow; the rest of the name opens the description.
+            const short = "shortTitle" in c ? c : null;
+            return (
+              <Link key={key} href={`/${locale}/${key}`} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:shadow-md" data-testid={`${key}-service`}>
+                <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><Icon className="size-5" /></div>
+                <div className="flex-1">
+                  {short ? (
+                    <>
+                      <p className="font-semibold text-ink"><span className="xl:hidden">{short.shortTitle}</span><span className="hidden xl:inline">{c.title}</span></p>
+                      <p className="mt-0.5 text-sm text-slate-600"><span className="xl:hidden">{short.shortDesc}</span><span className="hidden xl:inline">{c.desc}</span></p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-ink">{c.title}</p>
+                      <p className="mt-0.5 text-sm text-slate-600">{c.desc}</p>
+                    </>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

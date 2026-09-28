@@ -1080,6 +1080,8 @@
  "guides.verifyTitle": "验证导游许可证",
  "guides.whatsapp": "WhatsApp",
  "home.cards.audio.desc": "以您的语言收听主要景点的语音导览，现场和离线均可使用。",
+ "home.cards.audio.shortDesc": "旅游景点：以您的语言收听主要景点的语音导览，现场和离线均可使用。",
+ "home.cards.audio.shortTitle": "语音导览",
  "home.cards.audio.title": "旅游景点语音导览",
  "home.cards.events.desc": "沙特季节的音乐会、演出、比赛和体验门票，保存在“我的预订”。",
  "home.cards.events.title": "活动预订",

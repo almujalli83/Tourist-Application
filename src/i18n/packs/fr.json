@@ -1080,6 +1080,8 @@
  "guides.verifyTitle": "Vérifier la licence d'un guide touristique",
  "guides.whatsapp": "WhatsApp",
  "home.cards.audio.desc": "Visites commentées des principaux sites dans votre langue, sur place et hors ligne.",
+ "home.cards.audio.shortDesc": "Pour les sites touristiques : visites commentées des principaux sites dans votre langue, sur place et hors ligne.",
+ "home.cards.audio.shortTitle": "Guide audio",
  "home.cards.audio.title": "Guide audio des sites touristiques",
  "home.cards.events.desc": "Billets de concerts, spectacles, matchs et expériences des saisons saoudiennes, dans Mes réservations.",
  "home.cards.events.title": "Réservation d'événements",
