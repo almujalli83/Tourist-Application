@@ -11,7 +11,7 @@ import { CarIcon, GlobeIcon, HotelIcon, KaabaIcon, MapPinIcon, PlaneIcon, SunIco
 import { Card } from "../ui";
 
 const ICONS: Record<StepKey, ComponentType<{ className?: string }>> = {
-  hotel: HotelIcon, flight: PlaneIcon, transfer: CarIcon, rental: CarIcon, esim: GlobeIcon, events: TicketIcon,
+  hotel: HotelIcon, flight: PlaneIcon, onward: MapPinIcon, transfer: CarIcon, rental: CarIcon, esim: GlobeIcon, events: TicketIcon,
   restaurants: MapPinIcon, guides: UsersIcon, prayer: KaabaIcon,
 };
 
@@ -36,8 +36,9 @@ export function CompleteTrip({ steps, city, from, to, have, testId }: {
   const label = (s: Step) => {
     if (s.key === "transfer" && s.leg) return fmt(s.leg.direction === "arrival" ? n.transferArrival : n.transferDeparture, { airport: cityName(s.leg.airport, locale), time: when(s.leg.at), flight: s.leg.flightNo });
     if (s.key === "transfer") return fmt(n.transferCity, { city: place });
+    if (s.key === "onward" && s.onward) return fmt(n.onward, { city: cityName(s.onward.to, locale), date: day(s.onward.date) });
     if (s.key === "hotel") return fmt(n.hotel, { city: place, from: from ? day(from) : "", to: to ? day(to) : "" });
-    return fmt(n[s.key as Exclude<StepKey, "transfer" | "hotel">], { city: place });
+    return fmt(n[s.key as Exclude<StepKey, "transfer" | "hotel" | "onward">], { city: place });
   };
   return (
     <Card className="space-y-3 p-5 print:hidden" data-testid={testId ?? "complete-trip"}>

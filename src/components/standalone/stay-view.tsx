@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import { cityName } from "@/lib/data/cities";
@@ -33,10 +34,12 @@ export function StayView({ id }: { id: string }) {
   const [dates, setDates] = useState({ checkIn: "", checkOut: "" });
   const [quote, setQuote] = useState<{ offer: HotelOffer; differenceSAR: number } | null>(null);
   const [flights, setFlights] = useState<FlightOrder[]>([]);
+  const [siblings, setSiblings] = useState<StayOrder[]>([]);
   const load = () => fetch(`/api/stays/${id}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : "missing")).then(setData).catch(() => setData("missing"));
   useEffect(() => void load(), [id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetch("/api/flights", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { orders: [] })).then((d) => setFlights(d.orders ?? [])).catch(() => undefined);
+    fetch("/api/stays", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { stays: [] })).then((d) => setSiblings(d.stays ?? [])).catch(() => undefined);
   }, []);
   if (data === "missing") return <Alert tone="error">{s.errors.notFound}</Alert>;
   if (!data) return <div className="grid h-40 place-items-center text-brand-700"><Spinner className="size-6" /></div>;
@@ -85,6 +88,10 @@ export function StayView({ id }: { id: string }) {
   const trip = stayWindow(o, flights);
   const flight = matchingFlight(trip, flights);
   const route = (f: FlightOrder) => f.segments.map((sg) => `${sg.offer.from}–${sg.offer.to}`).join(" · ");
+  // A multi-city trip: the other hotels, the next city, and the flight home from the last one.
+  const tripStays = o.trip ? siblings.filter((x) => x.trip?.id === o.trip!.id).sort((a, b) => a.trip!.index - b.trip!.index) : [];
+  const nextStay = tripStays.find((x) => x.trip!.index === o.trip!.index + 1 && x.status === "confirmed");
+  const lastOut = tripStays.filter((x) => x.status === "confirmed").reduce((d, x) => (x.hotel.checkOut > d ? x.hotel.checkOut : d), h.checkOut);
 
   return (
     <div className="space-y-4" data-testid="stay-view">
@@ -94,6 +101,24 @@ export function StayView({ id }: { id: string }) {
         <Badge tone={live ? "brand" : "red"}><span data-testid="stay-status">{v.status[o.status]}</span></Badge>
       </div>
       {o.sandbox && <Alert tone="info">{v.sandbox}</Alert>}
+      {o.trip && (
+        <Card className="space-y-2 p-4 text-sm" data-testid="stay-trip">
+          <p className="font-semibold">{fmt(s.multi.partOf, { ref: o.trip.reference, n: o.trip.index + 1, count: o.trip.count })}</p>
+          {tripStays.length > 1 && (
+            <ol className="space-y-1">
+              {tripStays.map((x) => (
+                <li key={x.id} className="flex flex-wrap items-center gap-2">
+                  <span className="ltr-nums text-xs text-slate-500">{x.trip!.index + 1}.</span>
+                  {x.id === o.id ? <span className="font-semibold">{cityName(x.hotel.city, locale)} — {ar ? x.hotel.nameAr : x.hotel.nameEn}</span>
+                    : <Link href={`/${locale}/account/stays/${x.id}`} className="font-semibold text-brand-800 underline" data-testid="stay-trip-link">{cityName(x.hotel.city, locale)} — {ar ? x.hotel.nameAr : x.hotel.nameEn}</Link>}
+                  <span className="text-xs text-slate-500">{day(x.hotel.checkIn)} — {day(x.hotel.checkOut)}</span>
+                  {x.status !== "confirmed" && <Badge tone="red">{v.status[x.status]}</Badge>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      )}
       {err && <Alert tone="error"><span data-testid="stay-error">{err}</span></Alert>}
       <Card className="space-y-3 p-5 text-sm">
         <div className="flex flex-wrap items-center gap-2">
@@ -165,7 +190,11 @@ export function StayView({ id }: { id: string }) {
       {live && h.checkOut > new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10) && (
         <CompleteTrip
           testId="stay-complete"
-          steps={nextSteps(trip, { stay: true, flight: !!flight, hotelName: ar ? h.nameAr : h.nameEn })}
+          steps={nextSteps(trip, {
+            stay: true, flight: !!flight || (o.trip?.index ?? 0) > 0, hotelName: ar ? h.nameAr : h.nameEn,
+            ...(o.trip ? { backDate: lastOut } : {}),
+            ...(nextStay ? { onward: { to: nextStay.hotel.city, date: nextStay.hotel.checkIn } } : {}),
+          })}
           city={h.city} from={h.checkIn} to={h.checkOut}
           have={flight ? [{ label: fmt(s.next.yourFlight, { ref: flight.reference, route: route(flight) }), href: `/account/flights/${flight.id}` }] : []}
         />

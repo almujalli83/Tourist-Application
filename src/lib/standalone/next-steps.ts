@@ -100,13 +100,21 @@ export function matchingStay(w: Pick<TripWindow, "city" | "from" | "to">, stays:
   return stays.find((s) => s.status === "confirmed" && s.hotel.city === w.city && s.hotel.checkIn < w.to && s.hotel.checkOut > w.from);
 }
 
-export type StepKey = "hotel" | "flight" | "transfer" | "rental" | "esim" | "events" | "restaurants" | "guides" | "prayer";
+export type StepKey = "hotel" | "flight" | "onward" | "transfer" | "rental" | "esim" | "events" | "restaurants" | "guides" | "prayer";
 
 export interface Step {
   key: StepKey;
   href: string;
   /** For transfers: which flight end. */
   leg?: AirportLeg;
+  /** For onward travel: the next city and the day. */
+  onward?: { to: string; date: string };
+}
+
+/** Moving on to the next city of a multi-city trip: a flight between airports, else the intercity trains and buses. */
+export function onwardHref(from: string, to: string, date: string): string {
+  const air = (c: string) => c !== "MKX" && c in AIRPORTS;
+  return air(from) && air(to) ? `/flights?${qs({ from, to, date, trip: "oneway" })}` : `/transport?${qs({ city: from === "MKX" ? to : from })}`;
 }
 
 const qs = (p: Record<string, string | number | undefined>) =>
@@ -121,11 +129,16 @@ export function transferHref(leg: AirportLeg, pax: number, place?: string): stri
  * The links for a window, in the order a traveller needs them. `have` holds what is already
  * booked here (then the hotel / flight link is left out and the page shows the booking instead).
  */
-export function nextSteps(w: TripWindow, have: { stay?: boolean; flight?: boolean; hotelName?: string } = {}, legs?: AirportLeg[]): Step[] {
+export function nextSteps(
+  w: TripWindow,
+  have: { stay?: boolean; flight?: boolean; hotelName?: string; backDate?: string; onward?: { to: string; date: string } } = {},
+  legs?: AirportLeg[],
+): Step[] {
   const steps: Step[] = [];
   if (!have.stay) steps.push({ key: "hotel", href: `/hotels?${qs({ entry: w.entry, city: w.city, checkIn: w.from, checkOut: w.to })}` });
-  // Makkah has no airport: fly to Jeddah.
-  if (!have.flight) steps.push({ key: "flight", href: `/flights?${qs({ entry: w.entry, to: w.city === "MKX" ? "JED" : w.city, date: w.from, back: w.to, trip: "return" })}` });
+  // Makkah has no airport: fly to Jeddah. A multi-city trip flies home from its last city (`backDate`).
+  if (!have.flight) steps.push({ key: "flight", href: `/flights?${qs({ entry: w.entry, to: w.city === "MKX" ? "JED" : w.city, date: w.from, back: have.backDate ?? w.to, trip: "return" })}` });
+  if (have.onward) steps.push({ key: "onward", onward: have.onward, href: onwardHref(w.city, have.onward.to, have.onward.date) });
   const ends = legs ?? [w.arrival, w.departure].filter((l): l is AirportLeg => !!l);
   for (const leg of ends) steps.push({ key: "transfer", leg, href: transferHref(leg, w.pax, leg.airport === w.city ? have.hotelName : undefined) });
   if (!ends.length && w.city in AIRPORTS) {

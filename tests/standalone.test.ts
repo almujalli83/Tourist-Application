@@ -9,7 +9,9 @@ import { addDays } from "@/lib/dates";
 import { getAccount, ksaDate } from "@/lib/loyalty/loyalty";
 import { stopoverProblem, validDocNo } from "@/lib/standalone/entry";
 import { bookFlights, cancelFlightOrder, checkItinerary, flightCancelTerms, flightReminders, legKind, paxTypeOk, searchStandaloneFlights } from "@/lib/standalone/flights";
-import { bookStay, cancelStay, changeStayDates, quoteStayChange, searchStays, stayCancelTerms, stayReminders, validateStayQuery } from "@/lib/standalone/stays";
+import { AgentBookingError } from "@/lib/agents/provider";
+import { AGENTS } from "@/lib/agents/registry";
+import { bookStay, bookStayTrip, cancelStay, changeStayDates, quoteStayChange, searchStays, stayCancelTerms, stayReminders, StayTripError, validateStayQuery, validateTripLegs } from "@/lib/standalone/stays";
 import type { StayOrder } from "@/lib/standalone/types";
 import { store } from "@/lib/store";
 import type { FlightOffer, HotelOffer } from "@/lib/types";
@@ -203,5 +205,89 @@ describe("standalone flights", () => {
     if (!soon) return; // every flight tomorrow may leave later than 26 hours from now
     await bookFlights(u, { entry: "resident", tripType: "oneway", offers: [soon], passengers: [{ ...visitor, nationality: "EG", docType: "iqama", docNo: "2012345678" }], contact, expectedTotalSAR: soon.totalSAR, card });
     expect(await flightReminders(u.id)).toBe(1);
+  });
+});
+
+describe("multi-city hotel trips", () => {
+  /** Riyadh 3 nights, then Jeddah 2 nights: one prepaid refundable rate and one pay-at-hotel rate. */
+  async function tripLegs(days = 40) {
+    const a = addDays(today(), days);
+    const b = addDays(a, 3);
+    const c = addDays(b, 2);
+    const ruh = (await searchStays({ city: "RUH", checkIn: a, checkOut: b, rooms })).offers.find((o) => o.rate!.pay === "online" && o.refundable)!;
+    const jed = (await searchStays({ city: "JED", checkIn: b, checkOut: c, rooms })).offers.find((o) => o.rate!.pay === "hotel")!;
+    expect(ruh && jed).toBeTruthy();
+    return [
+      { offer: ruh, city: "RUH", checkIn: a, checkOut: b, expectedTotalSAR: ruh.totalSAR },
+      { offer: jed, city: "JED", checkIn: b, checkOut: c, expectedTotalSAR: jed.totalSAR },
+    ];
+  }
+
+  it("checks that the cities follow each other", () => {
+    const t = addDays(today(), 10);
+    const leg = (city: string, i: number, o: number) => ({ city, checkIn: addDays(t, i), checkOut: addDays(t, o) });
+    expect(validateTripLegs({ rooms, legs: [leg("RUH", 0, 2), leg("ULH", 2, 4), leg("JED", 4, 6)] })).toHaveLength(3);
+    expect(() => validateTripLegs({ rooms, legs: [leg("RUH", 0, 2)] })).toThrow("tripCities");
+    expect(() => validateTripLegs({ rooms, legs: [leg("RUH", 0, 2), leg("JED", 3, 4)] })).toThrow("tripDates");
+    expect(() => validateTripLegs({ rooms, legs: [leg("RUH", 0, 2), leg("RUH", 2, 4)] })).toThrow("tripSameCity");
+    expect(() => validateTripLegs({ rooms, legs: [leg("RUH", 0, 2), leg("MKX", 2, 4)] })).toThrow("makkahMuslimsOnly");
+    expect(validateTripLegs({ rooms, umrah: true, legs: [leg("JED", 0, 2), leg("MKX", 2, 4)] })[1].city).toBe("MKX");
+    expect(() => validateTripLegs({ rooms, legs: [leg("RUH", 0, 16), leg("JED", 16, 31)] })).toThrow("nights");
+    expect(() => validateTripLegs({ rooms, entry: "stopover", legs: [leg("RUH", 0, 2), leg("JED", 2, 5)] })).toThrow("stopoverNights");
+    try {
+      validateTripLegs({ rooms, legs: [leg("RUH", 0, 2), leg("JED", 3, 4)] });
+    } catch (e) {
+      expect((e as StayTripError).leg).toBe(1);
+    }
+  });
+
+  it("books every city with one charge for the prepaid hotels only; each hotel stays its own booking", async () => {
+    const u = user();
+    const legs = await tripLegs();
+    const res = await bookStayTrip(u, { entry: "evisa", rooms, lead, legs, card });
+    expect(res.trip.reference).toMatch(/^TP-/);
+    const [ruh, jed] = res.stays;
+    expect(ruh).toMatchObject({ pay: "online", trip: { id: res.trip.id, index: 0, count: 2 }, payment: { amountSAR: legs[0].offer.totalSAR } });
+    expect(jed).toMatchObject({ pay: "hotel", payment: null, trip: { index: 1, count: 2 } });
+    expect(ruh.loyalty?.earnedPoints).toBe(Math.floor(legs[0].offer.totalSAR / 20));
+    expect(jed.loyalty).toBeUndefined();
+    // Cancelling one hotel leaves the other.
+    const cancelled = await cancelStay(u, ruh.id);
+    expect(cancelled.cancellation?.refundSAR).toBe(legs[0].offer.totalSAR);
+    expect((await store().get<StayOrder>("stays", jed.id))!.status).toBe("confirmed");
+  });
+
+  it("all or nothing: a hotel that cannot be confirmed releases the others and names the city to replace", async () => {
+    const u = user();
+    const legs = await tripLegs(45);
+    // Only the Jeddah hotel is refused, whichever agents sell the two rooms.
+    const spies = AGENTS.map((a) => {
+      const real = a.bookHotel.bind(a);
+      return vi.spyOn(a, "bookHotel").mockImplementation(async (b) => (b.offer.city === "JED" ? Promise.reject(new AgentBookingError("rejected")) : real(b)));
+    });
+    const first = AGENTS.find((a) => a.id === legs[0].offer.agentId)!;
+    const cancel = vi.spyOn(first, "cancelHotel");
+    const err = await bookStayTrip(u, { entry: "evisa", rooms, lead, legs, card }).catch((e) => e);
+    expect(err).toBeInstanceOf(StayTripError);
+    expect(err.leg).toBe(1);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(err.code).toBe("agentRejected");
+    expect(await store().findBy("stays", "userId", u.id)).toHaveLength(0);
+    spies.forEach((x) => x.mockRestore());
+    cancel.mockRestore();
+  });
+
+  it("keeps a trip's hotels from overlapping when dates change", async () => {
+    const u = user();
+    const legs = await tripLegs(50);
+    const res = await bookStayTrip(u, { entry: "evisa", rooms, lead, legs, card });
+    await expect(quoteStayChange(u.id, res.stays[0].id, { checkIn: legs[0].checkIn, checkOut: addDays(legs[0].checkOut, 1) })).rejects.toThrow("tripOverlap");
+  });
+
+  it("refuses a changed price, naming the hotel", async () => {
+    const legs = await tripLegs(55);
+    legs[1].expectedTotalSAR = legs[1].offer.totalSAR - 10;
+    const err = await bookStayTrip(user(), { entry: "evisa", rooms, lead, legs, card }).catch((e) => e);
+    expect(err).toMatchObject({ code: "priceChanged", leg: 1 });
   });
 });
