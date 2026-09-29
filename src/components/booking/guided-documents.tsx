@@ -3,16 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fmt } from "@/i18n";
-import { COMPANION_TYPES } from "@/lib/mt-evisa/lookups";
 import type { Traveller, YesNo } from "@/lib/types";
 import { SECURITY_CLARIFIED, SECURITY_SIMPLE } from "@/lib/visa-validation";
 import { useApp } from "../app-provider";
 import { CheckIcon, LockIcon } from "../icons";
-import { Alert, Button, Card, cx, Field, Input, Select, Textarea, YesNo as YesNoInput } from "../ui";
+import { Alert, Button, Card, cx, Field, Input, Textarea, YesNo as YesNoInput } from "../ui";
 import { AuthForm } from "../auth-form";
 import { useBooking } from "./booking-context";
 import { ContactFields } from "./contact-fields";
-import { CountrySelect } from "./country-select";
 import { passportPatch } from "./passport-fill";
 import { PassportScanner } from "./passport-scanner";
 import { PhotoUploader } from "./photo-uploader";
@@ -21,12 +19,6 @@ import { travellerTypeLabel } from "./traveller-label";
 import { useTravellerValidation } from "./travellers-step";
 import { WizardShell } from "./wizard-shell";
 
-const IMAGE_KEYS = new Set(["passportImage", "personPhoto"]);
-/** Always shown in their own step, filled or not: the eVisa and trip notices depend on them. */
-const CONTACT_KEYS = new Set(["email", "mobileNo", "zipCode"]);
-const isDeclaration = (k: string) => k.startsWith("security.") || k.startsWith("insurance.");
-const DATE_KEYS = new Set(["birthDate", "passportIssueDate", "passportExpiryDate"]);
-const COUNTRY_KEYS = new Set(["birthplace", "nationality", "passportIssuePlace"]);
 
 function Bubble({ children, from = "assistant" }: { children: ReactNode; from?: "assistant" | "system" }) {
   const { t } = useApp();
@@ -115,7 +107,7 @@ export function GuidedDocuments() {
 }
 
 function GuidedTraveller({ index, name, onNext }: { index: number; name: string; onNext: () => void }) {
-  const { t, locale } = useApp();
+  const { t } = useApp();
   const d = t.planner.docs;
   const tf = t.travellers.fields;
   const booking = useBooking();
@@ -123,20 +115,16 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
   const tr = booking.travellers[index];
   const errs = useMemo(() => errors[index] ?? {}, [errors, index]);
   const [scan, setScan] = useState<{ read: boolean; n: number } | null>(null);
-  const [asked, setAsked] = useState<string[]>([]);
   const [showQuestions, setShowQuestions] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [touched, setTouched] = useState(false);
   const filledCount = useRef(0);
   const update = (patch: Partial<Traveller>) => booking.updateTraveller(index, patch);
+  const edit = (patch: Partial<Traveller>) => {
+    setTouched(true);
+    update(patch);
+  };
 
   const docsIn = !!tr.passportImage && !!tr.personPhoto;
-  // Questions are fixed once asked, so a field doesn't disappear while it is being typed.
-  const missing = useMemo(() => Object.keys(errs).filter((k) => !IMAGE_KEYS.has(k) && !CONTACT_KEYS.has(k) && !isDeclaration(k)), [errs]);
-  const missingKey = missing.join("|");
-  useEffect(() => {
-    if (!docsIn) return;
-    setAsked((cur) => [...cur, ...missingKey.split("|").filter((k) => k && !cur.includes(k))]);
-  }, [docsIn, missingKey]);
   const done = Object.keys(errs).length === 0;
 
   const allNo = () =>
@@ -151,54 +139,13 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
     && tr.insurance.question1 === "false" && tr.insurance.question2 === "false" && tr.insurance.question3 === "false";
 
   const errText = (k: string) => (errs[k] ? (t.travellers.errors as Record<string, string>)[errs[k]] ?? errs[k] : undefined);
-  const field = (k: string) => {
-    const id = `g${index}-${k}`;
-    const label = (tf as Record<string, string>)[k] ?? k;
-    const value = String((tr as unknown as Record<string, unknown>)[k] ?? "");
-    const e = errText(k);
-    let input: ReactNode;
-    if (DATE_KEYS.has(k)) input = <Input id={id} type="date" value={value} onChange={(ev) => update({ [k]: ev.target.value } as Partial<Traveller>)} invalid={!!e} />;
-    else if (COUNTRY_KEYS.has(k)) input = <CountrySelect id={id} value={value} onChange={(v) => update({ [k]: v } as Partial<Traveller>)} invalid={!!e} />;
-    else if (k === "gender" || k === "religion" || k === "maritalStatus" || k === "passportType") {
-      const opts = k === "gender" ? t.travellers.genders : k === "religion" ? t.travellers.religions : k === "maritalStatus" ? t.travellers.marital : t.travellers.passportTypes;
-      input = (
-        <Select id={id} value={value} onChange={(ev) => update({ [k]: ev.target.value } as Partial<Traveller>)} invalid={!!e}>
-          <option value="">—</option>
-          {Object.entries(opts).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </Select>
-      );
-    } else if (k === "companionType") {
-      input = (
-        <Select id={id} value={tr.companionType} onChange={(ev) => update({ companionType: ev.target.value })} invalid={!!e}>
-          <option value="">—</option>
-          {COMPANION_TYPES.map((c) => <option key={c.code} value={c.code}>{c[locale]}</option>)}
-        </Select>
-      );
-    } else if (k === "sponsorIndex") {
-      input = (
-        <Select id={id} value={tr.sponsorIndex === null ? "" : String(tr.sponsorIndex)} onChange={(ev) => update({ sponsorIndex: ev.target.value === "" ? null : Number(ev.target.value) })} invalid={!!e}>
-          <option value="">{tf.noSponsor}</option>
-          {booking.travellers.map((o, i) => (i !== index && o.paxType === "adult" && o.declaredAge == null ? <option key={i} value={i}>{[o.firstNameEn, o.familyNameEn].filter(Boolean).join(" ") || fmt(d.travellerN, { n: i + 1 })}</option> : null))}
-        </Select>
-      );
-    } else {
-      const latin = k.endsWith("En") || k === "passportNo" || k === "zipCode";
-      input = <Input id={id} dir={k.endsWith("Ar") ? "rtl" : latin ? "ltr" : undefined} value={value} onChange={(ev) => update({ [k]: latin ? ev.target.value.toUpperCase() : ev.target.value } as Partial<Traveller>)} invalid={!!e} />;
-    }
-    return <Field key={k} label={label} error={e} required htmlFor={id}>{input}</Field>;
-  };
-
   const yn = { yes: t.common.yes, no: t.common.no };
-  const extracted = [
-    [tf.firstNameEn, [tr.firstNameEn, tr.middleNameEn, tr.grandFatherNameEn, tr.familyNameEn].filter(Boolean).join(" ")],
-    [tf.passportNo, tr.passportNo],
-    [tf.birthDate, tr.birthDate],
-    [tf.passportExpiryDate, tr.passportExpiryDate],
-  ].filter(([, v]) => v);
 
+  // Every field is on screen from the start: the passport scan fills what it can read, in place,
+  // and the traveller sees what is left. Errors show once both images are in or a field is edited.
   return (
     <div className="space-y-4">
-      {/* Contact details first, always visible: the eVisa, the insurance policy and trip notices go there. */}
+      {/* Contact details first: the eVisa, the insurance policy and trip notices go there. */}
       <Bubble>{d.askContact}</Bubble>
       <div className="grid gap-4 ps-10 sm:grid-cols-2" data-testid="guided-contact">
         <ContactFields idPrefix={`g${index}`} traveller={tr} error={(k) => errText(k)} onChange={update} />
@@ -206,6 +153,7 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
           <Input id={`g${index}-zipCode`} dir="ltr" maxLength={15} value={tr.zipCode} onChange={(ev) => update({ zipCode: ev.target.value.toUpperCase() })} invalid={!!errText("zipCode")} />
         </Field>
       </div>
+
       <Bubble>{fmt(d.askPassport, { name })}</Bubble>
       <div className="max-w-md ps-10">
         <PassportScanner
@@ -217,79 +165,64 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
             update(patch);
           }}
           onDone={(read) => setScan({ read, n: read ? filledCount.current : 0 })}
-          error={errText("passportImage")}
+          error={docsIn || touched ? errText("passportImage") : undefined}
         />
       </div>
       {scan && <Bubble>{scan.read ? fmt(d.filled, { n: scan.n }) : d.notRead}</Bubble>}
-      {scan?.read && extracted.length > 0 && (
-        <dl className="ms-10 grid max-w-xl gap-x-4 gap-y-1 rounded-xl border border-slate-200 p-3 text-sm sm:grid-cols-2" aria-label={d.extracted}>
-          {extracted.map(([k, v]) => <div key={k}><dt className="text-xs text-slate-500">{k}</dt><dd className="font-semibold" dir="auto">{v}</dd></div>)}
-        </dl>
-      )}
-      {tr.passportImage && (
-        <>
-          <Bubble>{fmt(d.askPhoto, { name })}</Bubble>
-          <div className="max-w-xs ps-10"><PhotoUploader value={tr.personPhoto} onChange={(v) => update({ personPhoto: v })} error={errText("personPhoto")} /></div>
-        </>
-      )}
-      {docsIn && asked.length > 0 && (
-        <>
-          <Bubble>{d.askMissing}</Bubble>
-          <div className="grid gap-4 ps-10 sm:grid-cols-2" data-testid="guided-missing">{asked.map(field)}</div>
-        </>
-      )}
-      {docsIn && (
-        <>
-          <Bubble>{d.declarations}</Bubble>
-          <div className="space-y-3 ps-10">
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-gold-50 p-3 text-sm font-medium ring-1 ring-gold-500/30">
-              <input type="checkbox" className="mt-0.5 size-5 accent-brand-700" checked={allAnsweredNo} onChange={(e) => (e.target.checked ? allNo() : setShowQuestions(true))} data-testid="guided-all-no" />
-              <span>{d.allNo}</span>
-            </label>
-            <button type="button" className="text-sm font-semibold text-brand-700 hover:underline" onClick={() => setShowQuestions((v) => !v)}>{d.showQuestions}</button>
-            {showQuestions && (
-              <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 px-3">
-                {SECURITY_CLARIFIED.map((k) => (
-                  <div key={k} className="py-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-sm">{t.travellers.security[k]}</p>
-                      <YesNoInput name={`g${index}-${k}`} value={tr.security[k].answer} onChange={(v) => update({ security: { ...tr.security, [k]: { ...tr.security[k], answer: v } } })} labels={yn} invalid={!!errText(`security.${k}`)} />
-                    </div>
-                    {tr.security[k].answer === "true" && (
-                      <Textarea className="mt-2" maxLength={2000} placeholder={t.travellers.security.clarification} value={tr.security[k].clarification} onChange={(ev) => update({ security: { ...tr.security, [k]: { ...tr.security[k], clarification: ev.target.value } } })} invalid={!!errText(`security.${k}`)} />
-                    )}
-                  </div>
-                ))}
-                {SECURITY_SIMPLE.map((k) => (
-                  <div key={k} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm">{t.travellers.security[k]}</p>
-                    <YesNoInput name={`g${index}-${k}`} value={tr.security[k]} onChange={(v: YesNo) => update({ security: { ...tr.security, [k]: v } })} labels={yn} invalid={!!errText(`security.${k}`)} />
-                  </div>
-                ))}
-                {(["question1", "question2", "question3", "question4", "question5"] as const).map((k) => (
-                  <div key={k} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm">{t.travellers.insurance[k]}</p>
-                    <YesNoInput name={`g${index}-${k}`} value={tr.insurance[k] as YesNo | ""} onChange={(v) => update({ insurance: { ...tr.insurance, [k]: v } })} labels={yn} invalid={!!errText(`insurance.${k}`)} />
-                  </div>
-                ))}
-                {(tr.insurance.question4 === "true" || tr.insurance.question5 === "true") && (
-                  <div className="py-3"><Field label={t.travellers.insurance.question6} error={errText("insurance.question6")}><Input type="number" min={1} max={9} dir="ltr" value={tr.insurance.question6 === "0" ? "" : tr.insurance.question6} onChange={(ev) => update({ insurance: { ...tr.insurance, question6: ev.target.value } })} /></Field></div>
+
+      <Bubble>{fmt(d.askPhoto, { name })}</Bubble>
+      <div className="max-w-xs ps-10"><PhotoUploader value={tr.personPhoto} onChange={(v) => update({ personPhoto: v })} error={docsIn || touched ? errText("personPhoto") : undefined} /></div>
+
+      <Bubble>{d.checkDetails}</Bubble>
+      <div className="ps-10" data-testid="guided-form">
+        <TravellerForm index={index} traveller={tr} all={booking.travellers} errors={errs} showErrors={docsIn || touched} onChange={edit} omit={["documents", "contact", "declarations"]} />
+      </div>
+
+      <Bubble>{d.declarations}</Bubble>
+      <div className="space-y-3 ps-10">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-gold-50 p-3 text-sm font-medium ring-1 ring-gold-500/30">
+          <input type="checkbox" className="mt-0.5 size-5 accent-brand-700" checked={allAnsweredNo} onChange={(e) => (e.target.checked ? allNo() : setShowQuestions(true))} data-testid="guided-all-no" />
+          <span>{d.allNo}</span>
+        </label>
+        <button type="button" className="text-sm font-semibold text-brand-700 hover:underline" onClick={() => setShowQuestions((v) => !v)}>{d.showQuestions}</button>
+        {showQuestions && (
+          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 px-3">
+            {SECURITY_CLARIFIED.map((k) => (
+              <div key={k} className="py-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm">{t.travellers.security[k]}</p>
+                  <YesNoInput name={`g${index}-${k}`} value={tr.security[k].answer} onChange={(v) => update({ security: { ...tr.security, [k]: { ...tr.security[k], answer: v } } })} labels={yn} invalid={!!errText(`security.${k}`)} />
+                </div>
+                {tr.security[k].answer === "true" && (
+                  <Textarea className="mt-2" maxLength={2000} placeholder={t.travellers.security.clarification} value={tr.security[k].clarification} onChange={(ev) => update({ security: { ...tr.security, [k]: { ...tr.security[k], clarification: ev.target.value } } })} invalid={!!errText(`security.${k}`)} />
                 )}
               </div>
+            ))}
+            {SECURITY_SIMPLE.map((k) => (
+              <div key={k} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">{t.travellers.security[k]}</p>
+                <YesNoInput name={`g${index}-${k}`} value={tr.security[k]} onChange={(v: YesNo) => update({ security: { ...tr.security, [k]: v } })} labels={yn} invalid={!!errText(`security.${k}`)} />
+              </div>
+            ))}
+            {(["question1", "question2", "question3", "question4", "question5"] as const).map((k) => (
+              <div key={k} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">{t.travellers.insurance[k]}</p>
+                <YesNoInput name={`g${index}-${k}`} value={tr.insurance[k] as YesNo | ""} onChange={(v) => update({ insurance: { ...tr.insurance, [k]: v } })} labels={yn} invalid={!!errText(`insurance.${k}`)} />
+              </div>
+            ))}
+            {(tr.insurance.question4 === "true" || tr.insurance.question5 === "true") && (
+              <div className="py-3"><Field label={t.travellers.insurance.question6} error={errText("insurance.question6")}><Input type="number" min={1} max={9} dir="ltr" value={tr.insurance.question6 === "0" ? "" : tr.insurance.question6} onChange={(ev) => update({ insurance: { ...tr.insurance, question6: ev.target.value } })} /></Field></div>
             )}
           </div>
-        </>
-      )}
+        )}
+      </div>
+
       {done && (
         <div className="space-y-3">
           <Bubble from="system">{fmt(d.done, { name })}</Bubble>
           {booking.travellers.length > 1 && <div className="ps-10"><Button size="sm" onClick={onNext}>{d.next}</Button></div>}
         </div>
       )}
-      <div className="ps-10">
-        <button type="button" className="text-xs font-semibold text-slate-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? d.hideAll : d.editAll}</button>
-      </div>
-      {showAll && <TravellerForm index={index} traveller={tr} all={booking.travellers} errors={errs} showErrors onChange={update} omit={["documents", "contact", "declarations"]} />}
     </div>
   );
 }
