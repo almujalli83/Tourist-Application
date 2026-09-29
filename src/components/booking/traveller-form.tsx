@@ -23,6 +23,8 @@ type Props = {
   onChange: (patch: Partial<Traveller>) => void;
   /** "profile" edits a saved traveller: trip-specific sections are hidden. */
   mode?: "booking" | "profile";
+  /** Sections another view already shows (the smart booking asks for them step by step). */
+  omit?: ("documents" | "contact" | "declarations")[];
 };
 
 function Section({ title, icon, children, subtitle }: { title: string; icon: ReactNode; children: ReactNode; subtitle?: string }) {
@@ -34,7 +36,7 @@ function Section({ title, icon, children, subtitle }: { title: string; icon: Rea
   );
 }
 
-export function TravellerForm({ index, traveller: tr, all, errors, showErrors, onChange, mode = "booking" }: Props) {
+export function TravellerForm({ index, traveller: tr, all, errors, showErrors, onChange, mode = "booking", omit = [] }: Props) {
   const booking = mode === "booking";
   const { t, locale } = useApp();
   const tf = t.travellers.fields;
@@ -70,12 +72,14 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
 
   return (
     <div className="space-y-4">
-      <Section title={t.travellers.sections.documents} icon={<PassportIcon className="size-5" />}>
-        <div className="grid gap-6 md:grid-cols-2">
-          <PassportScanner value={tr.passportImage} onImage={(v) => onChange({ passportImage: v })} onParsed={applyMrz} error={e("passportImage")} />
-          <PhotoUploader value={tr.personPhoto} onChange={(v) => onChange({ personPhoto: v })} error={e("personPhoto")} />
-        </div>
-      </Section>
+      {!omit.includes("documents") && (
+        <Section title={t.travellers.sections.documents} icon={<PassportIcon className="size-5" />}>
+          <div className="grid gap-6 md:grid-cols-2">
+            <PassportScanner value={tr.passportImage} onImage={(v) => onChange({ passportImage: v })} onParsed={applyMrz} error={e("passportImage")} />
+            <PhotoUploader value={tr.personPhoto} onChange={(v) => onChange({ personPhoto: v })} error={e("personPhoto")} />
+          </div>
+        </Section>
+      )}
 
       <Section title={t.travellers.sections.personal} icon={<UserIcon className="size-5" />}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -143,7 +147,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
 
       <Section title={t.travellers.sections.contact} icon={<UserIcon className="size-5" />}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <ContactFields idPrefix={`t${index}`} traveller={tr} error={e} onChange={onChange} />
+          {!omit.includes("contact") && <ContactFields idPrefix={`t${index}`} traveller={tr} error={e} onChange={onChange} />}
           {text("zipCode", { dir: "ltr", max: 15 })}
         </div>
         {booking && index > 0 && (
@@ -178,6 +182,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
             </div>
           </Section>
 
+          {!omit.includes("declarations") && (<>
           <Section title={t.travellers.sections.security} icon={<ShieldIcon className="size-5" />} subtitle={t.travellers.security.intro}>
             <div className="divide-y divide-slate-100">
               {SECURITY_CLARIFIED.map((k) => (
@@ -247,6 +252,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
               )}
             </div>
           </Section>
+          </>)}
         </>
       )}
     </div>
