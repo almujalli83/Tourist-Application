@@ -23,7 +23,7 @@ import { WizardShell } from "./wizard-shell";
 
 const IMAGE_KEYS = new Set(["passportImage", "personPhoto"]);
 /** Always shown in their own step, filled or not: the eVisa and trip notices depend on them. */
-const CONTACT_KEYS = new Set(["email", "mobileNo"]);
+const CONTACT_KEYS = new Set(["email", "mobileNo", "zipCode"]);
 const isDeclaration = (k: string) => k.startsWith("security.") || k.startsWith("insurance.");
 const DATE_KEYS = new Set(["birthDate", "passportIssueDate", "passportExpiryDate"]);
 const COUNTRY_KEYS = new Set(["birthplace", "nationality", "passportIssuePlace"]);
@@ -229,6 +229,9 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
           <Bubble>{d.askContact}</Bubble>
           <div className="grid gap-4 ps-10 sm:grid-cols-2" data-testid="guided-contact">
             <ContactFields idPrefix={`g${index}`} traveller={tr} error={(k) => errText(k)} onChange={update} />
+            <Field label={tf.zipCode} error={errText("zipCode")} htmlFor={`g${index}-zipCode`}>
+              <Input id={`g${index}-zipCode`} dir="ltr" maxLength={15} value={tr.zipCode} onChange={(ev) => update({ zipCode: ev.target.value.toUpperCase() })} invalid={!!errText("zipCode")} />
+            </Field>
           </div>
         </>
       )}
