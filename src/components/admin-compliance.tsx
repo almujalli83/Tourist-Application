@@ -29,7 +29,7 @@ interface Incident {
 export function AdminCompliance() {
   const { t, locale } = useApp();
   const c = t.compliance;
-  const when = useCallback((iso: string) => new Intl.DateTimeFormat(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)), [locale]);
+  const when = useCallback((iso: string) => new Intl.DateTimeFormat(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" }).format(new Date(iso)), [locale]);
   const [status, setStatus] = useState<Status | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const load = useCallback(async () => {

@@ -53,7 +53,7 @@ export function MoneyView() {
             <p className="mt-1 text-xs text-slate-500" dir="ltr">{fmt(m.rate, { from, v: String(unit), to })}</p>
           </div>
           <div className="space-y-1 text-xs text-slate-500">
-            {fx?.live && fx.updatedAt ? <p data-testid="fx-updated">{fmt(m.updated, { date: new Date(fx.updatedAt).toLocaleString(locale), source: fx.source })}</p> : <p className="font-semibold text-amber-700" data-testid="fx-builtin">{m.builtIn}</p>}
+            {fx?.live && fx.updatedAt ? <p data-testid="fx-updated">{fmt(m.updated, { date: new Date(fx.updatedAt).toLocaleString(locale, { timeZone: "Asia/Riyadh" }), source: fx.source })}</p> : <p className="font-semibold text-amber-700" data-testid="fx-builtin">{m.builtIn}</p>}
             <p>{m.offline}</p>
             <p>{m.note}</p>
           </div>

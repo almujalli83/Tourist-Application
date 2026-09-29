@@ -397,7 +397,7 @@ function DevicesSection({ day }: { day: (iso: string) => string }) {
   useEffect(() => {
     void load();
   }, [load]);
-  const when = (iso: string) => `${day(iso)} ${new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-SA-u-nu-latn" : "en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+  const when = (iso: string) => `${day(iso)} ${new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-SA-u-nu-latn" : "en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Riyadh" })}`;
   return (
     <Section icon={<ShieldIcon className="size-5" />} title={s.title} testId="sec-devices">
       <p className="text-sm text-slate-600">{s.intro}</p>

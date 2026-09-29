@@ -103,7 +103,7 @@ export function MetroPanel() {
         )}
         {net && net.stations.length > 0 && (
           <p className={cx("border-t border-slate-200 px-5 py-2 text-xs", net.source === "sample" ? "bg-amber-50 text-amber-800" : "text-slate-500")} data-testid="metro-source">
-            {net.source === "sample" ? m.sample : <>{m.source}{net.fetchedAt ? ` · ${fmt(m.updated, { date: new Date(net.fetchedAt).toLocaleDateString(locale) })}` : ""}</>}
+            {net.source === "sample" ? m.sample : <>{m.source}{net.fetchedAt ? ` · ${fmt(m.updated, { date: new Date(net.fetchedAt).toLocaleDateString(locale, { timeZone: "Asia/Riyadh" }) })}` : ""}</>}
           </p>
         )}
       </Card>

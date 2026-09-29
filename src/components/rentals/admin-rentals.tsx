@@ -56,7 +56,7 @@ export function AdminRentals() {
         <h2 className="text-xl font-bold">{a.title}</h2>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">{a.intro}</p>
         <p className="mt-2 text-sm font-semibold" data-testid="admin-rentals-reviewed">
-          {data.reviewedAt ? fmt(a.reviewedAt, { date: new Date(data.reviewedAt).toLocaleDateString(locale), by: data.reviewedBy ?? "" }) : <span className="text-amber-700">{a.notReviewed}</span>}
+          {data.reviewedAt ? fmt(a.reviewedAt, { date: new Date(data.reviewedAt).toLocaleDateString(locale, { timeZone: "Asia/Riyadh" }), by: data.reviewedBy ?? "" }) : <span className="text-amber-700">{a.notReviewed}</span>}
         </p>
       </div>
       {rules.map((r, i) => (
