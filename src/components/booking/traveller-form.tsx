@@ -145,17 +145,19 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
         </div>
       </Section>
 
-      <Section title={t.travellers.sections.contact} icon={<UserIcon className="size-5" />}>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {!omit.includes("contact") && <ContactFields idPrefix={`t${index}`} traveller={tr} error={e} onChange={onChange} />}
-          {text("zipCode", { dir: "ltr", max: 15 })}
-        </div>
-        {booking && index > 0 && (
-          <button type="button" className="mt-3 text-sm font-semibold text-brand-700 hover:underline" onClick={() => onChange({ email: all[0].email, mobileNo: all[0].mobileNo, zipCode: all[0].zipCode })}>
-            {t.travellers.copyContact}
-          </button>
-        )}
-      </Section>
+      {!omit.includes("contact") && (
+        <Section title={t.travellers.sections.contact} icon={<UserIcon className="size-5" />}>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ContactFields idPrefix={`t${index}`} traveller={tr} error={e} onChange={onChange} />
+            {text("zipCode", { dir: "ltr", max: 15 })}
+          </div>
+          {booking && index > 0 && (
+            <button type="button" className="mt-3 text-sm font-semibold text-brand-700 hover:underline" onClick={() => onChange({ email: all[0].email, mobileNo: all[0].mobileNo, zipCode: all[0].zipCode })}>
+              {t.travellers.copyContact}
+            </button>
+          )}
+        </Section>
+      )}
 
       {booking && (
         <>
