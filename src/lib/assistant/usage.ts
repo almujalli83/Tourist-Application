@@ -1,8 +1,9 @@
 /**
  * Daily limits for the AI features (cost control). Signed-in accounts are counted per account,
- * visitors per hashed IP address. Assistant and translation: ASSISTANT_DAILY_LIMIT_USER (default
- * 100) and ASSISTANT_DAILY_LIMIT_GUEST (default 25). Trip planner (plans and regenerated days):
- * PLANNER_DAILY_LIMIT_USER (default 20) and PLANNER_DAILY_LIMIT_GUEST (default 5).
+ * visitors per hashed IP address. Visitors get the same limits as accounts by default, so people
+ * trying the platform from one office network don't run out. Assistant and translation:
+ * ASSISTANT_DAILY_LIMIT_USER and ASSISTANT_DAILY_LIMIT_GUEST (default 100 each). Trip planner (plans
+ * and regenerated days): PLANNER_DAILY_LIMIT_USER and PLANNER_DAILY_LIMIT_GUEST (default 20 each).
  */
 import { createHash } from "node:crypto";
 import { todayISO } from "../dates";
@@ -12,7 +13,7 @@ import { store } from "../store";
 interface UsageDoc { id: string; count: number }
 
 export type QuotaKind = "assistant" | "planner";
-const DEFAULTS: Record<QuotaKind, [number, number]> = { assistant: [100, 25], planner: [20, 5] };
+const DEFAULTS: Record<QuotaKind, [number, number]> = { assistant: [100, 100], planner: [20, 20] };
 
 const limitFor = (signedIn: boolean, kind: QuotaKind = "assistant") => {
   const prefix = kind === "planner" ? "PLANNER" : "ASSISTANT";

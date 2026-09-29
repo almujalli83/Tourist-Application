@@ -97,4 +97,10 @@ describe("daily limits", () => {
     expect(await quotaLeft(`ip:other-${run}`, false)).toBe(3);
     delete process.env.ASSISTANT_DAILY_LIMIT_GUEST;
   });
+
+  it("gives visitors the same daily limits as accounts by default", async () => {
+    expect(await quotaLeft(`ip:fresh-${run}`, false)).toBe(await quotaLeft(`user:fresh-${run}`, true));
+    expect(await quotaLeft(`ip:fresh-${run}`, false, "planner")).toBe(await quotaLeft(`user:fresh-${run}`, true, "planner"));
+    expect(await quotaLeft(`ip:fresh-${run}`, false, "planner")).toBe(20);
+  });
 });
