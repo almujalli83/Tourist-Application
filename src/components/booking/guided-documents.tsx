@@ -198,6 +198,14 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
 
   return (
     <div className="space-y-4">
+      {/* Contact details first, always visible: the eVisa, the insurance policy and trip notices go there. */}
+      <Bubble>{d.askContact}</Bubble>
+      <div className="grid gap-4 ps-10 sm:grid-cols-2" data-testid="guided-contact">
+        <ContactFields idPrefix={`g${index}`} traveller={tr} error={(k) => errText(k)} onChange={update} />
+        <Field label={tf.zipCode} error={errText("zipCode")} htmlFor={`g${index}-zipCode`}>
+          <Input id={`g${index}-zipCode`} dir="ltr" maxLength={15} value={tr.zipCode} onChange={(ev) => update({ zipCode: ev.target.value.toUpperCase() })} invalid={!!errText("zipCode")} />
+        </Field>
+      </div>
       <Bubble>{fmt(d.askPassport, { name })}</Bubble>
       <div className="max-w-md ps-10">
         <PassportScanner
@@ -222,17 +230,6 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
         <>
           <Bubble>{fmt(d.askPhoto, { name })}</Bubble>
           <div className="max-w-xs ps-10"><PhotoUploader value={tr.personPhoto} onChange={(v) => update({ personPhoto: v })} error={errText("personPhoto")} /></div>
-        </>
-      )}
-      {docsIn && (
-        <>
-          <Bubble>{d.askContact}</Bubble>
-          <div className="grid gap-4 ps-10 sm:grid-cols-2" data-testid="guided-contact">
-            <ContactFields idPrefix={`g${index}`} traveller={tr} error={(k) => errText(k)} onChange={update} />
-            <Field label={tf.zipCode} error={errText("zipCode")} htmlFor={`g${index}-zipCode`}>
-              <Input id={`g${index}-zipCode`} dir="ltr" maxLength={15} value={tr.zipCode} onChange={(ev) => update({ zipCode: ev.target.value.toUpperCase() })} invalid={!!errText("zipCode")} />
-            </Field>
-          </div>
         </>
       )}
       {docsIn && asked.length > 0 && (
