@@ -289,7 +289,7 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
       <div className="ps-10">
         <button type="button" className="text-xs font-semibold text-slate-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? d.hideAll : d.editAll}</button>
       </div>
-      {showAll && <TravellerForm index={index} traveller={tr} all={booking.travellers} errors={errs} showErrors onChange={update} />}
+      {showAll && <TravellerForm index={index} traveller={tr} all={booking.travellers} errors={errs} showErrors onChange={update} omit={["documents", "contact", "declarations"]} />}
     </div>
   );
 }
