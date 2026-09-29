@@ -63,7 +63,7 @@ export function PrayerAlerts() {
 
   if (!alert) return null;
   return (
-    <div role="status" className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-2xl bg-brand-900 p-4 text-white shadow-2xl ring-1 ring-white/10 sm:bottom-6" data-testid="prayer-alert">
+    <div role="status" className="fixed inset-x-3 bottom-[calc(6rem+var(--bottom-bar,0px))] z-50 mx-auto max-w-md rounded-2xl bg-brand-900 p-4 text-white shadow-2xl ring-1 ring-white/10 sm:bottom-[calc(1.5rem+var(--bottom-bar,0px))]" data-testid="prayer-alert">
       <div className="flex items-start gap-3">
         <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-500/20 text-gold-100"><ClockIcon className="size-5" /></div>
         <div className="min-w-0 flex-1">

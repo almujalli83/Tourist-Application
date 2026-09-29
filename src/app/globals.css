@@ -38,6 +38,8 @@ body {
 
 body {
   font-family: var(--font-sans);
+  /* Room for a bar fixed to the bottom of the screen (the privacy notice), so it never hides the page end. */
+  padding-bottom: var(--bottom-bar, 0px);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

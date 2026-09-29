@@ -124,7 +124,7 @@ export function AssistantWidget() {
           onClick={() => setOpen(true)}
           aria-label={a.open}
           title={a.open}
-          className="fixed bottom-5 end-5 z-[700] grid size-14 place-items-center rounded-full bg-brand-700 text-white shadow-xl ring-4 ring-white transition hover:bg-brand-800"
+          className="fixed bottom-[calc(1.25rem+var(--bottom-bar,0px))] end-5 z-[700] grid size-14 place-items-center rounded-full bg-brand-700 text-white shadow-xl ring-4 ring-white transition hover:bg-brand-800"
           data-testid="assistant-open"
         >
           <ChatIcon className="size-7" />
@@ -134,7 +134,7 @@ export function AssistantWidget() {
         <section
           role="dialog"
           aria-label={a.title}
-          className="fixed inset-0 z-[700] flex flex-col bg-white shadow-2xl sm:inset-auto sm:bottom-5 sm:end-5 sm:h-[600px] sm:max-h-[calc(100dvh-2.5rem)] sm:w-[400px] sm:rounded-2xl sm:ring-1 sm:ring-black/10"
+          className="fixed inset-0 z-[700] flex flex-col bg-white shadow-2xl sm:inset-auto sm:bottom-[calc(1.25rem+var(--bottom-bar,0px))] sm:end-5 sm:h-[600px] sm:max-h-[calc(100dvh-2.5rem-var(--bottom-bar,0px))] sm:w-[400px] sm:rounded-2xl sm:ring-1 sm:ring-black/10"
           data-testid="assistant-panel"
         >
           <header className="flex items-start justify-between gap-2 rounded-t-2xl bg-brand-800 px-4 py-3 text-white">

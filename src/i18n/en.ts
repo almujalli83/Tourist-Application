@@ -3421,8 +3421,8 @@ const en: Dictionary = {
       text: "When this policy changes, signed-in users are asked to read it again. The version number is shown at the top.",
     },
     banner: {
-      text: "We have updated our privacy policy.",
-      read: "Read it",
+      text: "We updated our privacy policy in {date}.",
+      read: "Read the policy",
       ok: "I've read it",
     },
     signupNotice: "By creating an account, you confirm that you have read the",
