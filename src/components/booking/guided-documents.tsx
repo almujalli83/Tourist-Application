@@ -8,10 +8,10 @@ import type { Traveller, YesNo } from "@/lib/types";
 import { SECURITY_CLARIFIED, SECURITY_SIMPLE } from "@/lib/visa-validation";
 import { useApp } from "../app-provider";
 import { CheckIcon, LockIcon } from "../icons";
-import { PhoneInput } from "../phone-input";
 import { Alert, Button, Card, cx, Field, Input, Select, Textarea, YesNo as YesNoInput } from "../ui";
 import { AuthForm } from "../auth-form";
 import { useBooking } from "./booking-context";
+import { ContactFields } from "./contact-fields";
 import { CountrySelect } from "./country-select";
 import { passportPatch } from "./passport-fill";
 import { PassportScanner } from "./passport-scanner";
@@ -22,6 +22,8 @@ import { useTravellerValidation } from "./travellers-step";
 import { WizardShell } from "./wizard-shell";
 
 const IMAGE_KEYS = new Set(["passportImage", "personPhoto"]);
+/** Always shown in their own step, filled or not: the eVisa and trip notices depend on them. */
+const CONTACT_KEYS = new Set(["email", "mobileNo"]);
 const isDeclaration = (k: string) => k.startsWith("security.") || k.startsWith("insurance.");
 const DATE_KEYS = new Set(["birthDate", "passportIssueDate", "passportExpiryDate"]);
 const COUNTRY_KEYS = new Set(["birthplace", "nationality", "passportIssuePlace"]);
@@ -129,7 +131,7 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
 
   const docsIn = !!tr.passportImage && !!tr.personPhoto;
   // Questions are fixed once asked, so a field doesn't disappear while it is being typed.
-  const missing = useMemo(() => Object.keys(errs).filter((k) => !IMAGE_KEYS.has(k) && !isDeclaration(k)), [errs]);
+  const missing = useMemo(() => Object.keys(errs).filter((k) => !IMAGE_KEYS.has(k) && !CONTACT_KEYS.has(k) && !isDeclaration(k)), [errs]);
   const missingKey = missing.join("|");
   useEffect(() => {
     if (!docsIn) return;
@@ -157,7 +159,6 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
     let input: ReactNode;
     if (DATE_KEYS.has(k)) input = <Input id={id} type="date" value={value} onChange={(ev) => update({ [k]: ev.target.value } as Partial<Traveller>)} invalid={!!e} />;
     else if (COUNTRY_KEYS.has(k)) input = <CountrySelect id={id} value={value} onChange={(v) => update({ [k]: v } as Partial<Traveller>)} invalid={!!e} />;
-    else if (k === "mobileNo") input = <PhoneInput id={id} value={tr.mobileNo} defaultCountry={tr.nationality} onChange={(v) => update({ mobileNo: v })} invalid={!!e} />;
     else if (k === "gender" || k === "religion" || k === "maritalStatus" || k === "passportType") {
       const opts = k === "gender" ? t.travellers.genders : k === "religion" ? t.travellers.religions : k === "maritalStatus" ? t.travellers.marital : t.travellers.passportTypes;
       input = (
@@ -181,8 +182,8 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
         </Select>
       );
     } else {
-      const latin = k.endsWith("En") || k === "passportNo" || k === "email" || k === "zipCode";
-      input = <Input id={id} type={k === "email" ? "email" : "text"} dir={k.endsWith("Ar") ? "rtl" : latin ? "ltr" : undefined} value={value} onChange={(ev) => update({ [k]: latin && k !== "email" ? ev.target.value.toUpperCase() : ev.target.value } as Partial<Traveller>)} invalid={!!e} />;
+      const latin = k.endsWith("En") || k === "passportNo" || k === "zipCode";
+      input = <Input id={id} dir={k.endsWith("Ar") ? "rtl" : latin ? "ltr" : undefined} value={value} onChange={(ev) => update({ [k]: latin ? ev.target.value.toUpperCase() : ev.target.value } as Partial<Traveller>)} invalid={!!e} />;
     }
     return <Field key={k} label={label} error={e} required htmlFor={id}>{input}</Field>;
   };
@@ -221,6 +222,14 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
         <>
           <Bubble>{fmt(d.askPhoto, { name })}</Bubble>
           <div className="max-w-xs ps-10"><PhotoUploader value={tr.personPhoto} onChange={(v) => update({ personPhoto: v })} error={errText("personPhoto")} /></div>
+        </>
+      )}
+      {docsIn && (
+        <>
+          <Bubble>{d.askContact}</Bubble>
+          <div className="grid gap-4 ps-10 sm:grid-cols-2" data-testid="guided-contact">
+            <ContactFields idPrefix={`g${index}`} traveller={tr} error={(k) => errText(k)} onChange={update} />
+          </div>
         </>
       )}
       {docsIn && asked.length > 0 && (

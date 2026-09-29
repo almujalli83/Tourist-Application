@@ -217,7 +217,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
         </div>
         <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
           {t.confirmation.emailNote}
-          {booking.mt.lastCheckedAt && <> · {t.confirmation.lastChecked}: <span className="ltr-nums">{new Date(booking.mt.lastCheckedAt).toLocaleTimeString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB")}</span></>}
+          {booking.mt.lastCheckedAt && <> · {t.confirmation.lastChecked}: <span className="ltr-nums">{new Date(booking.mt.lastCheckedAt).toLocaleTimeString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { timeZone: "Asia/Riyadh" })}</span></>}
         </p>
       </Card>
 
@@ -277,7 +277,7 @@ function ModificationLog({ booking, onChange }: { booking: StoredBooking; onChan
               <p className="flex flex-wrap items-center gap-2 font-semibold">
                 <Badge tone={m.kind === "extend" ? "brand" : "gold"}>{m.kind === "extend" ? l.extend : l.shorten}</Badge>
                 <span className="ltr-nums">{fmt(l.returnChange, { from: m.previousReturnDate, to: m.newReturnDate })}</span>
-                <span className="ltr-nums text-xs font-normal text-slate-500">{new Date(m.createdAt).toLocaleString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" })}</span>
+                <span className="ltr-nums text-xs font-normal text-slate-500">{new Date(m.createdAt).toLocaleString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" })}</span>
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 {m.chargeSAR > 0 && <span className="ltr-nums text-xs font-semibold">{fmt(l.charged, { amount: money(m.chargeSAR) })}</span>}

@@ -6,9 +6,9 @@ import { COMPANION_TYPES } from "@/lib/mt-evisa/lookups";
 import type { ClarifiedAnswer, Traveller, YesNo } from "@/lib/types";
 import { SECURITY_CLARIFIED, SECURITY_SIMPLE, type FieldErrors } from "@/lib/visa-validation";
 import { useApp } from "../app-provider";
-import { PhoneInput, phoneHint } from "../phone-input";
 import { HeartPulseIcon, PassportIcon, ShieldIcon, UserIcon, UsersIcon } from "../icons";
 import { Card, Field, Input, SectionTitle, Select, Textarea, YesNo as YesNoInput } from "../ui";
+import { ContactFields } from "./contact-fields";
 import { CountrySelect } from "./country-select";
 import { passportPatch } from "./passport-fill";
 import { PassportScanner, type PassportScan } from "./passport-scanner";
@@ -143,10 +143,7 @@ export function TravellerForm({ index, traveller: tr, all, errors, showErrors, o
 
       <Section title={t.travellers.sections.contact} icon={<UserIcon className="size-5" />}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {text("email", { required: true, dir: "ltr", type: "email", hint: tf.emailHint, max: 50 })}
-          <Field label={tf.mobileNo} required error={e("mobileNo")} hint={phoneHint(tr.mobileNo, tr.nationality, tf.mobileLength)} htmlFor={`t${index}-mobileNo`}>
-            <PhoneInput id={`t${index}-mobileNo`} value={tr.mobileNo} defaultCountry={tr.nationality} onChange={(v) => onChange({ mobileNo: v })} invalid={!!e("mobileNo")} />
-          </Field>
+          <ContactFields idPrefix={`t${index}`} traveller={tr} error={e} onChange={onChange} />
           {text("zipCode", { dir: "ltr", max: 15 })}
         </div>
         {booking && index > 0 && (

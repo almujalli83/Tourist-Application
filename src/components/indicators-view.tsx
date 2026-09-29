@@ -80,7 +80,7 @@ export function IndicatorsView() {
       {d && (
         <>
           {d.sandbox && <Alert tone="warning">{s.sandbox}</Alert>}
-          <p className="text-xs text-slate-500">{fmt(s.generated, { date: new Date(d.generatedAt).toLocaleString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB") })}</p>
+          <p className="text-xs text-slate-500">{fmt(s.generated, { date: new Date(d.generatedAt).toLocaleString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { timeZone: "Asia/Riyadh" }) })}</p>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6" data-testid="ind-kpis">
             {([
               [s.kpi.travellers, num(d.visitors.travellers)], [s.kpi.bookings, num(d.visitors.bookings)], [s.kpi.visas, num(d.visitors.visasIssued)],

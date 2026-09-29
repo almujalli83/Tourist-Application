@@ -31,7 +31,7 @@ export function AdminOperations() {
   const [data, setData] = useState<Overview | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const dt = (d: string) => new Date(d).toLocaleString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+  const dt = (d: string) => new Date(d).toLocaleString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" });
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/operations", { cache: "no-store" });
