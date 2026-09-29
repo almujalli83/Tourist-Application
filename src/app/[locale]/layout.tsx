@@ -62,10 +62,10 @@ export default async function LocaleLayout({ children, params }: { children: Rea
         <AppProvider locale={locale} uiLang={uiLang} dict={dict} initialCurrency={currency} initialUser={user}>
           <a href="#main" className="skip-link">{dict.a11y.skip}</a>
           <SiteHeader />
-          <PrivacyBanner />
           <WeatherBanner />
           <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">{children}</main>
           <SiteFooter />
+          <PrivacyBanner />
           <AssistantWidget />
           <PrayerAlerts />
           <SosButton />

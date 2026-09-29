@@ -16,7 +16,7 @@ export function SosButton() {
       aria-label={t.emergency.title}
       title={t.emergency.title}
       data-testid="sos"
-      className="fixed bottom-5 start-5 z-[650] flex h-14 items-center gap-1.5 rounded-full bg-red-600 px-4 text-sm font-bold text-white shadow-xl ring-4 ring-white transition hover:bg-red-700"
+      className="fixed bottom-[calc(1.25rem+var(--bottom-bar,0px))] start-5 z-[650] flex h-14 items-center gap-1.5 rounded-full bg-red-600 px-4 text-sm font-bold text-white shadow-xl ring-4 ring-white transition hover:bg-red-700"
     >
       <PhoneIcon className="size-5" />
       {t.emergency.sos}
