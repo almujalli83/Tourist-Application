@@ -143,8 +143,9 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
   // and the traveller sees what is left. Errors show once both images are in or a field is edited.
   return (
     <div className="space-y-4">
-      <Bubble>{fmt(d.askPassport, { name })}</Bubble>
-      <div className="max-w-md ps-10">
+      {/* Passport and personal photo side by side, as in the documents section of every visa form. */}
+      <Bubble>{fmt(d.askDocs, { name })}</Bubble>
+      <div className="grid gap-6 ps-10 md:grid-cols-2" data-testid="guided-documents-pair">
         <PassportScanner
           value={tr.passportImage}
           onImage={(v) => update({ passportImage: v })}
@@ -156,11 +157,9 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
           onDone={(read) => setScan({ read, n: read ? filledCount.current : 0 })}
           error={docsIn || touched ? errText("passportImage") : undefined}
         />
+        <PhotoUploader value={tr.personPhoto} onChange={(v) => update({ personPhoto: v })} error={docsIn || touched ? errText("personPhoto") : undefined} />
       </div>
       {scan && <Bubble>{scan.read ? fmt(d.filled, { n: scan.n }) : d.notRead}</Bubble>}
-
-      <Bubble>{fmt(d.askPhoto, { name })}</Bubble>
-      <div className="max-w-xs ps-10"><PhotoUploader value={tr.personPhoto} onChange={(v) => update({ personPhoto: v })} error={docsIn || touched ? errText("personPhoto") : undefined} /></div>
 
       <Bubble>{d.checkDetails}</Bubble>
       <div className="ps-10" data-testid="guided-form">
