@@ -10,7 +10,6 @@ import { CheckIcon, LockIcon } from "../icons";
 import { Alert, Button, Card, cx, Field, Input, Textarea, YesNo as YesNoInput } from "../ui";
 import { AuthForm } from "../auth-form";
 import { useBooking } from "./booking-context";
-import { ContactFields } from "./contact-fields";
 import { passportPatch } from "./passport-fill";
 import { PassportScanner } from "./passport-scanner";
 import { PhotoUploader } from "./photo-uploader";
@@ -109,7 +108,6 @@ export function GuidedDocuments() {
 function GuidedTraveller({ index, name, onNext }: { index: number; name: string; onNext: () => void }) {
   const { t } = useApp();
   const d = t.planner.docs;
-  const tf = t.travellers.fields;
   const booking = useBooking();
   const { errors } = useTravellerValidation();
   const tr = booking.travellers[index];
@@ -145,15 +143,6 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
   // and the traveller sees what is left. Errors show once both images are in or a field is edited.
   return (
     <div className="space-y-4">
-      {/* Contact details first: the eVisa, the insurance policy and trip notices go there. */}
-      <Bubble>{d.askContact}</Bubble>
-      <div className="grid gap-4 ps-10 sm:grid-cols-2" data-testid="guided-contact">
-        <ContactFields idPrefix={`g${index}`} traveller={tr} error={(k) => errText(k)} onChange={update} />
-        <Field label={tf.zipCode} error={errText("zipCode")} htmlFor={`g${index}-zipCode`}>
-          <Input id={`g${index}-zipCode`} dir="ltr" maxLength={15} value={tr.zipCode} onChange={(ev) => update({ zipCode: ev.target.value.toUpperCase() })} invalid={!!errText("zipCode")} />
-        </Field>
-      </div>
-
       <Bubble>{fmt(d.askPassport, { name })}</Bubble>
       <div className="max-w-md ps-10">
         <PassportScanner
@@ -175,7 +164,7 @@ function GuidedTraveller({ index, name, onNext }: { index: number; name: string;
 
       <Bubble>{d.checkDetails}</Bubble>
       <div className="ps-10" data-testid="guided-form">
-        <TravellerForm index={index} traveller={tr} all={booking.travellers} errors={errs} showErrors={docsIn || touched} onChange={edit} omit={["documents", "contact", "declarations"]} />
+        <TravellerForm index={index} traveller={tr} all={booking.travellers} errors={errs} showErrors={docsIn || touched} onChange={edit} omit={["documents", "declarations"]} />
       </div>
 
       <Bubble>{d.declarations}</Bubble>
