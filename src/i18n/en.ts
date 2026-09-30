@@ -2898,6 +2898,7 @@ const en: Dictionary = {
       assistant: "Assistant",
       askPassport: "Send me a clear photo of {name}'s passport data page (the page with the photo and the two lines at the bottom).",
       askPhoto: "And send a recent personal photo of {name} on a light background.",
+      askDocs: "Send me a clear photo of {name}'s passport data page (the page with the photo and the two lines at the bottom), and a recent personal photo on a light background.",
       checkDetails: "These are all the visa details. I fill in what I read from the passport — check it and complete the rest:",
       filled: "I read the passport and filled in {n} fields.",
       notRead: "I couldn't read the passport automatically; try a clearer photo, or complete the details below.",
