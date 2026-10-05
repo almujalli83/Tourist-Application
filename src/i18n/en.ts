@@ -1090,7 +1090,7 @@ const en: Dictionary = {
     sandbox: "Sandbox",
     remaining: "{n} messages left today",
     translate: "Live translation",
-    errors: { dailyLimit: "You've reached today's message limit. Please try again tomorrow.", unavailable: "The assistant is busy, please try again shortly.", invalidMessage: "The message is empty or too long.", generic: "Couldn't get an answer, please try again." },
+    errors: { dailyLimit: "You've reached today's message limit. Please try again tomorrow.", aiKey: "The Claude key was rejected — check ANTHROPIC_API_KEY in the site settings.", aiCredit: "The Claude account has no credit left — add credit at console.anthropic.com.", unavailable: "The assistant is busy, please try again shortly.", invalidMessage: "The message is empty or too long.", generic: "Couldn't get an answer, please try again." },
   },
   translate: {
     nav: "Translate",
@@ -1119,7 +1119,7 @@ const en: Dictionary = {
     chooseImage: "Take or choose a photo",
     sandbox: "Sandbox mode — real translation works once Claude is enabled.",
     sandboxResult: "Sample result: the text wasn't actually translated because the Claude key (ANTHROPIC_API_KEY) isn't set on the site.",
-    errors: { empty: "Enter text to translate.", invalidImage: "Unsupported image format (JPG, PNG or WebP).", imageTooLarge: "The image is larger than 4 MB.", declined: "This content couldn't be translated.", dailyLimit: "You've reached today's limit. Please try again tomorrow.", unavailable: "The service is busy, please try again shortly.", generic: "Translation failed, please try again." },
+    errors: { empty: "Enter text to translate.", invalidImage: "Unsupported image format (JPG, PNG or WebP).", imageTooLarge: "The image is larger than 4 MB.", declined: "This content couldn't be translated.", dailyLimit: "You've reached today's limit. Please try again tomorrow.", aiKey: "The Claude key was rejected — check ANTHROPIC_API_KEY in the site settings.", aiCredit: "The Claude account has no credit left — add credit at console.anthropic.com.", unavailable: "The service is busy, please try again shortly.", generic: "Translation failed, please try again." },
   },
   confirmation: {
     title: "Your application has been received",

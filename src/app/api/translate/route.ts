@@ -1,4 +1,4 @@
-import { AiUnavailableError } from "@/lib/assistant/claude";
+import { aiErrorCode, AiUnavailableError } from "@/lib/assistant/claude";
 import { LANGUAGES, translateImage, translateText, TranslateError, type Lang } from "@/lib/assistant/translate";
 import { takeQuota, visitorKey } from "@/lib/assistant/usage";
 import { currentUser } from "@/lib/auth/session";
@@ -24,7 +24,7 @@ export const POST = handle(async (req: Request) => {
     return json({ translation, remaining: quota.remaining });
   } catch (e) {
     if (e instanceof TranslateError) return error(e.message, 422);
-    if (e instanceof AiUnavailableError) return error("unavailable", 503);
+    if (e instanceof AiUnavailableError) return error(aiErrorCode(e), 503);
     throw e;
   }
 });

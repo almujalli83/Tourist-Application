@@ -14,7 +14,19 @@ export const aiModel = () => process.env.ASSISTANT_MODEL?.trim() || "claude-opus
 let client: Anthropic | null = null;
 const getClient = () => (client ??= new Anthropic());
 
-export class AiUnavailableError extends Error {}
+/**
+ * Why Claude couldn't answer: "busy" (rate limit, overload, network: try again shortly), "key" (the key
+ * was rejected), "credit" (the account has no credit left) or "error" (any other API error). Shown to
+ * the user as different messages so whoever runs the site knows what to fix.
+ */
+export type AiFailure = "busy" | "key" | "credit" | "error";
+export class AiUnavailableError extends Error {
+  constructor(readonly reason: AiFailure) {
+    super(reason);
+  }
+}
+/** The error code the API routes return for each reason. */
+export const aiErrorCode = (e: AiUnavailableError) => ({ busy: "unavailable", key: "aiKey", credit: "aiCredit", error: "unavailable" })[e.reason];
 
 export interface AskInput {
   system: Anthropic.Beta.BetaTextBlockParam[];
@@ -49,7 +61,11 @@ export async function askClaude({ system, messages, maxTokens = 4000, schema, ef
     }
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       console.error("Claude credentials rejected", error.message);
-      throw new AiUnavailableError("config");
+      throw new AiUnavailableError("key");
+    }
+    if (error instanceof Anthropic.BadRequestError && /credit balance/i.test(error.message)) {
+      console.error("Claude account has no credit", error.message);
+      throw new AiUnavailableError("credit");
     }
     if (error instanceof Anthropic.APIError) {
       console.error(`Claude API error ${error.status}`, error.message);
