@@ -392,7 +392,7 @@ export function PlanEditor({ initial, warning, onNew, readOnly = false }: { init
             </div>
             <ol className="mt-4 space-y-2" data-testid="plan-day">
               {schedules[i].map((e, k) => (
-                <EntryRow key={`${e.kind}-${e.item?.id ?? e.prayer ?? k}`} entry={e} day={d} prev={schedules[i].slice(0, k).reverse().find((x) => x.item)?.item ?? null} editable={editable} selected={selected === e.item?.id}
+                <EntryRow key={`${e.kind}-${e.item?.id ?? e.prayer ?? k}`} entry={e} day={d} prev={schedules[i].slice(0, k).reverse().find((x) => x.item)?.item ?? null} editable={editable} rides={plan.status === "booked"} selected={selected === e.item?.id}
                   onSelect={() => setSelected(e.item?.id ?? null)} onMove={(dir) => e.item && move(d.date, e.item.id, dir)} onRemove={() => e.item && remove(d.date, e.item.id)}
                   onSwap={() => e.item && setPicker({ mode: "swap", date: d.date, itemId: e.item.id })}
                   canUp={!!e.item && isFlexible(e.item) && d.items.filter(isFlexible)[0]?.id !== e.item.id}
@@ -480,8 +480,10 @@ function LegLine({ from, to, city }: { from: PlanItem; to: PlanItem; city: strin
   );
 }
 
-function EntryRow({ entry: e, day, prev, editable, selected, onSelect, onMove, onRemove, onSwap, canUp, canDown, guests }: {
+function EntryRow({ entry: e, day, prev, editable, rides, selected, onSelect, onMove, onRemove, onSwap, canUp, canDown, guests }: {
   entry: ScheduledEntry; day: PlanDay; prev: PlanItem | null; editable: boolean; selected: boolean; guests: number;
+  /** Ride requests only once the plan is booked: before that there is no trip to ride to. */
+  rides: boolean;
   onSelect: () => void; onMove: (dir: -1 | 1) => void; onRemove: () => void; onSwap: () => void; canUp: boolean; canDown: boolean;
 }) {
   const { t, locale, money } = useApp();
@@ -525,7 +527,7 @@ function EntryRow({ entry: e, day, prev, editable, selected, onSelect, onMove, o
             )}
             {it.bookHref && <span className="text-[11px] text-slate-500">{p.suggestBook}</span>}
             <a href={dir.google} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><DirectionsIcon className="size-3.5" />{p.actions.directions}</a>
-            <RideMenu to={{ lat: it.lat, lng: it.lng, name: title }} estimate={prev ? estimateRide(prev, it) : null} />
+            {rides && <RideMenu to={{ lat: it.lat, lng: it.lng, name: title }} estimate={prev ? estimateRide(prev, it) : null} />}
             {editable && (
               <span className="ms-auto flex items-center gap-1">
                 {isFlexible(it) && <button type="button" disabled={!canUp} onClick={() => onMove(-1)} className="h-8 rounded-lg px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-30" aria-label={p.actions.up}>↑ {p.actions.up}</button>}
