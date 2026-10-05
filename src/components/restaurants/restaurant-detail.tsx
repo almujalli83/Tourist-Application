@@ -15,7 +15,6 @@ import { BackLink } from "../back-link";
 import { ClockIcon, DirectionsIcon, MapPinIcon } from "../icons";
 import { Alert, Badge, Card, Spinner } from "../ui";
 import { priceSigns, SlotPicker, Stars } from "./shared";
-import { RideMenu } from "../transport/ride-menu";
 import { RatingBadge, ReviewsSection, useSummaries } from "../reviews/shared";
 
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -128,7 +127,6 @@ export function RestaurantDetail({ id }: { id: string }) {
                   <a href={links.google} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"><DirectionsIcon className="size-3.5" />{g.googleMaps}</a>
                   <Link href={`/${locale}/guide?city=${r.city}&place=${encodeURIComponent(`restaurant:${r.id}`)}`} className="font-semibold text-brand-700 hover:underline">{rs.showOnMap}</Link>
                 </dd>
-                <dd className="mt-2"><RideMenu to={{ lat: r.lat, lng: r.lng, name: ar ? r.nameAr : r.nameEn }} /></dd>
               </div>
               <div>
                 <dt className="flex items-center gap-1.5 font-semibold"><ClockIcon className="size-4 text-slate-500" />{d.hours}</dt>
