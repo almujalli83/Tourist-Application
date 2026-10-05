@@ -1,5 +1,5 @@
 import { cleanHistory, clearHistory, getHistory, MAX_MESSAGE_CHARS, reply } from "@/lib/assistant/assistant";
-import { aiConfigured, AiUnavailableError } from "@/lib/assistant/claude";
+import { aiConfigured, aiErrorCode, AiUnavailableError } from "@/lib/assistant/claude";
 import { quotaLeft, takeQuota, visitorKey } from "@/lib/assistant/usage";
 import { currentUser } from "@/lib/auth/session";
 import { body, error, handle, json } from "@/lib/http";
@@ -28,7 +28,7 @@ export const POST = handle(async (req: Request) => {
     const out = await reply({ user, locale: b?.locale === "en" ? "en" : "ar", message, guestHistory: user ? undefined : cleanHistory(b?.history) });
     return json({ ...out, remaining: quota.remaining });
   } catch (e) {
-    if (e instanceof AiUnavailableError) return error("unavailable", 503);
+    if (e instanceof AiUnavailableError) return error(aiErrorCode(e), 503);
     throw e;
   }
 });

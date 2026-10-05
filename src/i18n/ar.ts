@@ -1088,7 +1088,7 @@ const ar = {
     sandbox: "وضع تجريبي",
     remaining: "{n} رسالة متبقية اليوم",
     translate: "الترجمة الفورية",
-    errors: { dailyLimit: "وصلت إلى الحد اليومي للرسائل. حاول غدًا.", unavailable: "المساعد مشغول الآن، حاول بعد قليل.", invalidMessage: "الرسالة فارغة أو طويلة جدًا.", generic: "تعذّر الحصول على إجابة، حاول مرة أخرى." },
+    errors: { dailyLimit: "وصلت إلى الحد اليومي للرسائل. حاول غدًا.", aiKey: "مفتاح Claude مرفوض — تحقّق من ANTHROPIC_API_KEY في إعدادات الموقع.", aiCredit: "رصيد حساب Claude غير كافٍ — أضف رصيدًا من console.anthropic.com.", unavailable: "المساعد مشغول الآن، حاول بعد قليل.", invalidMessage: "الرسالة فارغة أو طويلة جدًا.", generic: "تعذّر الحصول على إجابة، حاول مرة أخرى." },
   },
   translate: {
     nav: "الترجمة",
@@ -1117,7 +1117,7 @@ const ar = {
     chooseImage: "التقط أو اختر صورة",
     sandbox: "وضع تجريبي — الترجمة الفعلية تعمل بعد تفعيل Claude.",
     sandboxResult: "نتيجة تجريبية: النص لم يُترجم فعليًا لأن مفتاح Claude (ANTHROPIC_API_KEY) غير مفعّل على الموقع.",
-    errors: { empty: "أدخل نصًا للترجمة.", invalidImage: "صيغة الصورة غير مدعومة (JPG أو PNG أو WebP).", imageTooLarge: "الصورة أكبر من 4 ميجابايت.", declined: "تعذّرت ترجمة هذا المحتوى.", dailyLimit: "وصلت إلى الحد اليومي. حاول غدًا.", unavailable: "الخدمة مشغولة الآن، حاول بعد قليل.", generic: "تعذّرت الترجمة، حاول مرة أخرى." },
+    errors: { empty: "أدخل نصًا للترجمة.", invalidImage: "صيغة الصورة غير مدعومة (JPG أو PNG أو WebP).", imageTooLarge: "الصورة أكبر من 4 ميجابايت.", declined: "تعذّرت ترجمة هذا المحتوى.", dailyLimit: "وصلت إلى الحد اليومي. حاول غدًا.", aiKey: "مفتاح Claude مرفوض — تحقّق من ANTHROPIC_API_KEY في إعدادات الموقع.", aiCredit: "رصيد حساب Claude غير كافٍ — أضف رصيدًا من console.anthropic.com.", unavailable: "الخدمة مشغولة الآن، حاول بعد قليل.", generic: "تعذّرت الترجمة، حاول مرة أخرى." },
   },
   confirmation: {
     title: "تم استلام طلبك",
