@@ -18,14 +18,15 @@ import type { EventOrder } from "@/lib/events/types";
 import type { RestaurantBooking } from "@/lib/restaurants/bookings";
 import type { TrainOrder } from "@/lib/trains/orders";
 import { groupByTrip } from "@/lib/account/trips";
-import { eventRide, guideRide, inRideWindow, packageRide, tableRide, trainRide, type RideTarget } from "@/lib/transport/booking-rides";
-import { estimateRide } from "@/lib/transport/rides";
+import { directionsLinks } from "@/lib/guide/geo";
+import { eventRide, guideRide, inRideWindow, packageRide, RIDE_LEAD_MS, tableRide, trainRide, type RideTarget } from "@/lib/transport/booking-rides";
+import { AIRPORTS, estimateRide } from "@/lib/transport/rides";
 import { STATIONS } from "@/lib/trains/network";
 import { RideMenu } from "./transport/ride-menu";
 import type { BookingRow } from "./account-view";
 import { useApp } from "./app-provider";
 import { StatusBadge } from "./booking-details";
-import { BusIcon, CalendarIcon, CarIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, TicketIcon, TrainIcon, UsersIcon } from "./icons";
+import { BusIcon, CalendarIcon, CarIcon, DirectionsIcon, HotelIcon, PassportIcon, PhoneIcon, PlaneIcon, TicketIcon, TrainIcon, UsersIcon } from "./icons";
 import { useNetwork } from "./transport/train-ticket-view";
 import { Badge, Card, cx, Spinner } from "./ui";
 
@@ -68,6 +69,10 @@ interface Item {
   packageId?: string;
   /** «Order a car» while the booking is current (from the day before until it ends). */
   ride?: RideTarget | null;
+  /** The ride target at a given time; null outside the booking's ride window. */
+  rideFor?: (at: number) => RideTarget | null;
+  /** Where an upcoming confirmed booking takes place: directions are offered right away. */
+  place?: RideTarget["to"] | null;
 }
 
 type Entry = { item: Item; children: Item[] };
@@ -135,7 +140,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         upcoming: !cancelled && b.returnDate >= today, today: !cancelled && b.departureDate <= today && b.returnDate >= today,
         status: <StatusBadge status={b.status} />, amount: money(b.totalSAR),
         trip: { from: b.departureDate, to: b.returnDate, cancelled },
-        ride: b.ride ? packageRide(b.ride, now, ar) : null,
+        rideFor: b.ride ? ((r) => (at: number) => packageRide(r, at, ar))(b.ride) : undefined,
       });
     }
     for (const o of events ?? []) {
@@ -148,7 +153,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(o.session.start), day: ksaDay(o.session.start),
         upcoming: live && end > now, today: live && end > now && ksaDay(o.session.start) === today,
         status: badge(t.events.ticket.status[o.status], !live), amount: money(o.totalSAR),
-        ride: eventRide(o, now, ar),
+        rideFor: (at) => eventRide(o, at, ar),
       });
     }
     for (const o of trains ?? []) {
@@ -162,7 +167,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(first.depart), day: ksaDay(first.depart),
         upcoming: live && Date.parse(last.depart) > now, today: live && Date.parse(last.depart) > now && o.legs.some((l) => ksaDay(l.trip.depart) === today),
         status: badge(t.trains.ticket.status[o.status], !live), amount: money(o.totalSAR),
-        ride: trainRide(o, STATIONS, now, ar),
+        rideFor: (at) => trainRide(o, STATIONS, at, ar),
       });
     }
     for (const b of tables ?? []) {
@@ -174,7 +179,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: Date.parse(b.start), day: b.day,
         upcoming: live && Date.parse(b.start) > now - 2 * 3_600_000, today: live && b.day === today && Date.parse(b.start) > now - 2 * 3_600_000,
         status: badge(t.restaurants.booking.status[b.status], !live), amount: b.fee.paidSAR ? money(b.fee.paidSAR) : undefined,
-        ride: tableRide(b, now, ar),
+        rideFor: (at) => tableRide(b, at, ar),
       });
     }
     for (const o of esims ?? []) {
@@ -202,7 +207,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: start, day: b.date,
         upcoming: live && end > now, today: live && end > now && b.date === today,
         status: <Badge tone={b.status === "confirmed" ? "brand" : b.status === "pending" ? "amber" : "red"}>{t.guides.booking.status[b.status]}</Badge>,
-        ride: guideRide(b, now, ar),
+        rideFor: (at) => guideRide(b, at, ar),
       });
     }
     for (const x of transfers ?? []) {
@@ -272,7 +277,7 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: start, day: h.checkIn,
         upcoming: live && end > now, today: live && h.checkIn <= today && today <= h.checkOut,
         status: badge(t.standalone.stay.status[o.status], !live), amount: money(o.totalSAR),
-        ride: live && typeof h.lat === "number" && typeof h.lng === "number" && inRideWindow(start, end, now) ? { to: { lat: h.lat, lng: h.lng, name: ar ? h.nameAr : h.nameEn }, purpose: "hotel" } : null,
+        rideFor: live && typeof h.lat === "number" && typeof h.lng === "number" ? ((to) => (at: number) => (inRideWindow(start, end, at) ? { to, purpose: "hotel" as const } : null))({ lat: h.lat, lng: h.lng, name: ar ? h.nameAr : h.nameEn }) : undefined,
       });
     }
     for (const o of flights ?? []) {
@@ -287,6 +292,10 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         at: start, day: first.departAt.slice(0, 10),
         upcoming: live && Date.parse(`${last.arriveAt}:00+03:00`) > now, today: live && first.departAt.slice(0, 10) === today,
         status: badge(t.standalone.flight.status[o.status], !live), amount: money(o.totalSAR),
+        // A ride to the departure airport (Saudi airports), from the day before until take-off.
+        rideFor: live && AIRPORTS[first.from]
+          ? (at) => (inRideWindow(start, start, at) ? { to: { ...AIRPORTS[first.from], name: ar ? `مطار ${cityName(first.from, locale)}` : `${cityName(first.from, locale)} airport` }, purpose: "airport" } : null)
+          : undefined,
       });
     }
     // Tourist eVisa applications while undecided (or refused); an issued visa lives in the wallet instead.
@@ -312,6 +321,11 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
         upcoming: live && Date.parse(o.trip.arrive) > now, today: live && ksaDay(new Date(start)) === today,
         status: badge(t.buses.status[o.status], !live), amount: money(o.totalSAR),
       });
+    }
+    for (const i of out) {
+      i.ride = i.rideFor?.(now) ?? null;
+      // The destination at the booking's own time, so directions show as soon as it is confirmed.
+      i.place = i.upcoming && i.rideFor ? i.rideFor(Math.max(now, i.at))?.to ?? null : null;
     }
     return out;
   }, [packages, events, trains, tables, esims, guides, transfers, rentals, transit, rides, buses, stays, flights, visas, net, locale, ar, money, t]);
@@ -341,7 +355,17 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
           {i.amount && <span className="ltr-nums text-sm font-semibold">{i.amount}</span>}
         </div>
       </Link>
-      {i.ride && <RideMenu to={i.ride.to} from={i.ride.from} estimate={i.ride.from ? estimateRide(i.ride.from, i.ride.to) : null} className="shrink-0" />}
+      {i.place && (
+        <a href={directionsLinks(i.place).google} target="_blank" rel="noopener noreferrer" data-testid="booking-directions"
+          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">
+          <DirectionsIcon className="size-3.5" />{m.directions}
+        </a>
+      )}
+      {i.ride ? (
+        <RideMenu to={i.ride.to} from={i.ride.from} estimate={i.ride.from ? estimateRide(i.ride.from, i.ride.to) : null} className="shrink-0" />
+      ) : i.place ? (
+        <span className="hidden max-w-28 shrink-0 text-[11px] leading-tight text-slate-500 sm:block" data-testid="ride-from">{fmt(m.rideFrom, { date: fmtDay(ksaDay(new Date(i.at - RIDE_LEAD_MS).toISOString()), locale, { day: "numeric", month: "short" }) })}</span>
+      ) : null}
     </div>
   );
 
@@ -393,7 +417,6 @@ export function MyBookings({ packages }: { packages: BookingRow[] }) {
           {upcoming.length > 0 && (
             <section>
               <p className="px-5 pt-4 text-sm font-bold text-slate-700">{m.upcoming}</p>
-              {upcoming.some((e) => !e.item.ride) && <p className="px-5 pt-1 text-xs text-slate-500" data-testid="ride-hint">{m.rideHint}</p>}
               {list(upcoming)}
             </section>
           )}

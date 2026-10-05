@@ -67,7 +67,7 @@ export function TableBookingView({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
-      <div className="print:hidden"><BookingRide target={tableRide(b, Date.now(), ar)} /></div>
+      <div className="print:hidden"><BookingRide rideAt={(at) => tableRide(b, at, ar)} start={Date.parse(b.start)} /></div>
       {notice && !cancelled && <Alert tone="success" className="print:hidden">{notice}</Alert>}
       {cancelled && <Alert tone="warning">{bk.cancelled}{b.cancellation?.refundSAR ? ` ${fmt(bk.refunded, { amount: money(b.cancellation.refundSAR) })}` : ""}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}

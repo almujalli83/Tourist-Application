@@ -2594,6 +2594,8 @@ const en: Dictionary = {
       todayHint: "Open the booking to show its entry QR code.",
       upcoming: "Upcoming",
       rideHint: "«Order a car» appears on each booking from the day before it until it ends.",
+      directions: "Directions",
+      rideFrom: "Car booking opens {date}",
       past: "Past & cancelled",
       empty: "No bookings of this kind yet.",
       open: "Open",

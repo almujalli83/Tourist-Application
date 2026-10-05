@@ -13,7 +13,7 @@ import { ReceiptLink } from "./payments/receipt-link";
 import { BackLink } from "./back-link";
 import { ChatIcon, CheckIcon, RefreshIcon } from "./icons";
 import { Alert, Badge, Button, Card, cx, Spinner } from "./ui";
-import { packageRide, packageRideInfo } from "@/lib/transport/booking-rides";
+import { packageRide, packageRideInfo, packageRideStart } from "@/lib/transport/booking-rides";
 import { BookingRide } from "./transport/booking-ride";
 import { HotelMetro } from "./metro/metro-panel";
 import { TransfersSection } from "./transfers/transfers-section";
@@ -83,7 +83,7 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
   return (
     <div className="space-y-5">
       <BackLink href={`/${locale}/account`} label={t.nav.myBookings} className="-ms-2.5" />
-      <BookingRide target={packageRide(packageRideInfo(booking), Date.now(), locale === "ar")} />
+      <BookingRide rideAt={(at) => packageRide(packageRideInfo(booking), at, locale === "ar")} start={packageRideStart(packageRideInfo(booking))} />
       <TransfersSection bookingId={booking.id} cancelled={booking.status === "CANCELLED" || booking.mt.packageStatus === "CANCELLED" || !booking.mt.packageId} />
       <RentalsSection bookingId={booking.id} cancelled={booking.status === "CANCELLED" || booking.mt.packageStatus === "CANCELLED" || !booking.mt.packageId} />
       {fresh && (
