@@ -69,7 +69,7 @@ export function TicketView({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <div className="print:hidden"><BackLink href={`/${locale}/account`} label={t.nav.myBookings} /></div>
-      <div className="print:hidden"><BookingRide target={eventRide(o, Date.now(), ar)} /></div>
+      <div className="print:hidden"><BookingRide rideAt={(at) => eventRide(o, at, ar)} start={Date.parse(o.session.start)} /></div>
       {fresh && !cancelled && <Alert tone="success" className="print:hidden">{tk.purchased}</Alert>}
       {cancelled && o.cancellation && <Alert tone="warning">{fmt(tk.cancelled, { amount: money(o.cancellation.refundSAR) })}</Alert>}
       {err && <Alert tone="error">{err}</Alert>}

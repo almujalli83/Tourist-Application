@@ -9,7 +9,7 @@ import type { GuideBooking, GuideBookingStatus } from "@/lib/guides/bookings";
 import { useApp } from "../app-provider";
 import { BackLink } from "../back-link";
 import { Alert, Badge, Button, Card, Spinner } from "../ui";
-import { guideRide } from "@/lib/transport/booking-rides";
+import { guideRide, guideRideStart } from "@/lib/transport/booking-rides";
 import { BookingRide } from "../transport/booking-ride";
 import { ContactButtons, langLabel } from "./guide-card";
 
@@ -49,7 +49,7 @@ export function GuideBookingView({ id }: { id: string }) {
         <span data-testid="guide-booking-status"><Badge tone={GUIDE_STATUS_TONE[b.status]}>{b_.status[b.status]}</Badge></span>
       </div>
       {b.cancelReason && <Alert tone="warning">{b_.cancelReason[b.cancelReason]}</Alert>}
-      <BookingRide target={guideRide(b, Date.now(), ar)} />
+      <BookingRide rideAt={(at) => guideRide(b, at, ar)} start={guideRideStart(b)} />
       <Card className="space-y-3 p-5">
         <p className="text-lg font-bold">
           <Link href={`/${locale}/guides/${encodeURIComponent(b.guide.licenseNo)}`} className="hover:text-brand-700">{ar ? b.guide.nameAr : b.guide.nameEn}</Link>

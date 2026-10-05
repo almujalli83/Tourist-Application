@@ -37,7 +37,7 @@ const hotelDest = (h: PackageRideInfo["hotels"][number], ar: boolean): RideDesti
 export function packageRide(p: PackageRideInfo, now: number, ar: boolean): RideTarget | null {
   if (p.cancelled || !p.hotels.length) return null;
   const first = p.hotels[0];
-  const start = p.arrival ? ksaMs(p.arrival.at) : ksaMs(`${first.checkIn}T12:00`);
+  const start = packageRideStart(p);
   const end = p.departure ? ksaMs(p.departure.at) : ksaMs(`${p.hotels[p.hotels.length - 1].checkOut}T12:00`);
   if (!inRideWindow(start, end, now)) return null;
   const today = ksaDay(now);
@@ -53,6 +53,14 @@ export function packageRide(p: PackageRideInfo, now: number, ar: boolean): RideT
   const to = hotelDest(tonight, ar);
   return to ? { to, purpose: "hotel" } : null;
 }
+
+/** When a package's rides start (arrival, else the first check-in): its ride window opens the day before. */
+export function packageRideStart(p: PackageRideInfo): number {
+  return p.arrival ? ksaMs(p.arrival.at) : p.hotels.length ? ksaMs(`${p.hotels[0].checkIn}T12:00`) : NaN;
+}
+
+/** When a guide tour starts (Saudi time). */
+export const guideRideStart = (g: { date: string; startTime: string }) => ksaMs(`${g.date}T${g.startTime}`);
 
 /** An event ticket: to the venue, from the day before until the show ends. */
 export function eventRide(o: { status: string; session: { start: string }; event: { lat: number; lng: number; venueAr: string; venueEn: string; durationMins: number } }, now: number, ar: boolean): RideTarget | null {
@@ -85,7 +93,7 @@ export function trainRide(
 /** A confirmed guide tour: to the meeting point (when the guide gave its location), until the tour ends. */
 export function guideRide(g: { status: string; date: string; startTime: string; hours: number; meetingPoint?: { text: string; lat: number | null; lng: number | null } | null; guide: { nameAr: string; nameEn: string } }, now: number, ar: boolean): RideTarget | null {
   if (g.status !== "confirmed" || !g.meetingPoint || g.meetingPoint.lat === null || g.meetingPoint.lng === null) return null;
-  const start = ksaMs(`${g.date}T${g.startTime}`);
+  const start = guideRideStart(g);
   if (!inRideWindow(start, start + g.hours * 3_600_000, now)) return null;
   const name = g.meetingPoint.text || (ar ? `لقاء ${g.guide.nameAr}` : `Meeting ${g.guide.nameEn}`);
   return { to: { lat: g.meetingPoint.lat, lng: g.meetingPoint.lng, name }, purpose: "meeting" };
