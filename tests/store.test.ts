@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -30,6 +30,23 @@ function suite(name: string, make: () => DocStore) {
 }
 
 suite("file store", () => createFileStore(path.join(mkdtempSync(path.join(tmpdir(), "st-")), "db.json")));
+
+describe("file store cache", () => {
+  it("sees edits made to the file by another process, and drops a write that failed", async () => {
+    const file = path.join(mkdtempSync(path.join(tmpdir(), "st-")), "db.json");
+    const s = createFileStore(file);
+    await s.put("users", "a", { id: "a", n: 1 });
+    expect(await s.get("users", "a")).toMatchObject({ n: 1 });
+    const d = JSON.parse(readFileSync(file, "utf8"));
+    d.users.a.n = 2;
+    d.users.b = { id: "b", n: 3, pad: "x".repeat(10) };
+    writeFileSync(file, JSON.stringify(d));
+    expect(await s.get("users", "a")).toMatchObject({ n: 2 });
+    expect(await s.get("users", "b")).toMatchObject({ n: 3 });
+    await expect(s.update<{ n: number }>("users", "a", (x) => { x.n = 99; throw new Error("boom"); })).rejects.toThrow("boom");
+    expect(await s.get("users", "a")).toMatchObject({ n: 2 });
+  });
+});
 
 // Runs against a real Postgres when TEST_DATABASE_URL is provided.
 if (process.env.TEST_DATABASE_URL) suite("postgres store", () => createPgStore(process.env.TEST_DATABASE_URL!));
