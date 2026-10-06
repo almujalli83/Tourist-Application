@@ -1,8 +1,9 @@
 /**
- * The traveller's Umrah trips (packages and draft plans with a Makkah stay): the Umrah day, the way
- * to Makkah (flying into Jeddah, or from Jeddah by road), the Hajj-season warning, the days on which
- * Nusuk permits can be requested (Umrah: the nights in Makkah; Rawdah: the days in Madinah), the
- * permits issued, and the reminders.
+ * The traveller's trips to the two holy cities (packages and draft plans with a stay in Makkah or
+ * Madinah): the Umrah day, the way to Makkah (flying into Jeddah, or from Jeddah by road), the
+ * Hajj-season warning, the days on which Nusuk permits can be requested (Umrah: the nights in Makkah;
+ * Rawdah: the days in Madinah), the permits issued, and the reminders. A trip to Madinah without
+ * Makkah has no Umrah part: its Makkah fields are null and only the Rawdah can be booked.
  */
 import { mtConfig } from "../config";
 import { UMRAH_CITY } from "../data/cities";
@@ -26,13 +27,13 @@ export interface UmrahTrip {
   reference: string | null;
   departureDate: string;
   returnDate: string;
-  makkahFrom: string;
-  makkahTo: string;
+  makkahFrom: string | null;
+  makkahTo: string | null;
   madinahFrom: string | null;
   madinahTo: string | null;
-  umrahDate: string;
-  /** How the traveller reaches Makkah: flying into Jeddah, or from a stay in Jeddah. */
-  route: "air" | "jeddah";
+  umrahDate: string | null;
+  /** How the traveller reaches Makkah: flying into Jeddah, or from a stay in Jeddah (null without Makkah). */
+  route: "air" | "jeddah" | null;
   fromCity: string | null;
   /** Travellers of the booking; permits can be issued once the visa is. */
   travellers: { applicationNo: string; name: string; visa: boolean }[];
@@ -65,10 +66,20 @@ function daysBetween(from: string, to: string, inclusive: boolean): string[] {
 
 function shape(stays: Stay[], season: UmrahSeason, today: string) {
   const i = stays.findIndex((s) => s.city === UMRAH_CITY);
-  if (i < 0) return null;
+  const med = stays.find((x) => x.city === "MED") ?? null;
+  if (i < 0) {
+    // Madinah without Makkah: only the Rawdah visit.
+    if (!med) return null;
+    const rawdah = daysBetween(med.checkIn, med.checkOut, true);
+    return {
+      makkahFrom: null, makkahTo: null, madinahFrom: med.checkIn, madinahTo: med.checkOut,
+      umrahDate: null, route: null, fromCity: null, pause: null,
+      windows: { umrah: [] as string[], rawdah: rawdah.filter((d) => d >= today) },
+      stayDays: { umrah: [] as string[], rawdah },
+    };
+  }
   const s = stays[i];
   const prev = i > 0 ? stays[i - 1].city : null;
-  const med = stays.find((x) => x.city === "MED") ?? null;
   const pause = pauseOverlap(season, s.checkIn, s.checkOut);
   const inPause = (d: string) => !!season.pauseFrom && !!season.pauseTo && d >= season.pauseFrom && d <= season.pauseTo;
   return {
@@ -173,36 +184,52 @@ export async function umrahReminders(userId: string, now = new Date()): Promise<
     if (!t.bookingId || t.demo) continue;
     const base = { userId, kind: "umrah" as const, bookingId: t.bookingId, reference: t.reference ?? "", createdAt: now.toISOString(), href: "/umrah", readAt: null, deletedAt: null, email: null };
     const d = (x: string, ar: boolean) => new Date(`${x}T12:00:00Z`).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { weekday: "long", day: "numeric", month: "long" });
+    if (!t.makkahFrom || !t.umrahDate) {
+      // Madinah only: once the visas are issued, a reminder to book the Rawdah visit.
+      const allRawdah = t.travellers.length > 0 && t.travellers.every((x) => t.permits.some((p) => p.type === "rawdah" && p.travellers.some((y) => y.applicationNo === x.applicationNo)));
+      if (!allRawdah && t.travellers.some((x) => x.visa) && t.madinahTo && today <= t.madinahTo) {
+        await notify(userId, {
+          ...base, id: `rawdah:visas:${t.bookingId}`,
+          titleAr: "صدرت تأشيرتك — احجز موعد الروضة الشريفة", titleEn: "Your visa is issued — book your Rawdah visit",
+          linesAr: [auto ? "اختر اليوم والوقت من صفحة العمرة والروضة قبل امتلاء المواعيد، ويصدر التصريح من «نسك» تلقائيًا." : "احجز موعد الروضة الشريفة في تطبيق «نسك» قبل امتلاء المواعيد."],
+          linesEn: [auto ? "Pick the day and time on the Umrah & Rawdah page before the times fill up; Nusuk issues the permit automatically." : "Book your Rawdah visit in the Nusuk app before the times fill up."],
+        });
+        n++;
+      }
+      continue;
+    }
+    const umrahDate = t.umrahDate;
+    const makkahFrom = t.makkahFrom;
     const allHave = t.travellers.length > 0 && t.travellers.every((x) => t.permits.some((p) => p.type === "umrah" && p.travellers.some((y) => y.applicationNo === x.applicationNo)));
     // As soon as the visas are issued: book early, while the times are open.
-    if (!allHave && t.travellers.some((x) => x.visa) && today <= t.makkahFrom) {
+    if (!allHave && t.travellers.some((x) => x.visa) && today <= makkahFrom) {
       await notify(userId, {
         ...base, id: `umrah:visas:${t.bookingId}`,
         titleAr: "صدرت تأشيرتك — احجز موعد العمرة الآن", titleEn: "Your visa is issued — book your Umrah time now",
         linesAr: [
           auto ? "اختر يوم العمرة ووقتها (وموعد الروضة الشريفة إن كانت المدينة في رحلتك) قبل امتلاء الأوقات، ويصدر التصريح من «نسك» تلقائيًا." : "احجز موعد العمرة (والروضة الشريفة إن كانت المدينة في رحلتك) في تطبيق «نسك» قبل امتلاء الأوقات.",
-          `يوم العمرة في برنامجك: ${d(t.umrahDate, true)}.`,
+          `يوم العمرة في برنامجك: ${d(umrahDate, true)}.`,
         ],
         linesEn: [
           auto ? "Pick your Umrah day and time (and a Rawdah visit if Madinah is in your trip) before the times fill up; Nusuk issues the permit automatically." : "Book your Umrah time (and a Rawdah visit if Madinah is in your trip) in the Nusuk app before the times fill up.",
-          `Your Umrah day: ${d(t.umrahDate, false)}.`,
+          `Your Umrah day: ${d(umrahDate, false)}.`,
         ],
       });
       n++;
     }
-    if (!allHave && today >= addDays(t.departureDate, -BOOK_REMINDER_DAYS) && today <= t.makkahFrom) {
+    if (!allHave && today >= addDays(t.departureDate, -BOOK_REMINDER_DAYS) && today <= makkahFrom) {
       const pauseAr = t.pause ? [`⚠️ رحلتك تقع في فترة إيقاف تصاريح العمرة لموسم الحج (${t.pause.from} – ${t.pause.to}).`] : [];
       const pauseEn = t.pause ? [`⚠️ Your trip falls in the Umrah permit pause for the Hajj season (${t.pause.from} – ${t.pause.to}).`] : [];
       await notify(userId, {
         ...base, id: `umrah:book:${t.bookingId}`,
         titleAr: "احجز تصريح العمرة", titleEn: "Book your Umrah permit",
         linesAr: [
-          `يوم العمرة في برنامجك: ${d(t.umrahDate, true)}.`,
+          `يوم العمرة في برنامجك: ${d(umrahDate, true)}.`,
           auto ? "اختر اليوم والوقت المناسبين من صفحة العمرة، ويصدر التصريح من «نسك» تلقائيًا." : "احجز التصريح في تطبيق «نسك» بجوازك ورقم تأشيرتك قبل الرحلة.",
           ...pauseAr,
         ],
         linesEn: [
-          `Your Umrah day: ${d(t.umrahDate, false)}.`,
+          `Your Umrah day: ${d(umrahDate, false)}.`,
           auto ? "Pick the day and time on the Umrah page and the permit is issued by Nusuk automatically." : "Book the permit in the Nusuk app with your passport and visa number before the trip.",
           ...pauseEn,
         ],
@@ -210,7 +237,7 @@ export async function umrahReminders(userId: string, now = new Date()): Promise<
       });
       n++;
     }
-    if (today === t.umrahDate) {
+    if (today === umrahDate) {
       const miqatAr = t.route === "jeddah" ? "من جدة إلى مكة: راجع صفحة العمرة لمعرفة موضع الإحرام." : "أحرم من الميقات قبل تجاوزه.";
       const miqatEn = t.route === "jeddah" ? "From Jeddah to Makkah: see the Umrah page for where to enter ihram." : "Enter ihram at the miqat before passing it.";
       await notify(userId, {

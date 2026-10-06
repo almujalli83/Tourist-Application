@@ -50,20 +50,26 @@ function TripCard({ trip, links, nusuk, onChange }: { trip: UmrahTrip & { permit
         </p>
         {href && <Link href={href} className="text-sm font-semibold text-brand-700 hover:underline">{trip.bookingId ? u.open : u.openPlan}</Link>}
       </div>
-      <p className="text-sm text-slate-600">{fmt(u.makkah, { from: d(trip.makkahFrom), to: d(trip.makkahTo) })}</p>
-      <p className="flex items-center gap-2 rounded-xl bg-gold-50 px-4 py-3 text-sm font-bold text-gold-700 ring-1 ring-gold-500/30" data-testid="umrah-day">
-        <KaabaIcon className="size-5" />{u.day}: {d(trip.umrahDate)}
-      </p>
-      {trip.pause && <Alert tone="warning"><span data-testid="umrah-pause-trip">{fmt(t.umrah.pause.trip, { from: trip.pause.from, to: trip.pause.to })}</span></Alert>}
-      <p className="text-sm leading-6 text-slate-700">{trip.route === "jeddah" ? u.viaJeddah : u.viaAir}</p>
-      <div className="flex flex-wrap items-center gap-2" data-testid="umrah-transfer">
-        <Link href={`/${locale}/trains?from=${trip.route === "jeddah" ? "JSL" : "JAP"}&to=MKK&date=${trip.makkahFrom}`}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-50 px-3 text-xs font-semibold text-brand-800 ring-1 ring-brand-700/15 hover:bg-brand-100" data-testid="umrah-train">
-          <TrainIcon className="size-4" />{t.rides.haramain}
-        </Link>
-        {(trip.bookingId || trip.demo) && <RideMenu to={{ lat: KAABA.lat, lng: KAABA.lng, name: locale === "ar" ? "المسجد الحرام، مكة المكرمة" : "Masjid al-Haram, Makkah" }} from={trip.makkahHotel ?? null} />}
-      </div>
-      <UmrahBus hotel={trip.makkahHotel} />
+      {trip.makkahFrom ? (
+        <>
+          <p className="text-sm text-slate-600">{fmt(u.makkah, { from: d(trip.makkahFrom), to: d(trip.makkahTo!) })}</p>
+          <p className="flex items-center gap-2 rounded-xl bg-gold-50 px-4 py-3 text-sm font-bold text-gold-700 ring-1 ring-gold-500/30" data-testid="umrah-day">
+            <KaabaIcon className="size-5" />{u.day}: {d(trip.umrahDate!)}
+          </p>
+          {trip.pause && <Alert tone="warning"><span data-testid="umrah-pause-trip">{fmt(t.umrah.pause.trip, { from: trip.pause.from, to: trip.pause.to })}</span></Alert>}
+          <p className="text-sm leading-6 text-slate-700">{trip.route === "jeddah" ? u.viaJeddah : u.viaAir}</p>
+          <div className="flex flex-wrap items-center gap-2" data-testid="umrah-transfer">
+            <Link href={`/${locale}/trains?from=${trip.route === "jeddah" ? "JSL" : "JAP"}&to=MKK&date=${trip.makkahFrom}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-50 px-3 text-xs font-semibold text-brand-800 ring-1 ring-brand-700/15 hover:bg-brand-100" data-testid="umrah-train">
+              <TrainIcon className="size-4" />{t.rides.haramain}
+            </Link>
+            {(trip.bookingId || trip.demo) && <RideMenu to={{ lat: KAABA.lat, lng: KAABA.lng, name: locale === "ar" ? "المسجد الحرام، مكة المكرمة" : "Masjid al-Haram, Makkah" }} from={trip.makkahHotel ?? null} />}
+          </div>
+          <UmrahBus hotel={trip.makkahHotel} />
+        </>
+      ) : (
+        <p className="text-sm text-slate-600" data-testid="umrah-madinah">{fmt(u.madinah, { from: d(trip.madinahFrom!), to: d(trip.madinahTo!) })}</p>
+      )}
       <div className="border-t border-slate-100 pt-3">
         <PermitsPanel trip={trip} nusuk={nusuk} links={<NusukButtons links={links} />} onChange={onChange} />
       </div>

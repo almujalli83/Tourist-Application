@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmt } from "@/i18n";
 import type { Eligibility } from "@/lib/bookings/modify";
 import type { BookingModification, StoredBooking } from "@/lib/bookings/types";
-import { cityName } from "@/lib/data/cities";
+import { cityName, UMRAH_CITY } from "@/lib/data/cities";
 import { countryName } from "@/lib/data/countries";
 import { useApp } from "./app-provider";
 import { TripShareCard } from "./trip-share";
@@ -79,6 +79,9 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
   if (error || !booking) return <Alert tone="error">{t.review.errors.generic}</Alert>;
 
   const failed = booking.status === "SUBMISSION_FAILED";
+  // Nusuk permits for a stay in Makkah (Umrah and Rawdah) or Madinah only (Rawdah).
+  const live = booking.status !== "CANCELLED" && booking.mt.packageStatus !== "CANCELLED";
+  const holy = !live ? null : booking.criteria.stays.some((s) => s.city === UMRAH_CITY) ? "umrah" : booking.criteria.stays.some((s) => s.city === "MED") ? "rawdah" : null;
 
   return (
     <div className="space-y-5">
@@ -108,6 +111,15 @@ export function BookingDetails({ id, fresh, updated }: { id: string; fresh?: boo
         </Link>
       </Card>
       {booking.status !== "CANCELLED" && <TripShareCard bookingId={booking.id} />}
+      {holy && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5" data-testid="booking-permits">
+          <div className="text-sm">
+            <p className="font-bold text-ink">{t.umrah.bookingCard.title}</p>
+            <p className="text-slate-600">{holy === "umrah" ? t.umrah.bookingCard.umrah : t.umrah.bookingCard.rawdah}</p>
+          </div>
+          <Link href={`/${locale}/umrah`} className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-700/25 hover:bg-brand-50">{t.umrah.bookingCard.open}</Link>
+        </Card>
+      )}
       {booking.tripPlanId && (
         <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5" data-testid="booking-plan">
           <div className="text-sm">
