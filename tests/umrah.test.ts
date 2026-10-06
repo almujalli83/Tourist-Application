@@ -169,18 +169,18 @@ describe("Nusuk permits issued automatically", () => {
     const women = await availableSlots(u.id, { tripKey: "permit-b1", type: "rawdah", date: addDays(mk, 2), people: 1, group: "women" });
     expect(women.every((x) => x.group === "women")).toBe(true);
 
-    const slots = await availableSlots(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, people: 2 });
+    const slots = await availableSlots(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate!, people: 2 });
     const open = slots.find((x) => x.remaining >= 2)!;
     const full = slots.find((x) => x.remaining < 2);
-    if (full) await expect(issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, slotId: full.id, applicationNos: ["1", "2"] })).rejects.toMatchObject({ code: "slotFull" });
-    const p = await issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, slotId: open.id, applicationNos: ["1", "2"] });
-    expect(p).toMatchObject({ type: "umrah", status: "issued", source: "sandbox", date: trip.umrahDate, start: open.start });
+    if (full) await expect(issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate!, slotId: full.id, applicationNos: ["1", "2"] })).rejects.toMatchObject({ code: "slotFull" });
+    const p = await issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate!, slotId: open.id, applicationNos: ["1", "2"] });
+    expect(p).toMatchObject({ type: "umrah", status: "issued", source: "sandbox", date: trip.umrahDate!, start: open.start });
     expect(p.permitNo).toMatch(/^SBX-/);
     expect(JSON.stringify(p)).not.toContain("A12345678");
     // Seats are taken in Nusuk.
-    expect((await availableSlots(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, people: 1 })).find((x) => x.id === open.id)!.remaining).toBe(open.remaining - 2);
+    expect((await availableSlots(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate!, people: 1 })).find((x) => x.id === open.id)!.remaining).toBe(open.remaining - 2);
     // One Umrah permit per traveller and trip.
-    await expect(issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate, slotId: open.id, applicationNos: ["1"] })).rejects.toMatchObject({ code: "alreadyHasPermit" });
+    await expect(issuePermit(u.id, { tripKey: "permit-b1", type: "umrah", date: trip.umrahDate!, slotId: open.id, applicationNos: ["1"] })).rejects.toMatchObject({ code: "alreadyHasPermit" });
     // Rawdah for the women's group.
     const w = (await availableSlots(u.id, { tripKey: "permit-b1", type: "rawdah", date: addDays(mk, 3), people: 1, group: "women" })).find((x) => x.remaining >= 1)!;
     await issuePermit(u.id, { tripKey: "permit-b1", type: "rawdah", group: "women", date: addDays(mk, 3), slotId: w.id, applicationNos: ["1"] });
@@ -226,12 +226,31 @@ describe("Nusuk permits issued automatically", () => {
     expect(await store().get("notifications", `umrah:permitCancelled:${p.id}`)).toMatchObject({ severity: "warning" });
   });
 
+  it("offers the Rawdah alone on a trip to Madinah without Makkah", async () => {
+    const u = user("permit-u3");
+    await store().put("users", u.id, { ...u, passwordHash: "x" });
+    const c = crit([{ city: "MED", nights: 3 }]);
+    await saveBooking(umrahBooking("permit-b3", u.id, c));
+    const [t] = await listUmrahTrips(u.id);
+    expect(t).toMatchObject({ key: "permit-b3", makkahFrom: null, umrahDate: null, route: null, madinahFrom: c.departureDate });
+    expect(t.windows.umrah).toEqual([]);
+    expect(t.windows.rawdah).toEqual([c.departureDate, addDays(c.departureDate, 1), addDays(c.departureDate, 2), addDays(c.departureDate, 3)]);
+    await expect(availableSlots(u.id, { tripKey: "permit-b3", type: "umrah", date: c.departureDate, people: 1 })).rejects.toMatchObject({ code: "invalidDate" });
+    const slot = (await availableSlots(u.id, { tripKey: "permit-b3", type: "rawdah", date: addDays(c.departureDate, 1), people: 1, group: "men" })).find((x) => x.remaining >= 1)!;
+    const p = await issuePermit(u.id, { tripKey: "permit-b3", type: "rawdah", group: "men", date: addDays(c.departureDate, 1), slotId: slot.id, applicationNos: ["1"] });
+    expect(p).toMatchObject({ type: "rawdah", status: "issued" });
+    // Reminded to book the Rawdah, never the Umrah.
+    await umrahReminders(u.id);
+    expect(await store().get("notifications", "rawdah:visas:permit-b3")).toMatchObject({ kind: "umrah" });
+    expect(await store().get("notifications", "umrah:visas:permit-b3")).toBeNull();
+  });
+
   it("lets anyone try it on the sample trip in sandbox", async () => {
     const [t] = await listUmrahTrips("permit-demo");
     expect(t).toMatchObject({ key: "demo", demo: true });
     expect(t.windows.rawdah.length).toBeGreaterThan(0);
-    const slot = (await availableSlots("permit-demo", { tripKey: "demo", type: "umrah", date: t.umrahDate, people: 1 })).find((x) => x.remaining >= 1)!;
-    await issuePermit("permit-demo", { tripKey: "demo", type: "umrah", date: t.umrahDate, slotId: slot.id, applicationNos: ["demo-1"] });
+    const slot = (await availableSlots("permit-demo", { tripKey: "demo", type: "umrah", date: t.umrahDate!, people: 1 })).find((x) => x.remaining >= 1)!;
+    await issuePermit("permit-demo", { tripKey: "demo", type: "umrah", date: t.umrahDate!, slotId: slot.id, applicationNos: ["demo-1"] });
     expect((await listCards("permit-demo"))[0].permits).toHaveLength(1);
   });
 
